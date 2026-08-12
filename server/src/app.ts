@@ -4,10 +4,19 @@ import cors from "cors";
 
 // The app is built by a factory (rather than created at import time) so that
 // Supertest can mount it without starting a real listener.
+// CLIENT_ORIGIN holds one origin or a comma-separated list, so a second Vite
+// instance on another port can be allowed without editing code.
+function allowedOrigins() {
+  return (process.env.CLIENT_ORIGIN ?? "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
 export function createApp() {
   const app = express();
 
-  app.use(cors({ origin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173" }));
+  app.use(cors({ origin: allowedOrigins() }));
   app.use(express.json());
 
   app.get("/", (_req, res) => {

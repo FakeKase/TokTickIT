@@ -10,10 +10,18 @@ export function createApp() {
   app.use(cors({ origin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173" }));
   app.use(express.json());
 
-  // Routes for the health check and the category list are added in Issues 2 and 4.
   app.get("/", (_req, res) => {
     res.json({ service: "TokTickIT API" });
   });
+
+  // Liveness probe for the frontend's [Check System] button. Deliberately does
+  // not touch the database: it answers "is the API process up?", which is a
+  // different question from "is PostgreSQL reachable?".
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", service: "TokTickIT API" });
+  });
+
+  // The category list route is added in Issue 4.
 
   return app;
 }

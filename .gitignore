@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Secrets - never commit real credentials. See server/.env.example
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Generated Prisma client
+server/src/generated/
+
+# Test output
+coverage/
+
+# Agent / AI tooling
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp

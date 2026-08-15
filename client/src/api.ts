@@ -20,3 +20,23 @@ export async function fetchHealth(): Promise<HealthResponse> {
 
   return (await response.json()) as HealthResponse
 }
+
+export interface Category {
+  id: number
+  name: string
+  description: string
+}
+
+/**
+ * Fetches the list of IT request categories. Throws on any network error or
+ * non-2xx response, so callers can treat all failures uniformly.
+ */
+export async function fetchCategories(): Promise<Category[]> {
+  const response = await fetch(`${API_URL}/api/categories`)
+
+  if (!response.ok) {
+    throw new Error(`TokTickIT API responded with ${response.status}`)
+  }
+
+  return (await response.json()) as Category[]
+}

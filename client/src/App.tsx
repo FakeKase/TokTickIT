@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { fetchHealth } from './api'
+import { fetchHealth, fetchCategories, Category } from './api'
 
 type CheckState =
   | { phase: 'idle' }
   | { phase: 'loading' }
-  | { phase: 'online'; service: string }
+  | { phase: 'online'; service: string; categories: Category[] }
   | { phase: 'offline'; message: string }
 
 function App() {
@@ -14,11 +14,10 @@ function App() {
     setCheck({ phase: 'loading' })
 
     try {
-      const health = await fetchHealth()
-      setCheck({ phase: 'online', service: health.service })
+      await fetchHealth()
+      const categories = await fetchCategories()
+      setCheck({ phase: 'online', service: 'TokTickIT API', categories })
     } catch {
-      // Network errors and non-2xx responses both mean the same thing to the
-      // user, so they share one message rather than leaking the raw error.
       setCheck({
         phase: 'offline',
         message: 'Unable to connect to TokTickIT API',
@@ -27,65 +26,86 @@ function App() {
   }
 
   return (
-    <div className="min-vh-100 bg-body-tertiary">
+    <div className="min-vh-100 bg-light d-flex flex-column">
       <nav className="navbar navbar-dark bg-success shadow-sm">
         <div className="container">
-          <span className="navbar-brand mb-0 h1">TokTickIT</span>
+          <span className="navbar-brand mb-0 h5">TokTickIT</span>
         </div>
       </nav>
 
-      <main className="container py-5">
-        <h1 className="h3 mb-1">TokTickIT IT Service Desk</h1>
-        <p className="text-body-secondary mb-4">
-          Check that the service is reachable before submitting a request.
-        </p>
+      <main className="flex-grow-1 py-5">
+        <div className="container">
+          <div className="mb-5">
+            <h1 className="h3 mb-1">IT Service Desk</h1>
+            <p className="text-muted small mb-4">
+              Submit a request by selecting your issue category
+            </p>
 
-        <div className="card shadow-sm">
-          <div className="card-body p-4">
-            <button
-              type="button"
-              className="btn btn-success px-4"
-              onClick={handleCheckSystem}
-              disabled={check.phase === 'loading'}
-            >
-              {check.phase === 'loading' ? (
-                <>
-                  <span
-                    className="spinner-border spinner-border-sm me-2"
-                    aria-hidden="true"
-                  />
-                  Checking…
-                </>
-              ) : (
-                'Check System'
-              )}
-            </button>
-
-            <div className="mt-4" aria-live="polite">
-              {check.phase === 'loading' && (
-                <p className="text-body-secondary mb-0">Loading…</p>
-              )}
+            <div className="d-flex gap-2 align-items-center">
+              <button
+                type="button"
+                className="btn btn-sm btn-success"
+                onClick={handleCheckSystem}
+                disabled={check.phase === 'loading'}
+              >
+                {check.phase === 'loading' ? (
+                  <>
+                    <span
+                      className="spinner-border spinner-border-sm me-2"
+                      aria-hidden="true"
+                    />
+                    Checking…
+                  </>
+                ) : (
+                  'Check System'
+                )}
+              </button>
 
               {check.phase === 'online' && (
-                <p className="mb-0">
-                  <span className="me-2">System Status:</span>
-                  <span className="badge text-bg-success">Online</span>
-                </p>
+                <span className="badge bg-success small">Online</span>
               )}
-
               {check.phase === 'offline' && (
-                <>
-                  <p className="mb-2">
-                    <span className="me-2">System Status:</span>
-                    <span className="badge text-bg-danger">Offline</span>
-                  </p>
-                  <div className="alert alert-danger mb-0" role="alert">
-                    {check.message}
-                  </div>
-                </>
+                <span className="badge bg-danger small">Offline</span>
               )}
             </div>
           </div>
+
+          {check.phase === 'offline' && (
+            <div className="alert alert-danger small mb-0" role="alert">
+              {check.message}
+            </div>
+          )}
+
+          {check.phase === 'online' && (
+            <div className="row g-3">
+              {check.categories.map((category) => (
+                <div key={category.id} className="col-md-6 col-lg-3">
+                  <div className="card h-100 border-0 bg-white shadow-sm">
+                    <div className="card-body d-flex flex-column">
+                      <h6 className="card-title fw-600 mb-2 text-success">
+                        {category.name}
+                      </h6>
+                      <p className="card-text small text-muted flex-grow-1 mb-3">
+                        {category.description}
+                      </p>
+                      <button className="btn btn-sm btn-outline-success">
+                        Submit
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {check.phase === 'loading' && (
+            <div className="text-center text-muted py-5">
+              <div className="spinner-border spinner-border-sm mb-3" role="status">
+                <span className="visually-hidden">Loading…</span>
+              </div>
+              <p className="small">Loading categories…</p>
+            </div>
+          )}
         </div>
       </main>
     </div>

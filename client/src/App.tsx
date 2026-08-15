@@ -1,5 +1,8 @@
 import { useState } from 'react'
-import { fetchHealth, fetchCategories, Category } from './api'
+import type { Category } from './api'
+import { fetchHealth, fetchCategories } from './api'
+import sunIcon from './assets/sun.png'
+import moonIcon from './assets/moon.png'
 
 type CheckState =
   | { phase: 'idle' }
@@ -7,8 +10,11 @@ type CheckState =
   | { phase: 'online'; service: string; categories: Category[] }
   | { phase: 'offline'; message: string }
 
+type Theme = 'light' | 'dark'
+
 function App() {
   const [check, setCheck] = useState<CheckState>({ phase: 'idle' })
+  const [theme, setTheme] = useState<Theme>('light')
 
   async function handleCheckSystem() {
     setCheck({ phase: 'loading' })
@@ -25,89 +31,288 @@ function App() {
     }
   }
 
+  const isDark = theme === 'dark'
+  const bgColor = isDark ? '#1a1a1a' : '#f8f9fa'
+  const textColor = isDark ? '#ffffff' : '#000000'
+  const cardBg = isDark ? '#2d2d2d' : '#ffffff'
+  const headerBg = isDark ? '#0d0d0d' : '#ffffff'
+  const secondaryText = isDark ? '#b0b0b0' : '#666666'
+  const borderColor = isDark ? '#404040' : '#e9ecef'
+
   return (
-    <div className="min-vh-100 bg-light d-flex flex-column">
-      <nav className="navbar navbar-dark bg-success shadow-sm">
-        <div className="container">
-          <span className="navbar-brand mb-0 h5">TokTickIT</span>
+    <div
+      style={{
+        height: '100vh',
+        width: '100vw',
+        backgroundColor: bgColor,
+        color: textColor,
+        transition: 'all 0.3s ease',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        margin: 0,
+        padding: 0,
+      }}
+    >
+      {/* Header */}
+      <header
+        style={{
+          backgroundColor: headerBg,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '2rem 3rem',
+          flexShrink: 0,
+          width: '100%',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div>
+          <h1 style={{ fontSize: '2.5rem', fontWeight: '700', margin: '0', color: textColor }}>
+            TokTickIT
+          </h1>
         </div>
-      </nav>
 
-      <main className="flex-grow-1 py-5">
-        <div className="container">
-          <div className="mb-5">
-            <h1 className="h3 mb-1">IT Service Desk</h1>
-            <p className="text-muted small mb-4">
-              Submit a request by selecting your issue category
-            </p>
+        <button
+          onClick={() => setTheme(isDark ? 'light' : 'dark')}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '50px',
+            height: '50px',
+            borderRadius: '8px',
+            backgroundColor: isDark ? '#333' : '#f0f0f0',
+            transition: 'all 0.3s ease',
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = isDark ? '#404040' : '#e0e0e0'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = isDark ? '#333' : '#f0f0f0'
+          }}
+          title={isDark ? 'Light Mode' : 'Dark Mode'}
+        >
+          <img
+            src={isDark ? sunIcon : moonIcon}
+            alt={isDark ? 'Light Mode' : 'Dark Mode'}
+            style={{
+              width: '24px',
+              height: '24px',
+              filter: isDark ? 'invert(1) brightness(0.9)' : 'none',
+            }}
+          />
+        </button>
+      </header>
 
-            <div className="d-flex gap-2 align-items-center">
-              <button
-                type="button"
-                className="btn btn-sm btn-success"
-                onClick={handleCheckSystem}
-                disabled={check.phase === 'loading'}
+      {/* Main Content */}
+      <main
+        style={{
+          flex: 1,
+          width: '100%',
+          padding: '3rem 3rem',
+          boxSizing: 'border-box',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}
+      >
+        {/* Control Section */}
+        <div style={{ marginBottom: '3rem' }}>
+          <h2
+            style={{
+              fontSize: '2rem',
+              fontWeight: '700',
+              marginBottom: '0.5rem',
+              color: textColor,
+            }}
+          >
+            What can we help you with?
+          </h2>
+          <p style={{ fontSize: '1.1rem', color: secondaryText, marginBottom: '2rem' }}>
+            Select a category below to submit your request
+          </p>
+
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={handleCheckSystem}
+              disabled={check.phase === 'loading'}
+              style={{
+                padding: '0.75rem 1.5rem',
+                fontSize: '1rem',
+                fontWeight: '600',
+                border: 'none',
+                borderRadius: '8px',
+                backgroundColor: '#198754',
+                color: 'white',
+                cursor: check.phase === 'loading' ? 'not-allowed' : 'pointer',
+                opacity: check.phase === 'loading' ? 0.7 : 1,
+              }}
+            >
+              {check.phase === 'loading' ? 'Checking…' : 'Check System'}
+            </button>
+
+            {check.phase === 'online' && (
+              <span
+                style={{
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  backgroundColor: '#d1e7dd',
+                  color: '#0f5132',
+                  borderRadius: '20px',
+                }}
               >
-                {check.phase === 'loading' ? (
-                  <>
-                    <span
-                      className="spinner-border spinner-border-sm me-2"
-                      aria-hidden="true"
-                    />
-                    Checking…
-                  </>
-                ) : (
-                  'Check System'
-                )}
-              </button>
-
-              {check.phase === 'online' && (
-                <span className="badge bg-success small">Online</span>
-              )}
-              {check.phase === 'offline' && (
-                <span className="badge bg-danger small">Offline</span>
-              )}
-            </div>
+                Online
+              </span>
+            )}
+            {check.phase === 'offline' && (
+              <span
+                style={{
+                  padding: '0.5rem 1rem',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  backgroundColor: '#f8d7da',
+                  color: '#842029',
+                  borderRadius: '20px',
+                }}
+              >
+                Offline
+              </span>
+            )}
           </div>
-
-          {check.phase === 'offline' && (
-            <div className="alert alert-danger small mb-0" role="alert">
-              {check.message}
-            </div>
-          )}
-
-          {check.phase === 'online' && (
-            <div className="row g-3">
-              {check.categories.map((category) => (
-                <div key={category.id} className="col-md-6 col-lg-3">
-                  <div className="card h-100 border-0 bg-white shadow-sm">
-                    <div className="card-body d-flex flex-column">
-                      <h6 className="card-title fw-600 mb-2 text-success">
-                        {category.name}
-                      </h6>
-                      <p className="card-text small text-muted flex-grow-1 mb-3">
-                        {category.description}
-                      </p>
-                      <button className="btn btn-sm btn-outline-success">
-                        Submit
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {check.phase === 'loading' && (
-            <div className="text-center text-muted py-5">
-              <div className="spinner-border spinner-border-sm mb-3" role="status">
-                <span className="visually-hidden">Loading…</span>
-              </div>
-              <p className="small">Loading categories…</p>
-            </div>
-          )}
         </div>
+
+        {/* Error State */}
+        {check.phase === 'offline' && (
+          <div
+            role="alert"
+            style={{
+              padding: '1.5rem',
+              backgroundColor: isDark ? '#3d2e2e' : '#f8d7da',
+              border: `1px solid ${isDark ? '#5a4242' : '#f5c2c7'}`,
+              borderRadius: '12px',
+              color: isDark ? '#f5a5a5' : '#842029',
+              fontSize: '1rem',
+              marginBottom: '2rem',
+            }}
+          >
+            <strong>Connection Error</strong>
+            <p style={{ margin: '0.5rem 0 0 0' }}>{check.message}</p>
+          </div>
+        )}
+
+        {/* Categories Grid */}
+        {check.phase === 'online' && (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '2rem',
+            }}
+          >
+            {check.categories.map((category) => (
+              <div
+                key={category.id}
+                style={{
+                  backgroundColor: cardBg,
+                  borderRadius: '12px',
+                  padding: '2rem',
+                  border: `1px solid ${borderColor}`,
+                  boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = isDark ? '0 8px 16px rgba(0,0,0,0.5)' : '0 8px 16px rgba(0,0,0,0.12)'
+                  e.currentTarget.style.transform = 'translateY(-4px)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: '1.5rem',
+                    fontWeight: '700',
+                    marginBottom: '0.5rem',
+                    color: '#198754',
+                  }}
+                >
+                  {category.name}
+                </h3>
+                <p
+                  style={{
+                    fontSize: '1rem',
+                    color: secondaryText,
+                    flex: 1,
+                    marginBottom: '1.5rem',
+                    lineHeight: '1.5',
+                  }}
+                >
+                  {category.description}
+                </p>
+                <button
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    border: '2px solid #198754',
+                    borderRadius: '8px',
+                    backgroundColor: 'white',
+                    color: '#198754',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#198754'
+                    e.currentTarget.style.color = 'white'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white'
+                    e.currentTarget.style.color = '#198754'
+                  }}
+                >
+                  Submit Request →
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Loading State */}
+        {check.phase === 'loading' && (
+          <div style={{ textAlign: 'center', paddingTop: '3rem' }}>
+            <div
+              style={{
+                display: 'inline-block',
+                width: '40px',
+                height: '40px',
+                border: `4px solid ${isDark ? '#404040' : '#e9ecef'}`,
+                borderTop: '4px solid #198754',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                marginBottom: '1rem',
+              }}
+            />
+            <p style={{ fontSize: '1.1rem', color: secondaryText }}>Loading categories…</p>
+          </div>
+        )}
       </main>
+
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }

@@ -8,7 +8,7 @@ describe('UI-01 TokTickIT heading', () => {
     render(<App />)
 
     expect(
-      screen.getByRole('heading', { name: /IT Service Desk/i }),
+      screen.getByRole('heading', { name: /What can we help you with/i }),
     ).toBeInTheDocument()
   })
 

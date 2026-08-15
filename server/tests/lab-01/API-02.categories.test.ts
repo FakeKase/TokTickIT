@@ -22,10 +22,10 @@ describe("API-02 GET /api/categories", () => {
 
     expect(response.body).toHaveLength(4);
     expect(response.body.map((c: any) => c.name)).toEqual([
+      "Account and Access",
       "Hardware",
       "Software",
       "Network",
-      "Other",
     ]);
   });
 

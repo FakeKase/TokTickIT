@@ -6,19 +6,17 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
 const prisma = new PrismaClient({ adapter })
 
 async function main() {
+  await prisma.category.deleteMany({})
+
   const categories = [
+    { name: 'Account and Access', description: 'Login, password, permissions, and account management' },
     { name: 'Hardware', description: 'Computer, printer, monitor, and other equipment issues' },
     { name: 'Software', description: 'Application, license, and installation problems' },
     { name: 'Network', description: 'Internet, VPN, WiFi, and connectivity issues' },
-    { name: 'Other', description: 'Everything else' },
   ]
 
   for (const cat of categories) {
-    await prisma.category.upsert({
-      where: { name: cat.name },
-      update: cat,
-      create: cat,
-    })
+    await prisma.category.create({ data: cat })
   }
 
   console.log('Seeded 4 categories')

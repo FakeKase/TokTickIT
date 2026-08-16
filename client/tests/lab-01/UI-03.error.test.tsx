@@ -43,8 +43,14 @@ describe('UI-03 API failure', () => {
   })
 
   it('reports Online when the API answers', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    // First fetch is health check, second is categories
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       Response.json({ status: 'ok', service: 'TokTickIT API' }),
+    )
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      Response.json([
+        { id: 1, name: 'Hardware', description: 'Hardware issues' },
+      ]),
     )
     const user = userEvent.setup()
 

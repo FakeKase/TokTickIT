@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { createPrismaClient } from "./prisma.js";
 
 // The app is built by a factory (rather than created at import time) so that
 // Supertest can mount it without starting a real listener.
@@ -13,7 +14,7 @@ function allowedOrigins() {
     .filter(Boolean);
 }
 
-export function createApp() {
+export function createApp(prisma = createPrismaClient()) {
   const app = express();
 
   app.use(cors({ origin: allowedOrigins() }));
@@ -30,7 +31,12 @@ export function createApp() {
     res.json({ status: "ok", service: "TokTickIT API" });
   });
 
-  // The category list route is added in Issue 4.
+  app.get("/api/categories", async (_req, res) => {
+    const categories = await prisma.category.findMany({
+      orderBy: { id: "asc" },
+    });
+    res.json(categories);
+  });
 
   return app;
 }

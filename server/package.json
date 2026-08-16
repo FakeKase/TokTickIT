@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "db:check": "tsx src/scripts/db-check.ts",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "db:seed": "tsx prisma/seed.ts"
   },
   "keywords": [],
   "author": "",

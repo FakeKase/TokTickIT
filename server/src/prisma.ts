@@ -15,3 +15,9 @@ const adapter = new PrismaPg({ connectionString });
 // A single shared client. Prisma opens a connection pool per instance, so
 // creating one per request would exhaust PostgreSQL connections.
 export const prisma = new PrismaClient({ adapter });
+
+// Factory for creating new instances (useful in tests to avoid shared state).
+export function createPrismaClient() {
+  const newAdapter = new PrismaPg({ connectionString: connectionString! });
+  return new PrismaClient({ adapter: newAdapter });
+}

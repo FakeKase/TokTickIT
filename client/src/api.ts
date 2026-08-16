@@ -7,10 +7,12 @@ export interface HealthResponse {
   service: string
 }
 
-/**
- * Asks the API whether it is up. Throws on any non-2xx response or network
- * failure so callers can treat both the same way: the backend is unreachable.
- */
+export interface Category {
+  id: number
+  name: string
+  description: string
+}
+
 export async function fetchHealth(): Promise<HealthResponse> {
   const response = await fetch(`${API_URL}/api/health`)
 
@@ -19,4 +21,14 @@ export async function fetchHealth(): Promise<HealthResponse> {
   }
 
   return (await response.json()) as HealthResponse
+}
+
+export async function fetchCategories(): Promise<Category[]> {
+  const response = await fetch(`${API_URL}/api/categories`)
+
+  if (!response.ok) {
+    throw new Error(`TokTickIT API responded with ${response.status}`)
+  }
+
+  return (await response.json()) as Category[]
 }

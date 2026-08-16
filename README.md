@@ -122,9 +122,29 @@ npm run db:check      # confirms PostgreSQL is reachable through Prisma
 
 ## Running the tests
 
+Both suites need PostgreSQL running and migrated first, since `API-02.categories.test.ts`
+queries the real database rather than mocking it.
+
 ```bash
-cd server && npm test    # Supertest API tests
-cd client && npm test    # Vitest UI tests
+# One-time setup, from server/
+npx prisma migrate deploy   # creates the Category table
+npx tsx prisma/seed.ts      # inserts the four categories
+
+# Run the suites
+cd server && npm test       # Supertest API tests
+cd client && npm test       # Vitest UI tests
+```
+
+Expected output:
+
+```
+$ cd server && npm test
+ Test Files  3 passed (3)
+      Tests  8 passed (8)
+
+$ cd client && npm test
+ Test Files  3 passed (3)
+      Tests  9 passed (9)
 ```
 
 Test files live in `server/tests/lab-01/` and `client/tests/lab-01/`.

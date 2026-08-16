@@ -25,9 +25,9 @@ cd client && npm test    # UI tests
 | --- | --- | --- | --- | --- |
 | `server/tests/lab-01/API-00.smoke.test.ts` | Supertest | Express app mounts and serves the service name | 1 | ✅ |
 | `server/tests/lab-01/API-01.health.test.ts` | Supertest | Health endpoint returns 200 and expected JSON | 2 | ✅ |
-| `server/tests/lab-01/API-02.categories.test.ts` | Supertest | Categories endpoint returns the four seeded categories | 4 | planned |
+| `server/tests/lab-01/API-02.categories.test.ts` | Supertest | Categories endpoint returns the four seeded categories | 4 | ✅ |
 | `client/tests/lab-01/UI-01.heading.test.tsx` | Vitest | TokTickIT heading renders | 2 | ✅ |
-| `client/tests/lab-01/UI-02.loading.test.tsx` | Vitest | Loading state changes to category list | 4 | planned |
+| `client/tests/lab-01/UI-02.categories.test.tsx` | Vitest | Loading state changes to category list | 4 | ✅ |
 | `client/tests/lab-01/UI-03.error.test.tsx` | Vitest | API failure displays a useful error message | 2 | ✅ |
 
 API-00 is a foundation smoke test added in Issue 1 to prove the Supertest toolchain is
@@ -42,16 +42,14 @@ removed in Issue 2 once UI-01 covered the same assertion for real.
 
 ## Results
 
-Latest run on `feature/2-health-check`:
+All four Issues are merged into `lab1-staging` and all required tests pass:
 
 ```
 $ cd server && npm test
- Test Files  2 passed (2)
-      Tests  4 passed (4)
+ Test Files  3 passed (3)
+      Tests  8 passed (8)
 
 $ cd client && npm test
- Test Files  2 passed (2)
-      Tests  5 passed (5)
+ Test Files  3 passed (3)
+      Tests  9 passed (9)
 ```
-
-_Final evidence from `main` is added once all four issues are merged._

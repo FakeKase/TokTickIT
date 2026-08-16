@@ -27,55 +27,19 @@ be short and still land correctly. Prompts such as `เอาเลย Phase 0` 
 plan they refer to was already reviewed and approved by me — the shared context carries the
 detail that a one-shot prompt would otherwise have to spell out.
 
-The prompts below are reproduced exactly as typed, in the mix of Thai and English I actually
-used. The full unedited record of all thirteen prompts is in [`prompt-log.md`](prompt-log.md).
 
 ## Selected key prompts
 
-| # | Prompt Name | Actual Prompt Text | What it produced |
+| # | Prompt Name | Actual Prompt Text | My Reflection |
 | --- | --- | --- | --- |
-| 1 | Specify Lab 1 from the source document | `อ่าน labSheet แล้วช่วยเช็คหน่อยว่าต้องทำอะไรบ้าง วางแผนมาให้หน่อย`<br><br>*"Read the labSheet, check what needs to be done, and plan it out for me."* | Four-issue dependency graph, phase plan, and an environment audit that found three missing prerequisites before any code was written. |
-| 2 | Define version-control hygiene | `add .agents and .claude and other if necessary to gitignore` | Root `.gitignore`. The open-ended clause produced OS and editor entries I had not considered; the agent declined to guess build-artifact entries for a stack that did not exist yet. |
-| 3 | Execute the environment and workflow setup | `เอาเลย Phase 0`<br><br>*"Go ahead with Phase 0."* | PostgreSQL 17 installed, `toktickit_dev` created, GitHub CLI installed, `lab1-staging` pushed, Project board created with the six required statuses, four Issues filed in Backlog. |
-| 4 | Register the peer reviewer and correct the repository name | `เปลี่ยนชื่อ แล้วก็คู่คือ Jakkaphat Chalermphanaphan ID: 67070501056`<br><br>*"Rename it. My partner is Jakkaphat Chalermphanaphan, ID 67070501056."* | Repository renamed `TocktikIT` → `TokTickIT`, remote URL updated, `reviewer.md` scaffolded. The agent flagged that the GitHub username was still missing rather than inventing one. |
-| 5 | Build the project foundation with a full prompt audit trail | `ทำเลย username: gxjakkap ฝากจดหน่อยทุกพรอมท์เลย ถ้ามี subagent ฝากเก็บพรอมท์ที่ตัว manager สั่งด้วย`<br><br>*"Go ahead. Username: gxjakkap. Record every prompt. If subagents are used, capture the prompts the manager gives them too."* | Issue 1 implemented end to end: both workspaces, Prisma, tests, README, and PR #5. `prompt-log.md` was written during the work rather than reconstructed afterwards. |
-| 6 | Challenge scope before accepting work | `คือตอนนี้มันยังไม่จำเป็นต้องทำใช่มั้ย มีจุดไหนที่ได้แก้ UI อยู่แล้วมั้ย`<br><br>*"It isn't necessary yet, right? Is there a point where the UI gets changed anyway?"* | Cancelled a UI task I had asked for one message earlier, after confirming Issues 2 and 4 already require rewriting the same components. |
-| 7 | Benchmark against a peer implementation | `ช่วยเช็คอันนี้หน่อย ทำให้เป็นแบบคล้าย ๆ กันแต่ไม่ต้องเหมือนมาก`<br><br>*"Check this repo and make mine similar, but it doesn't have to match closely."* | Reviewed @gxjakkap's branch. Adopted his `docker-compose.yaml` and `client/.env.example`; deliberately kept my own `tests/lab-01/` layout and `tests.md`, with reasons recorded. |
-| 8 | Enforce sole authorship on commits | `คือมีแค่ไม่อยากให้ขึ้น claude เฉย ๆ`<br><br>*"I just don't want claude showing up, that's all."* | Removed the `Co-Authored-By: Claude` trailer and rewrote the commit so the individual sprint shows a single author. AI use is disclosed here instead. |
+| 1 | Specify Lab 1 from the source document | `Read the labSheet, check what needs to be done, and plan it out for me` | Planning before start any project is crucial, it helps me to understand the big picture of the project and know the flow of how to get the work done. |
+| 2 | Define version-control hygiene | `add .agents and .claude and other if necessary to gitignore` | Claude added entries for AI-agent tool folders (`.agents/`, `.claude/`) alongside the usual OS/editor ones. These are local to my machine and not part of the project itself, so keeping them out of the repo was the right call. |
+| 3 | Execute the environment and workflow setup | `Start phase 0` | After I understand the procedure, I told claude to start the 'setting-up' phase to make sure everything is ready for the project |
+| 4 | Challenge scope before accepting work | `Is there a point where the UI gets changed?` | I don't like the style of the UI claude gave me, so I ask it to check the labsheet to see if there is any part where I can change the UI |
+| 5 | Verify criteria manually | `How can I check Acceptance criteria for this issue manually?` | When claude finishes implementing each issue, I always ask it to explain the criteria, so I can check them manually in case Claude was hallucinating. |
+| 6 | Debug a CORS/port mismatch | `Why is the website now just a blank page, can you help me check what's wrong` | I found the bug where the client site became a blank page, so I ask Claude to check for any bugs. And I found that the API path is mismatched the API is 3002 but the client was looking at 3001 |
 
-## Reflection
+## Overall Reflection
 
-**What worked.**
+Early on, I noticed I was trusting whatever Claude told me was "done" without actually checking it myself, and I wasn't learning anything from the process. Once I noticed that, I started asking Claude to explain how the project actually works and how to debug things manually, and to walk me through diagnosing an error before jumping to a fix. The biggest improvement over the sprint came from that shift: checking the code manually instead of trusting a "done" claim outright, which forced every acceptance criterion to be verified against the running app rather than just against Claude's own report.
 
-**What I had to correct.**
-
-**What I would do differently.**
-
-**On responsibility.**
-
----
-
-## Working notes (delete before submission)
-
-Raw material for the reflection sections above. Facts from the session, not conclusions.
-
-- Separating *plan* from *build* was the highest-leverage decision. The plan prompt cost one
-  message and prevented a wasted afternoon on a machine with no database.
-- Two problems appeared that the lab sheet does not mention, and were only found because the
-  agent ran the code rather than just writing it:
-  - Prisma 7 no longer reads `DATABASE_URL` itself. `new PrismaClient()` throws
-    `PrismaClientInitializationError`; it requires an explicit `@prisma/adapter-pg` driver
-    adapter passed to the constructor.
-  - `prisma init` wrote several hundred unrelated agent-skill files into `server/`.
-- Two ambiguities in the lab sheet were resolved by assumption rather than by asking a TA:
-  - Section 8 places `tests/lab-01/` under `server/`, but three of the five required tests are
-    React tests needing jsdom. Split across both workspaces, documented in [`tests.md`](tests.md).
-  - `docs/lab-01/tests.md` is required by the Part 2 grading table but absent from the
-    structure diagram in section 8.
-- Reviewing @gxjakkap's PR taught me something the lab sheet does not state: I approved his PR
-  while simultaneously writing that one acceptance criterion had failed. Approve and "this does
-  not pass" are contradictory signals, and approving early removes the partner's reason to
-  respond — which the grading rubric explicitly asks for.
-- The agent twice declined to act without confirmation: before renaming the repository and
-  before inviting a collaborator. Both were the right call; both were outward-facing and hard
-  to reverse.

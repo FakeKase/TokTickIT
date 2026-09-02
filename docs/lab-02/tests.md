@@ -18,7 +18,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | UNIT-01 | Unit | BR-01, AC-01 | Ticket Number format/uniqueness helper | Returns `TKT-{year}-{6-digit id}`, unique per id | `server/tests/lab-02/ticket-number.unit.test.ts` | Pending |
-| API-01 | API | AC-01 | Create valid ticket | `201`; ticket saved; number returned | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
+| API-01 | API | AC-01, BR-02 | Create valid ticket | `201`; ticket saved; number returned; `currentStatus` is `NEW` even if a client-supplied `currentStatus` is present in the request body | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
 | API-02 | API | AC-04, BR-15 | Create ticket missing Category/RelatedSystem/Priority | `400` with per-field messages; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
 | API-03 | API | AC-05, BR-13 | Summary below 5 chars | `400`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
 | API-04 | API | BR-04, BR-15 | `requesterId` inactive or unknown | `404`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
@@ -37,6 +37,15 @@ E2E/visual tests use Playwright against a running dev stack.
 | API-17 | API | AC-20, BR-23 | Soft-remove with reason | `200`; `isRemoved: true`, metadata retained | `server/tests/lab-02/attachments.api.test.ts` | Pending |
 | API-18 | API | BR-04 | Inactive requester excluded | `GET /api/requesters` omits inactive seed row | `server/tests/lab-02/requesters.api.test.ts` | Pending |
 | API-19 | API | FR-14 | Reference data endpoints | Categories + related systems return seeded rows | `server/tests/lab-02/reference-data.api.test.ts` | Pending |
+| API-20 | API | AC-27, BR-14 | Description below 10 chars and above 2000 chars | `400` in both cases; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
+| API-21 | API | AC-28, BR-13 | Summary above 120 chars | `400`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
+| API-22 | API | AC-29, BR-15 | Unrecognized `categoryId`/`relatedSystemId` (valid shape, no matching row) | `404`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
+| API-23 | API | AC-30, BR-10/FR-06 | Filter My Tickets by Category and Requested Priority combined with `search` | Only tickets matching all three criteria returned | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
+| API-24 | API | AC-31, BR-11 | List tickets with no `sortBy`/`sortDir` supplied | Default order: Created Date desc, id desc tie-break | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
+| API-25 | API | AC-32, BR-12 | Out-of-range `page` (e.g. `0`, `-1`) and oversized `pageSize` (e.g. `500`) | Values clamped to nearest valid bound, not rejected | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
+| API-26 | API | AC-33, BR-09 | Search term matching an existing ticket's Number or Summary | Only the matching, owned ticket(s) returned | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
+| API-27 | API | AC-34, BR-08/BR-25 | Requester B requests Requester A's Attachment metadata, download, and removal | `404` on all three, identical to a nonexistent attachment | `server/tests/lab-02/attachments.api.test.ts` | Pending |
+| API-28 | API | AC-35, BR-22 | Ticket created successfully, then its attachment upload fails (e.g. oversized/invalid file) | Ticket still exists and is fetchable; failed file not attached; retry succeeds from Ticket Detail | `server/tests/lab-02/attachments.api.test.ts` | Pending |
 | UI-01 | UI | BR-04 | Selector lists only active requesters | Inactive seed row never rendered | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
 | UI-02 | UI | AC-23 | Selector empty state | Safe empty message; no selectable dropdown | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
 | UI-03 | UI | AC-24 | Selector API failure | Failure state + retry; no crash | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
@@ -47,7 +56,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | UI-08 | UI | AC-08, AC-09 | Invalid attachment selection | Inline rejection message; file not queued | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
 | UI-09 | UI | AC-01 | Successful submission | Confirmation card shows generated Ticket Number | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
 | UI-10 | UI | AC-13, AC-14, BR-28 | Empty vs. No-Results | Distinct copy/actions for each zero-result case | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| UI-11 | UI | AC-12, BR-05 | Switching requester | List reloads to the new requester's own tickets | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
+| UI-11 | UI | AC-12, BR-05 | Switching requester | List reloads to the new requester's own tickets; an in-progress Create Ticket draft is discarded on switch | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
 | UI-12 | UI | AC-17 | Ticket Detail header | All fields render read-only, no editable controls | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
 | UI-13 | UI | AC-18, AC-20 | Attachment add/remove controls | New attachment appears without reload; removed shows badge, no Download | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
 | UI-14 | UI | AC-26 | Keyboard focus | Visible focus ring on every Create Ticket control incl. Requester field | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
@@ -86,6 +95,15 @@ E2E/visual tests use Playwright against a running dev stack.
 | AC-24 | UI-03 |
 | AC-25 | RESP-01 |
 | AC-26 | UI-14 |
+| AC-27 | API-20 |
+| AC-28 | API-21 |
+| AC-29 | API-22 |
+| AC-30 | API-23 |
+| AC-31 | API-24 |
+| AC-32 | API-25 |
+| AC-33 | API-26 |
+| AC-34 | API-27 |
+| AC-35 | API-28 |
 
 ## 4. Responsive and Visual Checklist
 

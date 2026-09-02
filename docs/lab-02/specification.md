@@ -149,6 +149,15 @@ See `docs/lab-02/api-spec.md` for the full endpoint-by-endpoint contract.
 | AC-24 | Given the Requester API call fails on Selector load, then a safe failure state with a retry option is shown. |
 | AC-25 | Given a mobile viewport (<768px), when Create Ticket, My Tickets, or Ticket Detail render, then no control is clipped and the page does not scroll horizontally. |
 | AC-26 | Given a keyboard-only user tabs through Create Ticket, then a visible focus indicator appears on every interactive control, including the Requester dropdown. |
+| AC-27 | Given a Ticket Description shorter than 10 characters or longer than 2000 characters after trimming, when submitted, then a validation message states the allowed range and the Ticket is not created. |
+| AC-28 | Given a Ticket Summary longer than 120 characters after trimming, when submitted, then a validation message states the maximum length and the Ticket is not created. |
+| AC-29 | Given a `categoryId` or `relatedSystemId` that does not match an active reference row, when Create Ticket is submitted, then the request is rejected and no Ticket is created. |
+| AC-30 | Given Category and Requested Priority filters are both applied together with a search term, when My Tickets loads, then only Tickets matching all three criteria are returned. |
+| AC-31 | Given no `sortBy` is supplied, when My Tickets loads, then results are ordered by Created Date descending with id descending as the tie-break. |
+| AC-32 | Given an out-of-range or non-numeric `page` or `pageSize` value, when My Tickets loads, then the value is clamped to the nearest valid bound rather than rejected. |
+| AC-33 | Given a search term that matches an existing Ticket's Number or Summary, when the search runs, then only the matching Ticket(s) owned by the selected Requester are returned. |
+| AC-34 | Given Requester B requests an Attachment's metadata, download, or removal where the Attachment belongs to a Ticket owned by Requester A, then the server returns 404, identical to a nonexistent Attachment. |
+| AC-35 | Given a Ticket is created successfully but the accompanying attachment upload fails, then the Ticket remains saved and valid, the failure is reported, and the Requester can retry the upload from Ticket Detail. |
 
 ## 10. Definition of Done
 

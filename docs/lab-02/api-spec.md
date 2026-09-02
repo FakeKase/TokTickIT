@@ -77,7 +77,6 @@ List the selected Requester's own Tickets (BR-06/BR-07/BR-09..12).
 | `search` | string | — | matches `ticketNumber` or `summary`, case-insensitive contains |
 | `categoryId` | int | — | filter |
 | `requestedPriority` | `LOW\|MEDIUM\|HIGH` | — | filter |
-| `status` | ticket status enum | — | filter |
 | `sortBy` | `createdAt\|ticketNumber\|requestedPriority\|currentStatus` | `createdAt` | invalid value falls back to default |
 | `sortDir` | `asc\|desc` | `desc` | invalid value falls back to default |
 | `page` | int | `1` | clamped to ≥1 (BR-12) |

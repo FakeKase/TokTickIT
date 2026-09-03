@@ -1,0 +1,140 @@
+.ttk-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.ttk-shell__header {
+  background: var(--zg-primary);
+  flex-shrink: 0;
+}
+
+.ttk-shell__header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 64px;
+  padding: 0 var(--zg-space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--zg-space-6);
+}
+
+.ttk-shell__wordmark {
+  color: #ffffff;
+  font-size: var(--zg-font-size-heading-lg);
+  font-weight: var(--zg-font-weight-heading);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ttk-shell__nav {
+  display: flex;
+  gap: var(--zg-space-6);
+  flex: 1;
+}
+
+.ttk-shell__nav-link {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-weight: 600;
+  padding: var(--zg-space-2) 0;
+  border-bottom: 2px solid transparent;
+}
+
+.ttk-shell__nav-link:hover {
+  color: #ffffff;
+}
+
+.ttk-shell__nav-link--active {
+  color: #ffffff;
+  border-bottom-color: var(--zg-secondary);
+  text-decoration: underline;
+}
+
+.ttk-shell__requester {
+  display: flex;
+  align-items: center;
+  gap: var(--zg-space-3);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.ttk-shell__requester-name {
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.ttk-shell__change-requester.ttk-btn--tertiary {
+  color: #ffffff;
+}
+
+.ttk-shell__nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.ttk-shell__nav-toggle-bar {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #ffffff;
+}
+
+.ttk-shell__main {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--zg-space-6);
+  box-sizing: border-box;
+}
+
+/* Mobile (<768px): nav collapses into a hamburger menu; header stays a fixed height (ui-spec.md §5). */
+@media (max-width: 767px) {
+  .ttk-shell__header-inner {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 64px;
+    padding: var(--zg-space-2) var(--zg-space-4);
+  }
+
+  .ttk-shell__nav-toggle {
+    display: flex;
+    margin-left: auto;
+    order: 1;
+  }
+
+  .ttk-shell__nav {
+    order: 3;
+    flex-basis: 100%;
+    flex-direction: column;
+    gap: 0;
+    display: none;
+  }
+
+  .ttk-shell__nav--open {
+    display: flex;
+    padding-bottom: var(--zg-space-2);
+  }
+
+  .ttk-shell__nav-link {
+    padding: var(--zg-space-3) 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .ttk-shell__requester {
+    order: 2;
+    margin-left: 0;
+  }
+
+  .ttk-shell__requester-name {
+    display: none;
+  }
+}

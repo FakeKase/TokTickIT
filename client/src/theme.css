@@ -1,0 +1,103 @@
+/*
+ * Zen Green design tokens (Lab 2 UI Spec §1-2).
+ * These CSS custom properties are the single source of truth for color,
+ * typography, and spacing across the app. Components should reference the
+ * `--zg-*` variables below rather than hard-coding values.
+ */
+
+:root {
+  /* Color tokens (ui-spec.md §1) */
+  --zg-primary: #006b3c;
+  --zg-secondary: #0b7a46;
+  --zg-pale: #eaf6ef;
+  --zg-bg: #f5f7f6;
+  --zg-surface: #ffffff;
+  --zg-text: #1f2e27;
+  --zg-field-editable-bg: #ffffff;
+  --zg-field-readonly-bg: #f1f0e8;
+  --zg-error: #8a1f1f;
+  --zg-warning: #b7791f;
+  --zg-success: #0b7a46;
+
+  /* Derived tints used for badges/callouts so color is never the sole signal */
+  --zg-warning-tint: #fbf1de;
+  --zg-error-tint: #f6e6e6;
+  --zg-border: #cbd5ce;
+
+  /* Typography (ui-spec.md §2) */
+  --zg-font-sans: -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --zg-font-size-base: 16px;
+  --zg-font-size-label: 14px;
+  --zg-font-weight-label: 600;
+  --zg-font-size-heading-sm: 20px;
+  --zg-font-size-heading-lg: 24px;
+  --zg-font-weight-heading: 700;
+
+  /* Spacing scale, 4px base unit (ui-spec.md §2) */
+  --zg-space-1: 4px;
+  --zg-space-2: 8px;
+  --zg-space-3: 12px;
+  --zg-space-4: 16px;
+  --zg-space-6: 24px;
+  --zg-space-8: 32px;
+
+  --zg-radius: 6px;
+  --zg-radius-lg: 12px;
+
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--zg-bg);
+  color: var(--zg-text);
+  font-family: var(--zg-font-sans);
+  font-size: var(--zg-font-size-base);
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: var(--zg-font-weight-heading);
+  margin: 0 0 var(--zg-space-2);
+  color: var(--zg-text);
+}
+
+h2 {
+  font-size: var(--zg-font-size-heading-lg);
+}
+
+h3 {
+  font-size: var(--zg-font-size-heading-sm);
+}
+
+/* Visible focus ring everywhere — never removed via outline: none (ui-spec.md §3, §9) */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--zg-secondary);
+  outline-offset: 2px;
+}
+
+.ttk-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -22,6 +22,44 @@ async function main() {
   }
 
   console.log('Seeded 4 categories')
+
+  const relatedSystems = [
+    { name: 'Email' },
+    { name: 'Campus Wi-Fi' },
+    { name: 'VPN' },
+    { name: 'LEB2 App' },
+    { name: 'Grade Submission App' },
+    { name: 'Printer' },
+    { name: 'Corporate Laptop' },
+  ]
+
+  for (const system of relatedSystems) {
+    await prisma.relatedSystem.upsert({
+      where: { name: system.name },
+      update: system,
+      create: system,
+    })
+  }
+
+  console.log(`Seeded ${relatedSystems.length} related systems`)
+
+  const requesters = [
+    { name: 'Jennifer Anderson', email: 'jennifer.anderson@toktickit.test', isActive: true },
+    { name: 'Marcus Lee', email: 'marcus.lee@toktickit.test', isActive: true },
+    { name: 'Priya Natarajan', email: 'priya.natarajan@toktickit.test', isActive: true },
+    { name: 'Somchai Charoenkul', email: 'somchai.charoenkul@toktickit.test', isActive: true },
+    { name: 'David Kim', email: 'david.kim@toktickit.test', isActive: false },
+  ]
+
+  for (const requester of requesters) {
+    await prisma.requester.upsert({
+      where: { email: requester.email },
+      update: requester,
+      create: requester,
+    })
+  }
+
+  console.log(`Seeded ${requesters.length} requesters`)
 }
 
 main()

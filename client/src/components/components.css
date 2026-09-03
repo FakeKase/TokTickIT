@@ -1,0 +1,265 @@
+/* Shared styles for the reusable Zen Green components (ui-spec.md §3-4, §7). */
+
+/* ---------- Button (§4) ---------- */
+
+.ttk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zg-space-2);
+  min-height: 44px;
+  padding: var(--zg-space-2) var(--zg-space-4);
+  font-family: inherit;
+  font-size: var(--zg-font-size-base);
+  font-weight: 600;
+  border-radius: var(--zg-radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ttk-btn--primary {
+  background: var(--zg-primary);
+  border-color: var(--zg-primary);
+  color: #ffffff;
+}
+
+.ttk-btn--primary:hover:not(:disabled) {
+  background: var(--zg-secondary);
+  border-color: var(--zg-secondary);
+}
+
+.ttk-btn--secondary {
+  background: transparent;
+  border-color: var(--zg-secondary);
+  color: var(--zg-secondary);
+}
+
+.ttk-btn--secondary:hover:not(:disabled) {
+  background: var(--zg-pale);
+}
+
+.ttk-btn--tertiary {
+  background: transparent;
+  border-color: transparent;
+  color: var(--zg-secondary);
+  text-decoration: underline;
+  padding-left: var(--zg-space-2);
+  padding-right: var(--zg-space-2);
+  min-height: auto;
+}
+
+.ttk-btn--destructive {
+  background: transparent;
+  border-color: var(--zg-error);
+  color: var(--zg-error);
+}
+
+.ttk-btn--destructive:hover:not(:disabled) {
+  background: var(--zg-error-tint);
+}
+
+.ttk-btn:disabled:not(.ttk-btn--busy) {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.ttk-btn--busy {
+  cursor: not-allowed;
+}
+
+/* ---------- Field (§3) ---------- */
+
+.ttk-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-1);
+  margin-bottom: var(--zg-space-4);
+}
+
+.ttk-field--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ttk-field--disabled .ttk-field__control {
+  pointer-events: none;
+}
+
+.ttk-field__label {
+  font-size: var(--zg-font-size-label);
+  font-weight: var(--zg-font-weight-label);
+  color: var(--zg-text);
+}
+
+.ttk-field__required {
+  color: var(--zg-error);
+}
+
+.ttk-field__hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--zg-text);
+  opacity: 0.75;
+}
+
+.ttk-field__control {
+  min-height: 44px;
+  padding: var(--zg-space-2) var(--zg-space-3);
+  font-family: inherit;
+  font-size: var(--zg-font-size-base);
+  color: var(--zg-text);
+  background: var(--zg-field-editable-bg);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius);
+}
+
+.ttk-field__control--readonly {
+  background: var(--zg-field-readonly-bg);
+}
+
+.ttk-field__control--invalid {
+  border-color: var(--zg-error);
+  color: var(--zg-error);
+}
+
+.ttk-field__error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--zg-error);
+}
+
+/* ---------- Badge (§7) ---------- */
+
+.ttk-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--zg-space-2);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.ttk-badge--neutral {
+  background: #e6e8e6;
+  color: var(--zg-text);
+}
+
+.ttk-badge--pale {
+  background: var(--zg-pale);
+  color: var(--zg-secondary);
+}
+
+.ttk-badge--warning {
+  background: var(--zg-warning-tint);
+  color: var(--zg-warning);
+}
+
+.ttk-badge--danger {
+  background: var(--zg-error-tint);
+  color: var(--zg-error);
+}
+
+/* ---------- Card (§6) ---------- */
+
+.ttk-card {
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+  box-shadow: 0 1px 3px rgba(31, 46, 39, 0.08);
+  padding: var(--zg-space-6);
+}
+
+/* ---------- LoadingSpinner ---------- */
+
+.ttk-spinner-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zg-space-2);
+}
+
+.ttk-spinner-wrap:not(.ttk-spinner-wrap--inline) {
+  flex-direction: column;
+  width: 100%;
+  padding: var(--zg-space-8) 0;
+  text-align: center;
+}
+
+.ttk-spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border: 3px solid var(--zg-border);
+  border-top-color: var(--zg-primary);
+  animation: ttk-spin 0.8s linear infinite;
+}
+
+.ttk-spinner--sm {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.ttk-spinner--md {
+  width: 32px;
+  height: 32px;
+}
+
+.ttk-spinner--lg {
+  width: 48px;
+  height: 48px;
+}
+
+.ttk-spinner-label {
+  color: var(--zg-text);
+  opacity: 0.75;
+}
+
+@keyframes ttk-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- EmptyState / ErrorState ---------- */
+
+.ttk-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--zg-space-2);
+  padding: var(--zg-space-8) var(--zg-space-4);
+  text-align: center;
+}
+
+.ttk-empty-state__title {
+  margin: 0;
+}
+
+.ttk-empty-state__message {
+  margin: 0;
+  color: var(--zg-text);
+  opacity: 0.75;
+}
+
+.ttk-error-state {
+  padding: var(--zg-space-4) var(--zg-space-6);
+  background: var(--zg-error-tint);
+  border: 1px solid var(--zg-error);
+  border-radius: var(--zg-radius);
+  color: var(--zg-error);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--zg-space-2);
+}
+
+.ttk-error-state__title {
+  display: block;
+}
+
+.ttk-error-state__message {
+  margin: 0;
+}

@@ -7,6 +7,7 @@
 .ttk-shell__header {
   background: var(--zg-primary);
   flex-shrink: 0;
+  position: relative;
 }
 
 .ttk-shell__header-inner {
@@ -96,12 +97,11 @@
   box-sizing: border-box;
 }
 
-/* Mobile (<768px): nav collapses into a hamburger menu; header stays a fixed height (ui-spec.md §5). */
+/* Mobile (<768px): nav collapses into a hamburger menu; header stays a fixed height (ui-spec.md §5).
+   The open menu is an absolutely-positioned dropdown below the header rather than an inline flex
+   item, so it never affects header-inner's box and the header height never changes on toggle. */
 @media (max-width: 767px) {
   .ttk-shell__header-inner {
-    flex-wrap: wrap;
-    height: auto;
-    min-height: 64px;
     padding: var(--zg-space-2) var(--zg-space-4);
   }
 
@@ -112,16 +112,21 @@
   }
 
   .ttk-shell__nav {
-    order: 3;
-    flex-basis: 100%;
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
     flex-direction: column;
     gap: 0;
-    display: none;
+    background: var(--zg-primary);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    z-index: 10;
   }
 
   .ttk-shell__nav--open {
     display: flex;
-    padding-bottom: var(--zg-space-2);
+    padding: 0 var(--zg-space-4) var(--zg-space-2);
   }
 
   .ttk-shell__nav-link {

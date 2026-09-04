@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useSelectedRequester } from '../requester/useSelectedRequester'
+import { ThemeToggle } from '../theme/ThemeToggle'
 import './AppShell.css'
 
 const NAV_ITEMS = [
@@ -63,6 +64,7 @@ export function AppShell() {
           </nav>
 
           <div className="ttk-shell__requester">
+            <ThemeToggle />
             <span className="ttk-shell__requester-name">
               {requester ? (
                 <>

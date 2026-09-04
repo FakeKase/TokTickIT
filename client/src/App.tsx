@@ -7,29 +7,32 @@ import { RequesterSelectionPage } from './pages/RequesterSelectionPage'
 import { TicketDetailPage } from './pages/TicketDetailPage'
 import { RequesterProvider } from './requester/RequesterProvider'
 import { RequireRequester } from './requester/RequireRequester'
+import { ThemeProvider } from './theme/ThemeProvider'
 
 function App() {
   return (
-    <RequesterProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<AppShell />}>
-            <Route index element={<CheckSystemPage />} />
-            <Route path="select-requester" element={<RequesterSelectionPage />} />
+    <ThemeProvider>
+      <RequesterProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<AppShell />}>
+              <Route index element={<CheckSystemPage />} />
+              <Route path="select-requester" element={<RequesterSelectionPage />} />
 
-            {/* Requester-scoped screens: AC-02 sends the user to the selector
-                when no Development Requester has been chosen. */}
-            <Route element={<RequireRequester />}>
-              <Route path="tickets" element={<MyTicketsPage />} />
-              <Route path="tickets/new" element={<CreateTicketPage />} />
-              <Route path="tickets/:id" element={<TicketDetailPage />} />
+              {/* Requester-scoped screens: AC-02 sends the user to the selector
+                  when no Development Requester has been chosen. */}
+              <Route element={<RequireRequester />}>
+                <Route path="tickets" element={<MyTicketsPage />} />
+                <Route path="tickets/new" element={<CreateTicketPage />} />
+                <Route path="tickets/:id" element={<TicketDetailPage />} />
+              </Route>
+
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
-
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </RequesterProvider>
+          </Routes>
+        </BrowserRouter>
+      </RequesterProvider>
+    </ThemeProvider>
   )
 }
 

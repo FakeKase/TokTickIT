@@ -22,6 +22,7 @@
   /* Derived tints used for badges/callouts so color is never the sole signal */
   --zg-warning-tint: #fbf1de;
   --zg-error-tint: #f6e6e6;
+  --zg-neutral-tint: #e6e8e6;
   --zg-border: #cbd5ce;
 
   /* Typography (ui-spec.md §2) */
@@ -47,10 +48,50 @@
   color-scheme: light;
 }
 
+/*
+ * Dark appearance (ui-spec.md §1). Only the colour tokens are redefined —
+ * typography, spacing and radii are shared — so every component follows
+ * automatically without a single theme-aware rule of its own.
+ *
+ * The theme is stamped on <html> by ThemeProvider rather than being selected
+ * with `prefers-color-scheme`, so an explicit light choice still wins on a
+ * machine whose OS is set to dark. Contrast ratios below are against the
+ * surface/background they are used on; body text is 14:1 or better on both.
+ */
+:root[data-theme='dark'] {
+  --zg-primary: #006b3c; /* unchanged: brand green, white label 6.6:1 */
+  --zg-secondary: #4cc98a; /* 8.8:1 on --zg-bg */
+  --zg-pale: #14301f;
+  --zg-bg: #101613;
+  --zg-surface: #18211c;
+  --zg-text: #e6efe9; /* 15.6:1 on --zg-bg, 14.1:1 on --zg-surface */
+  --zg-field-editable-bg: #1e2a23;
+  --zg-field-readonly-bg: #353027; /* warm, and separated from editable by the
+                                      same 1.14 step the light theme uses */
+  --zg-error: #f08a8a; /* 6.8:1 on --zg-surface */
+  --zg-warning: #e0a94a; /* 7.8:1 */
+  --zg-success: #5fd39b; /* 8.9:1 */
+
+  --zg-warning-tint: #33291a;
+  --zg-error-tint: #3a1e1e;
+  --zg-neutral-tint: #303a34; /* body text 10.1:1 */
+  --zg-border: #5c7169; /* 3.2:1 on --zg-surface */
+
+  color-scheme: dark;
+}
+
 html,
 body,
 #root {
   height: 100%;
+}
+
+/* Painted on <html> as well as <body>: index.css (Lab 1 boilerplate) still
+   carries its own prefers-color-scheme block that sets a root background, and
+   without this an explicit light theme on a dark-OS machine would show that
+   colour behind the page. */
+html {
+  background: var(--zg-bg);
 }
 
 body {

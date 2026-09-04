@@ -5,6 +5,10 @@
 Fixed by the course handout; implemented as CSS custom properties on `:root` in a shared
 `theme.css` (not left as ad-hoc inline styles like Lab 1's `App.tsx`, which this sprint replaces).
 
+The values below are the light appearance. A dark appearance redefines the same token names —
+and only the colour tokens, never typography or spacing — so no component contains a
+theme-aware rule.
+
 | Token | Value | Use |
 | --- | --- | --- |
 | `--zg-primary` | `#006B3C` | App header, primary buttons, strong emphasis |
@@ -18,6 +22,28 @@ Fixed by the course handout; implemented as CSS custom properties on `:root` in 
 | `--zg-error` | `#8A1F1F` | Error text/border |
 | `--zg-warning` | `#B7791F` | Amber warning callouts/badges only — not decoration |
 | `--zg-success` | `#0B7A46` | Success confirmation text |
+
+### 1.1 Dark Appearance
+
+Selected by `<html data-theme="dark">`, stamped by `ThemeProvider` rather than by a
+`prefers-color-scheme` media query, so an explicit light choice still wins on a dark-set OS.
+First visit follows the OS preference; after that the user's choice is remembered.
+
+| Token | Dark value | Contrast |
+| --- | --- | --- |
+| `--zg-primary` | `#006B3C` (unchanged) | White label 6.6:1 |
+| `--zg-secondary` | `#4CC98A` | 8.8:1 on `--zg-bg` |
+| `--zg-pale` | `#14301F` | Body text 12.2:1 |
+| `--zg-bg` | `#101613` | Body text 15.6:1 |
+| `--zg-surface` | `#18211C` | Body text 14.1:1 |
+| `--zg-text` | `#E6EFE9` | — |
+| `--zg-field-editable-bg` | `#1E2A23` | Body text 12.7:1 |
+| `--zg-field-readonly-bg` | `#353027` | Separated from editable by the same 1.14 step the light theme uses |
+| `--zg-error` | `#F08A8A` | 6.8:1 on `--zg-surface` |
+| `--zg-warning` | `#E0A94A` | 7.8:1 on `--zg-surface` |
+| `--zg-success` | `#5FD39B` | 8.9:1 on `--zg-surface` |
+| `--zg-neutral-tint` | `#303A34` | Body text 10.1:1 |
+| `--zg-border` | `#5C7169` | 3.2:1 on `--zg-surface` |
 
 ## 2. Typography & Spacing
 
@@ -52,7 +78,10 @@ validation message below the control.
 ## 5. Application Shell
 
 - Header: `--zg-primary` background, "TokTickIT" wordmark left, nav center (`My Tickets`,
-  `Create Ticket`), current Requester name + `Change Requester` action right.
+  `Create Ticket`), light/dark theme switch + current Requester name + `Change Requester`
+  action right.
+- Theme switch: 44px icon button; its icon and accessible name both describe the theme it
+  switches *to*, and `aria-pressed` reports whether dark is active.
 - Active nav item: underline + `--zg-secondary` text.
 - Mobile (<768px): nav collapses into a hamburger menu; header stays fixed height.
 
@@ -130,7 +159,7 @@ Badges never rely on color alone — each carries its text label.
 
 | Viewport | Behavior |
 | --- | --- |
-| Desktop ≥992px | Multi-column layout, content max-width ~1200px, centered |
+| Desktop ≥992px | Multi-column layout, content max-width 1600px, centered (raised from 1200px so wide monitors are not left with large empty gutters; still a bounded, centered measure per handout §8.7) |
 | Tablet 768–991px | Two-column where practical; Summary/Description get full available width |
 | Mobile <768px | Everything stacks vertically; buttons remain ≥44px touch targets; no horizontal page scroll |
 | All sizes | No clipped labels, overlapping messages, hidden buttons, or unreadable attachment filenames (truncate with `title` tooltip instead) |

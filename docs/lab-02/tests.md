@@ -63,6 +63,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | UI-14 | UI | AC-26 | Keyboard focus | Visible focus ring on every Create Ticket control incl. Requester field | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
 | UI-15 | UI | AC-02 | Guard on every Requester-scoped route | `/tickets`, `/tickets/new`, and `/tickets/:id` all redirect to the Selector when nothing is selected; the blocked path is resumed after Continue | `client/tests/lab-02/RequesterContext.test.tsx` | Pass |
 | UI-16 | UI | BR-03, BR-05 | Selection persistence and replacement | Selection survives a reload, switching replaces the previous Requester outright, and corrupted stored data falls back to "nothing selected" instead of crashing | `client/tests/lab-02/RequesterContext.test.tsx` | Pass |
+| UI-17 | UI | ui-spec §1.1, §5 | Light/dark theme switch | Toggles `<html data-theme>`, persists the choice, follows the OS preference until an explicit choice is made, and falls back to light when `matchMedia` is unavailable | `client/tests/lab-02/ThemeToggle.test.tsx` | Pass |
 | RESP-01 | Responsive/Visual | AC-25 | Desktop/tablet/mobile screenshots | No clipping/overlap/horizontal scroll on any of the 3 screens | `e2e/lab-02/visual-regression.spec.ts` | Pending |
 | RESP-02 | Responsive/Visual | ui-spec §7 | Badge consistency | Priority/status badges render identically across My Tickets and Ticket Detail | `e2e/lab-02/visual-regression.spec.ts` | Pending |
 | E2E-01 | E2E | AC-01, AC-11, AC-17, AC-18, AC-20 | Full requester flow | Select requester → create ticket → find it in My Tickets → open Detail → add attachment → soft-remove it | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
@@ -130,11 +131,15 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | --- | --- | --- |
 | 14 — Development Requester context | `cd server && npm test` | 4 files, 14 tests passed |
 | 14 — Development Requester context | `cd client && npm test` | 5 files, 24 tests passed |
+| Shell polish (theme switch + 1600px width) | `cd client && npm test` | 6 files, 29 tests passed |
 
 ## 7. Known Limitations or Deferred Tests
 
 - No load/performance testing of pagination or search at scale — out of scope for Lab 2.
 - No automated cross-browser matrix; Playwright runs on Chromium only.
+- The dark appearance is asserted at the `data-theme` level (UI-17), not by computed colour;
+  the palette's contrast ratios are recorded in `ui-spec.md` §1.1 and confirmed by eye during
+  Issue 19's visual QA rather than by an automated contrast check.
 - `requesterId` spoofing (asserting someone else's id with no auth) is a known, accepted gap per
   BR-03/BR-29 — not tested as a "vulnerability" since it is explicitly out of scope until Lab 3
   authentication exists.

@@ -84,7 +84,10 @@ validation message below the control.
   switches *to*, and `aria-pressed` reports whether dark is active. Switching cross-fades the
   colour tokens over 220ms — armed only for the switch itself, so first paint and ordinary
   hover changes are never animated — and is suppressed under `prefers-reduced-motion: reduce`.
-- Active nav item: underline + `--zg-secondary` text.
+- Active nav item: underline + `--zg-secondary` text, and `aria-current="page"`. Exactly one
+  item is active at a time: **Create Ticket** owns `/tickets/new` alone, **My Tickets** owns
+  `/tickets` and every Ticket Detail route, so the current section stays indicated while
+  reading one ticket.
 - Mobile (<768px): nav collapses into a hamburger menu; header stays fixed height.
 
 ## 6. Screens

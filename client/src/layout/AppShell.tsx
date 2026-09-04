@@ -1,12 +1,32 @@
 import { useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useSelectedRequester } from '../requester/useSelectedRequester'
 import { ThemeToggle } from '../theme/ThemeToggle'
 import './AppShell.css'
 
+/**
+ * Each item owns a slice of the URL space, declared next to the item itself.
+ *
+ * `NavLink`'s built-in matching is not usable here: it treats a link as active
+ * for descendant paths too, so `/tickets` stayed active on `/tickets/new` and
+ * both items were underlined (and both carried `aria-current="page"`) at once.
+ * Adding `end` would fix that but then leave no item indicated at all while
+ * reading a ticket, which handout §8 asks for.
+ */
 const NAV_ITEMS = [
-  { to: '/tickets', label: 'My Tickets' },
-  { to: '/tickets/new', label: 'Create Ticket' },
+  {
+    to: '/tickets',
+    label: 'My Tickets',
+    // The list and every ticket detail, but not the create form.
+    isActive: (pathname: string) =>
+      pathname === '/tickets' ||
+      (pathname.startsWith('/tickets/') && pathname !== '/tickets/new'),
+  },
+  {
+    to: '/tickets/new',
+    label: 'Create Ticket',
+    isActive: (pathname: string) => pathname === '/tickets/new',
+  },
 ]
 
 /**
@@ -18,6 +38,7 @@ const NAV_ITEMS = [
 export function AppShell() {
   const [navOpen, setNavOpen] = useState(false)
   const { requester } = useSelectedRequester()
+  const { pathname } = useLocation()
 
   function closeNav() {
     setNavOpen(false)
@@ -49,18 +70,21 @@ export function AppShell() {
             className={`ttk-shell__nav ${navOpen ? 'ttk-shell__nav--open' : ''}`}
             aria-label="Primary"
           >
-            {NAV_ITEMS.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  `ttk-shell__nav-link${isActive ? ' ttk-shell__nav-link--active' : ''}`
-                }
-                onClick={closeNav}
-              >
-                {item.label}
-              </NavLink>
-            ))}
+            {NAV_ITEMS.map((item) => {
+              const active = item.isActive(pathname)
+
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={`ttk-shell__nav-link${active ? ' ttk-shell__nav-link--active' : ''}`}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={closeNav}
+                >
+                  {item.label}
+                </Link>
+              )
+            })}
           </nav>
 
           <div className="ttk-shell__requester">

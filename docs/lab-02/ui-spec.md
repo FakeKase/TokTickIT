@@ -25,9 +25,14 @@ theme-aware rule.
 
 ### 1.1 Dark Appearance
 
-Selected by `<html data-theme="dark">`, stamped by `ThemeProvider` rather than by a
-`prefers-color-scheme` media query, so an explicit light choice still wins on a dark-set OS.
-First visit follows the OS preference; after that the user's choice is remembered.
+Selected by `<html data-theme="dark">` rather than by a `prefers-color-scheme` media query, so
+an explicit light choice still wins on a dark-set OS. First visit follows the OS preference;
+after that the user's choice is remembered.
+
+The attribute is stamped twice, deliberately: a parser-blocking inline script in `index.html`
+sets it before the first paint (React mounts from a deferred module script, so a provider
+effect alone would let a stored dark preference flash light), and `ThemeProvider` then keeps it
+in step with state from a layout effect.
 
 | Token | Dark value | Contrast |
 | --- | --- | --- |
@@ -95,9 +100,14 @@ validation message below the control.
 ### 6.1 Development Requester Selection
 
 - Centered card on `--zg-bg`, max-width 480px.
-- Title, one-sentence "testing only, not login" explanation (exact text from handout §8.1), a
-  labeled `<select>` of active Requesters, a muted "Authentication coming in Lab 3" callout, and a
-  primary **Continue** button (disabled until a Requester is chosen).
+- Title, "testing only, not login" explanation, a labeled `<select>` of active Requesters, a
+  muted "Authentication coming in Lab 3" callout, and a primary **Continue** button (disabled
+  until a Requester is chosen).
+- The explanation and the callout together carry handout §8.1's suggested text verbatim, split
+  at the sentence that is about Lab 3: the explanation paragraph is "Select a Development
+  Requester to test requester-specific ticket behavior. This is not a login screen.", and the
+  muted callout is "Authentication and role-based access will be introduced in Lab 3." All
+  three sentences ship; only their placement is ours.
 - **Loading**: skeleton dropdown + disabled Continue.
 - **Empty** (`GET /api/requesters` → `[]`): pale-green info box — "No active Development
   Requesters are available. Contact your instructor." No dropdown rendered.

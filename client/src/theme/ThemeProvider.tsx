@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   THEME_TRANSITION_CLASS,
@@ -15,8 +15,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(initialTheme)
   const transitionTimer = useRef<number | undefined>(undefined)
 
-  // Keep <html data-theme> in step with state, including on first paint.
-  useEffect(() => {
+  /*
+   * Layout effect, not useEffect: this runs before the browser paints, so a
+   * theme change never shows one frame of the previous palette. The very
+   * first stamp is done earlier still, by the inline script in index.html —
+   * React does not mount until after the first paint, so this alone would
+   * leave a stored dark preference flashing light on load.
+   */
+  useLayoutEffect(() => {
     applyTheme(theme)
   }, [theme])
 

@@ -5,6 +5,32 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>client</title>
+    <script>
+      /*
+       * Stamps the theme before first paint. This has to be a parser-blocking
+       * inline script: /src/main.tsx is a module (deferred), so React does not
+       * mount until after the browser has already painted, and a stored dark
+       * preference would flash light first.
+       *
+       * Mirrors initialTheme() in src/theme/themeContext.ts — the storage key
+       * and the stored-then-OS rule must stay in step with that module.
+       * client/tests/lab-02/ThemeFlash.test.tsx runs this exact script and
+       * fails if the two ever disagree.
+       */
+      ;(function () {
+        try {
+          var stored = window.localStorage.getItem('toktickit.theme')
+          document.documentElement.dataset.theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+        } catch (error) {
+          document.documentElement.dataset.theme = 'light'
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

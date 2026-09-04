@@ -10,6 +10,15 @@ import { createContext } from 'react'
 
 export const THEME_STORAGE_KEY = 'toktickit.theme'
 
+/**
+ * Colour transition is armed only for the moment of an actual switch, by
+ * adding this class to <html> for THEME_TRANSITION_MS. Leaving a global
+ * transition permanently in place would also animate first paint and every
+ * ordinary hover/focus change, so it is opt-in per switch instead.
+ */
+export const THEME_TRANSITION_CLASS = 'ttk-theme-switching'
+export const THEME_TRANSITION_MS = 220
+
 export type Theme = 'light' | 'dark'
 
 export interface ThemeContextValue {

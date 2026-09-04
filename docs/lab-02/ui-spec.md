@@ -81,7 +81,9 @@ validation message below the control.
   `Create Ticket`), light/dark theme switch + current Requester name + `Change Requester`
   action right.
 - Theme switch: 44px icon button; its icon and accessible name both describe the theme it
-  switches *to*, and `aria-pressed` reports whether dark is active.
+  switches *to*, and `aria-pressed` reports whether dark is active. Switching cross-fades the
+  colour tokens over 220ms — armed only for the switch itself, so first paint and ordinary
+  hover changes are never animated — and is suppressed under `prefers-reduced-motion: reduce`.
 - Active nav item: underline + `--zg-secondary` text.
 - Mobile (<768px): nav collapses into a hamburger menu; header stays fixed height.
 

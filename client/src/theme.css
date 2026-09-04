@@ -45,6 +45,9 @@
   --zg-radius: 6px;
   --zg-radius-lg: 12px;
 
+  /* Kept in step with THEME_TRANSITION_MS in theme/themeContext.ts */
+  --zg-theme-transition: 220ms;
+
   color-scheme: light;
 }
 
@@ -78,6 +81,30 @@
   --zg-border: #5c7169; /* 3.2:1 on --zg-surface */
 
   color-scheme: dark;
+}
+
+/*
+ * Colour cross-fade while switching theme. Armed by ThemeProvider for 220ms
+ * around the switch only — a permanent global transition would also animate
+ * first paint and every ordinary hover change.
+ *
+ * `:root.ttk-theme-switching *` (0,2,0) out-specifies the 0.15s button
+ * transition in components.css (0,1,0), so the whole page moves together
+ * without needing !important. Only colour properties are listed: animating
+ * layout here would make the switch janky.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  :root.ttk-theme-switching,
+  :root.ttk-theme-switching *,
+  :root.ttk-theme-switching *::before,
+  :root.ttk-theme-switching *::after {
+    transition:
+      background-color var(--zg-theme-transition) ease,
+      border-color var(--zg-theme-transition) ease,
+      color var(--zg-theme-transition) ease,
+      fill var(--zg-theme-transition) ease,
+      box-shadow var(--zg-theme-transition) ease;
+  }
 }
 
 html,

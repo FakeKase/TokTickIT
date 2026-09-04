@@ -35,7 +35,8 @@ E2E/visual tests use Playwright against a running dev stack.
 | API-15 | API | AC-21, BR-26 | Download removed attachment | `404` | `server/tests/lab-02/attachments.api.test.ts` | Pending |
 | API-16 | API | AC-22, BR-25 | Soft-remove without reason | `400`; attachment still active | `server/tests/lab-02/attachments.api.test.ts` | Pending |
 | API-17 | API | AC-20, BR-23 | Soft-remove with reason | `200`; `isRemoved: true`, metadata retained | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-18 | API | BR-04 | Inactive requester excluded | `GET /api/requesters` omits inactive seed row | `server/tests/lab-02/requesters.api.test.ts` | Pending |
+| API-18 | API | BR-04 | Inactive requester excluded | `GET /api/requesters` omits inactive seed row | `server/tests/lab-02/requesters.api.test.ts` | Pass |
+| API-29 | API | BR-03, BR-29, api-spec §1 | `GET /api/requesters` contract | Returns only `id`/`name`/`email`, ordered by name asc; a database failure returns a safe `500` message with no internal detail | `server/tests/lab-02/requesters.api.test.ts` | Pass |
 | API-19 | API | FR-14 | Reference data endpoints | Categories + related systems return seeded rows | `server/tests/lab-02/reference-data.api.test.ts` | Pending |
 | API-20 | API | AC-27, BR-14 | Description below 10 chars and above 2000 chars | `400` in both cases; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
 | API-21 | API | AC-28, BR-13 | Summary above 120 chars | `400`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
@@ -46,9 +47,9 @@ E2E/visual tests use Playwright against a running dev stack.
 | API-26 | API | AC-33, BR-09 | Search term matching an existing ticket's Number or Summary | Only the matching, owned ticket(s) returned | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
 | API-27 | API | AC-34, BR-08/BR-25 | Requester B requests Requester A's Attachment metadata, download, and removal | `404` on all three, identical to a nonexistent attachment | `server/tests/lab-02/attachments.api.test.ts` | Pending |
 | API-28 | API | AC-35, BR-22 | Ticket created successfully, then its attachment upload fails (e.g. oversized/invalid file) | Ticket still exists and is fetchable; failed file not attached; retry succeeds from Ticket Detail | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| UI-01 | UI | BR-04 | Selector lists only active requesters | Inactive seed row never rendered | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
-| UI-02 | UI | AC-23 | Selector empty state | Safe empty message; no selectable dropdown | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
-| UI-03 | UI | AC-24 | Selector API failure | Failure state + retry; no crash | `client/tests/lab-02/RequesterSelector.test.tsx` | Pending |
+| UI-01 | UI | BR-04 | Selector lists only active requesters | Inactive seed row never rendered | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
+| UI-02 | UI | AC-23 | Selector empty state | Safe empty message; no selectable dropdown | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
+| UI-03 | UI | AC-24 | Selector API failure | Failure state + retry; no crash | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
 | UI-04 | UI | AC-02 | My Tickets with no requester selected | Redirects to Selector | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
 | UI-05 | UI | AC-04, AC-05 | Create Ticket inline validation | Field-level messages; no fetch call fired | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
 | UI-06 | UI | AC-06 | Submit busy state | Button disabled + busy label while pending | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
@@ -60,6 +61,8 @@ E2E/visual tests use Playwright against a running dev stack.
 | UI-12 | UI | AC-17 | Ticket Detail header | All fields render read-only, no editable controls | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
 | UI-13 | UI | AC-18, AC-20 | Attachment add/remove controls | New attachment appears without reload; removed shows badge, no Download | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
 | UI-14 | UI | AC-26 | Keyboard focus | Visible focus ring on every Create Ticket control incl. Requester field | `client/tests/lab-02/CreateTicket.test.tsx` | Pending |
+| UI-15 | UI | AC-02 | Guard on every Requester-scoped route | `/tickets`, `/tickets/new`, and `/tickets/:id` all redirect to the Selector when nothing is selected; the blocked path is resumed after Continue | `client/tests/lab-02/RequesterContext.test.tsx` | Pass |
+| UI-16 | UI | BR-03, BR-05 | Selection persistence and replacement | Selection survives a reload, switching replaces the previous Requester outright, and corrupted stored data falls back to "nothing selected" instead of crashing | `client/tests/lab-02/RequesterContext.test.tsx` | Pass |
 | RESP-01 | Responsive/Visual | AC-25 | Desktop/tablet/mobile screenshots | No clipping/overlap/horizontal scroll on any of the 3 screens | `e2e/lab-02/visual-regression.spec.ts` | Pending |
 | RESP-02 | Responsive/Visual | ui-spec §7 | Badge consistency | Priority/status badges render identically across My Tickets and Ticket Detail | `e2e/lab-02/visual-regression.spec.ts` | Pending |
 | E2E-01 | E2E | AC-01, AC-11, AC-17, AC-18, AC-20 | Full requester flow | Select requester → create ticket → find it in My Tickets → open Detail → add attachment → soft-remove it | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
@@ -70,7 +73,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | AC | Covered by |
 | --- | --- |
 | AC-01 | UNIT-01, API-01, UI-09, E2E-01 |
-| AC-02 | UI-04 |
+| AC-02 | UI-04, UI-15 |
 | AC-03 | API-09, E2E-02 |
 | AC-04 | API-02, UI-05 |
 | AC-05 | API-03, UI-05 |
@@ -120,8 +123,13 @@ npx playwright test e2e/lab-02   # responsive/visual + E2E specs
 
 ## 6. Final Results
 
-Not yet run — implementation has not started. This table is updated as each Issue's PR lands in
-`lab2-staging`, and a full final run is recorded here once `lab2-staging` merges to `main`.
+Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded here once
+`lab2-staging` merges to `main`.
+
+| Issue | Suite | Result |
+| --- | --- | --- |
+| 14 — Development Requester context | `cd server && npm test` | 4 files, 14 tests passed |
+| 14 — Development Requester context | `cd client && npm test` | 5 files, 24 tests passed |
 
 ## 7. Known Limitations or Deferred Tests
 

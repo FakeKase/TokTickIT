@@ -38,5 +38,23 @@ export function createApp(prisma = createPrismaClient()) {
     res.json(categories);
   });
 
+  // Active Development Requesters for the Lab 2 selector screen
+  // (api-spec.md §1). BR-04: inactive Requesters are never returned, so the
+  // selector cannot offer one. BR-03/BR-29: this is testing scaffolding, not
+  // an identity provider — it deliberately exposes no credentials of any kind.
+  app.get("/api/requesters", async (_req, res) => {
+    try {
+      const requesters = await prisma.requester.findMany({
+        where: { isActive: true },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, email: true },
+      });
+      res.json(requesters);
+    } catch {
+      // Safe error only: the client never sees the underlying failure.
+      res.status(500).json({ error: "Unable to load Development Requesters" });
+    }
+  });
+
   return app;
 }

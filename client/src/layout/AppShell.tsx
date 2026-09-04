@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
+import { useSelectedRequester } from '../requester/useSelectedRequester'
 import './AppShell.css'
 
 const NAV_ITEMS = [
@@ -9,13 +10,13 @@ const NAV_ITEMS = [
 
 /**
  * Application shell: header, primary nav, and the current-Requester area
- * (ui-spec.md §5). The Requester name and "Change Requester" action are
- * placeholders only — Issue #14 introduces the real Requester-selection
- * context and should replace the placeholder <span> below with the live
- * value without needing to touch the header layout.
+ * (ui-spec.md §5). The Requester name comes from the selection context, and
+ * "Change Requester" returns to the selector, which replaces the selection
+ * outright per BR-05.
  */
 export function AppShell() {
   const [navOpen, setNavOpen] = useState(false)
+  const { requester } = useSelectedRequester()
 
   function closeNav() {
     setNavOpen(false)
@@ -62,10 +63,22 @@ export function AppShell() {
           </nav>
 
           <div className="ttk-shell__requester">
-            {/* Placeholder for Issue #14's Requester-selection context. */}
-            <span className="ttk-shell__requester-name">No Requester selected</span>
-            <Link to="/select-requester" className="ttk-btn ttk-btn--tertiary ttk-shell__change-requester">
-              Change Requester
+            <span className="ttk-shell__requester-name">
+              {requester ? (
+                <>
+                  <span className="ttk-visually-hidden">Signed in for testing as </span>
+                  {requester.name}
+                </>
+              ) : (
+                'No Requester selected'
+              )}
+            </span>
+            <Link
+              to="/select-requester"
+              className="ttk-btn ttk-btn--tertiary ttk-shell__change-requester"
+              onClick={closeNav}
+            >
+              {requester ? 'Change Requester' : 'Select Requester'}
             </Link>
           </div>
         </div>

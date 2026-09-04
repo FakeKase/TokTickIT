@@ -1,0 +1,70 @@
+/* Development Requester Selection (ui-spec.md §6.1): a centered card on the
+   page background, capped at 480px so the form never stretches on desktop. */
+
+.ttk-requester-select {
+  display: flex;
+  justify-content: center;
+  padding: var(--zg-space-6) 0;
+}
+
+.ttk-requester-select__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-4);
+  width: 100%;
+  max-width: 480px;
+  box-sizing: border-box;
+}
+
+.ttk-requester-select__explanation {
+  margin: 0;
+}
+
+/* The Lab 3 note is deliberately muted: it is context, not an instruction. */
+.ttk-requester-select__callout {
+  margin: 0;
+  padding: var(--zg-space-3);
+  background: var(--zg-pale);
+  border-radius: var(--zg-radius);
+  color: var(--zg-text);
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.ttk-requester-select__loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-2);
+}
+
+/* Skeleton stand-in for the dropdown, matching the real control's height so
+   the card does not jump when the list arrives. */
+.ttk-requester-select__skeleton {
+  height: 44px;
+  border-radius: var(--zg-radius);
+  background: linear-gradient(90deg, var(--zg-field-readonly-bg), var(--zg-pale), var(--zg-field-readonly-bg));
+  background-size: 200% 100%;
+  animation: ttk-skeleton 1.2s ease-in-out infinite;
+}
+
+@keyframes ttk-skeleton {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ttk-requester-select__skeleton {
+    animation: none;
+  }
+}
+
+/* Mobile (<768px): the card fills the width, buttons stay touch-friendly. */
+@media (max-width: 767px) {
+  .ttk-requester-select {
+    padding: 0;
+  }
+}

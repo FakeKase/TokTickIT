@@ -29,10 +29,17 @@ Selected by `<html data-theme="dark">` rather than by a `prefers-color-scheme` m
 an explicit light choice still wins on a dark-set OS. First visit follows the OS preference;
 after that the user's choice is remembered.
 
-The attribute is stamped twice, deliberately: a parser-blocking inline script in `index.html`
-sets it before the first paint (React mounts from a deferred module script, so a provider
-effect alone would let a stored dark preference flash light), and `ThemeProvider` then keeps it
-in step with state from a layout effect.
+Avoiding a flash of the wrong theme on load takes two things in `index.html`, because React
+mounts from a deferred module script and every stylesheet is imported from `main.tsx`:
+
+1. An inlined critical `background` for both themes — in dev, Vite injects all CSS from
+   JavaScript, so the document otherwise reaches first paint with no stylesheet attached at all
+   and shows unstyled white whatever the theme says.
+2. A parser-blocking script that stamps `data-theme` during head parsing, so rule 1 resolves to
+   the right colour.
+
+`ThemeProvider` then keeps the attribute in step with state from a layout effect. The inlined
+background duplicates `--zg-bg`; `ThemeFlash.test.tsx` fails if the two drift apart.
 
 | Token | Dark value | Contrast |
 | --- | --- | --- |

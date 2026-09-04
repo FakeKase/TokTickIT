@@ -65,7 +65,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | UI-16 | UI | BR-03, BR-05 | Selection persistence and replacement | Selection survives a reload, switching replaces the previous Requester outright, and corrupted stored data falls back to "nothing selected" instead of crashing | `client/tests/lab-02/RequesterContext.test.tsx` | Pass |
 | UI-17 | UI | ui-spec §1.1, §5 | Light/dark theme switch | Toggles `<html data-theme>`, persists the choice, follows the OS preference until an explicit choice is made, falls back to light when `matchMedia` is unavailable, and arms the 220ms colour transition for the switch only (restarting it if switched again mid-animation) | `client/tests/lab-02/ThemeToggle.test.tsx` | Pass |
 | UI-18 | UI | ui-spec §5, handout §8 | Primary nav active-page indication | Exactly one nav item is active per screen: My Tickets on `/tickets` and on a Ticket Detail route, Create Ticket on `/tickets/new` only; the active item also carries `aria-current="page"` | `client/tests/lab-02/AppShellNav.test.tsx` | Pass |
-| UI-19 | UI | ui-spec §1.1 | No flash of the wrong theme on load | The parser-blocking stamp in `index.html` resolves stored-then-OS identically to `initialTheme()`, so a stored dark preference never paints light first | `client/tests/lab-02/ThemeFlash.test.tsx` | Pass |
+| UI-19 | UI | ui-spec §1.1 | No flash of the wrong theme on load | `index.html` inlines a critical background for both themes (matching `--zg-bg`) and stamps `data-theme` before first paint, resolving stored-then-OS identically to `initialTheme()` | `client/tests/lab-02/ThemeFlash.test.tsx` | Pass |
 | RESP-01 | Responsive/Visual | AC-25 | Desktop/tablet/mobile screenshots | No clipping/overlap/horizontal scroll on any of the 3 screens | `e2e/lab-02/visual-regression.spec.ts` | Pending |
 | RESP-02 | Responsive/Visual | ui-spec §7 | Badge consistency | Priority/status badges render identically across My Tickets and Ticket Detail | `e2e/lab-02/visual-regression.spec.ts` | Pending |
 | E2E-01 | E2E | AC-01, AC-11, AC-17, AC-18, AC-20 | Full requester flow | Select requester → create ticket → find it in My Tickets → open Detail → add attachment → soft-remove it | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
@@ -133,7 +133,7 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | --- | --- | --- |
 | 14 — Development Requester context | `cd server && npm test` | 4 files, 14 tests passed |
 | 14 — Development Requester context | `cd client && npm test` | 5 files, 24 tests passed |
-| Shell polish (theme switch, 1600px width, nav active state) | `cd client && npm test` | 8 files, 47 tests passed |
+| Shell polish (theme switch, 1600px width, nav active state) | `cd client && npm test` | 8 files, 50 tests passed |
 
 ## 7. Known Limitations or Deferred Tests
 

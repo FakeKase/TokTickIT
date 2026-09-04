@@ -3,6 +3,7 @@ import { THEME_STORAGE_KEY, initialTheme } from '../../src/theme/themeContext'
 // Vite's ?raw import hands us the shipped markup as a string, so the test needs
 // no Node filesystem APIs (the app tsconfig deliberately excludes node types).
 import indexHtml from '../../index.html?raw'
+import themeCss from '../../src/theme.css?raw'
 
 // UI-19: no flash of the wrong theme on load.
 //
@@ -36,6 +37,56 @@ function stubMatchMedia(matches: boolean) {
     value: () => ({ matches }) as MediaQueryList,
   })
 }
+
+/** The page background each theme declares in the inlined critical CSS. */
+function criticalBackgrounds() {
+  const style = indexHtml.match(/<style>([\s\S]*?)<\/style>/)
+  if (!style) throw new Error('index.html no longer inlines critical CSS — the first paint is unstyled')
+
+  const light = style[1].match(/:root\s*\{[^}]*background:\s*(#[0-9a-f]{3,8})/i)
+  const dark = style[1].match(/:root\[data-theme='dark'\]\s*\{[^}]*background:\s*(#[0-9a-f]{3,8})/i)
+  if (!light || !dark) throw new Error('critical CSS no longer declares a background for both themes')
+
+  return { light: light[1].toLowerCase(), dark: dark[1].toLowerCase() }
+}
+
+/** The --zg-bg token each theme declares in the real stylesheet. */
+function tokenBackgrounds() {
+  const lightBlock = themeCss.match(/:root\s*\{([\s\S]*?)\}/)
+  const darkBlock = themeCss.match(/:root\[data-theme='dark'\]\s*\{([\s\S]*?)\}/)
+  if (!lightBlock || !darkBlock) throw new Error('theme.css no longer declares both :root blocks')
+
+  const read = (block: string) => {
+    const found = block.match(/--zg-bg:\s*(#[0-9a-f]{3,8})/i)
+    if (!found) throw new Error('theme.css block no longer declares --zg-bg')
+    return found[1].toLowerCase()
+  }
+
+  return { light: read(lightBlock[1]), dark: read(darkBlock[1]) }
+}
+
+// The document has to paint the right colour before any stylesheet is attached:
+// every .css file is imported from main.tsx, so in dev Vite injects them from
+// JavaScript and first paint happens with no CSS at all. index.html therefore
+// inlines the page background for both themes — which duplicates --zg-bg, so
+// these two assertions keep the copy honest.
+describe('Critical background CSS', () => {
+  it('is inlined for both themes', () => {
+    const { light, dark } = criticalBackgrounds()
+
+    expect(light).toBeTruthy()
+    expect(dark).toBeTruthy()
+    expect(light).not.toBe(dark)
+  })
+
+  it('matches --zg-bg in theme.css', () => {
+    expect(criticalBackgrounds()).toEqual(tokenBackgrounds())
+  })
+
+  it('is declared before the module script, so it applies to the first paint', () => {
+    expect(indexHtml.indexOf('<style>')).toBeLessThan(indexHtml.indexOf('type="module"'))
+  })
+})
 
 describe('Pre-paint theme stamp', () => {
   beforeEach(() => {

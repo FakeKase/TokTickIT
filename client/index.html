@@ -5,6 +5,35 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>client</title>
+    <style>
+      /*
+       * Critical background, inlined so the very first paint is already the
+       * right colour.
+       *
+       * The data-theme stamp below is not enough on its own: every stylesheet
+       * is imported from main.tsx, so in dev Vite injects them from JavaScript
+       * and the document reaches first paint with no CSS attached at all —
+       * an unstyled white page, whatever data-theme says. (A production build
+       * does emit a <link> in this head, so there it is belt-and-braces.)
+       *
+       * Only the page background lives here; everything else can wait for the
+       * real stylesheet. Values mirror --zg-bg in src/theme.css, and
+       * ThemeFlash.test.tsx fails if the two ever drift apart.
+       */
+      :root {
+        background: #f5f7f6;
+        color-scheme: light;
+      }
+
+      :root[data-theme='dark'] {
+        background: #101613;
+        color-scheme: dark;
+      }
+
+      body {
+        margin: 0;
+      }
+    </style>
     <script>
       /*
        * Stamps the theme before first paint. This has to be a parser-blocking

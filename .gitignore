@@ -6,6 +6,10 @@ node_modules/
 .env.local
 .env.*.local
 
+# Local docker-compose overrides (e.g. port remaps for machine-specific conflicts)
+docker-compose.override.yaml
+docker-compose.override.yml
+
 # Build output
 dist/
 build/

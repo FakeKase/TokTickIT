@@ -577,15 +577,32 @@ export function createApp(prisma = createPrismaClient()) {
     }
 
     // BR-23: the owner already knows this one exists, so 409 reveals nothing
-    // new — unlike the ownership 404s above.
+    // new — unlike the ownership 404s above. This early exit is only a fast
+    // path; the authoritative check is the guarded update below, because the
+    // read above and the write are otherwise two statements a concurrent
+    // request can interleave between.
     if (attachment.isRemoved) {
       return res.status(409).json({ error: "This Attachment was already removed" });
     }
 
     try {
-      const removed = await prisma.attachment.update({
-        where: { id: attachment.id },
+      // `isRemoved: false` in the WHERE makes the check and the write one
+      // atomic statement: a second concurrent removal matches zero rows and
+      // is told so, instead of both callers succeeding and the later reason
+      // silently overwriting the earlier one.
+      const { count } = await prisma.attachment.updateMany({
+        where: { id: attachment.id, isRemoved: false },
         data: { isRemoved: true, removedAt: new Date(), removedReason: reason },
+      });
+
+      if (count === 0) {
+        return res.status(409).json({ error: "This Attachment was already removed" });
+      }
+
+      // Safe to re-read: removal is one-way, so nothing can change this row
+      // again, and any concurrent caller took the 409 branch above.
+      const removed = await prisma.attachment.findUniqueOrThrow({
+        where: { id: attachment.id },
         select: {
           id: true,
           ticketId: true,

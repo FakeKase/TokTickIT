@@ -34,7 +34,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | API-14 | API | AC-19 | Download active attachment | `200`; correct bytes + `Content-Disposition` | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-15 | API | AC-21, BR-26 | Download removed attachment | `404` | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-16 | API | AC-22, BR-25 | Soft-remove without reason | `400`; attachment still active | `server/tests/lab-02/attachments.api.test.ts` | Pass |
-| API-17 | API | AC-20, BR-23 | Soft-remove with reason | `200`; `isRemoved: true`, metadata retained | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-17 | API | AC-20, BR-23 | Soft-remove with reason, sequentially and concurrently | `200`; `isRemoved: true`, metadata retained; concurrent removals yield exactly one `200`, and the reason that persists is the winner's | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-18 | API | BR-04 | Inactive requester excluded | `GET /api/requesters` omits inactive seed row | `server/tests/lab-02/requesters.api.test.ts` | Pass |
 | API-29 | API | BR-03, BR-29, api-spec §1 | `GET /api/requesters` contract | Returns only `id`/`name`/`email`, ordered by name asc; a database failure returns a safe `500` message with no internal detail | `server/tests/lab-02/requesters.api.test.ts` | Pass |
 | API-19 | API | FR-14 | Reference data endpoints | Categories + related systems return seeded rows | `server/tests/lab-02/reference-data.api.test.ts` | Pass |
@@ -142,7 +142,7 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | 16 — My Tickets | `cd client && npm test` | 10 files, 85 tests passed |
 | 17 — Ticket Detail | `cd server && npm test` | 10 files, 98 tests passed |
 | 17 — Ticket Detail | `cd client && npm test` | 11 files, 96 tests passed |
-| 18 — Attachments | `cd server && npm test` | 10 files, 114 tests passed |
+| 18 — Attachments | `cd server && npm test` | 10 files, 115 tests passed |
 | 18 — Attachments | `cd client && npm test` | 12 files, 111 tests passed |
 
 ## 7. Known Limitations or Deferred Tests

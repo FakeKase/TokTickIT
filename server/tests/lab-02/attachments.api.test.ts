@@ -600,3 +600,26 @@ describe("API-27 cross-Requester access (AC-34, BR-08/BR-25)", () => {
     expect([metadata.status, download.status, removal.status]).toEqual([400, 400, 400]);
   });
 });
+
+describe("API-17 removal is atomic under concurrency (BR-23)", () => {
+  it("admits exactly one removal when several land at once", async () => {
+    const id = await makeAttachment();
+
+    // Sequential deletes cannot expose a check-then-update race: the first
+    // commits before the second reads. These overlap deliberately.
+    const responses = await Promise.all(
+      ["First reason", "Second reason", "Third reason"].map((reason) =>
+        request(app).delete(`/api/attachments/${id}`).send({ requesterId, reason }),
+      ),
+    );
+
+    const statuses = responses.map((r) => r.status).sort();
+    expect(statuses).toEqual([200, 409, 409]);
+
+    // The winner's reason must survive — a later update overwriting it would
+    // mean two callers both believed they had removed it.
+    const winner = responses.find((r) => r.status === 200)!;
+    const stored = await prisma.attachment.findUnique({ where: { id } });
+    expect(stored?.removedReason).toBe(winner.body.removedReason);
+  });
+});

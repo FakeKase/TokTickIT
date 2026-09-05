@@ -13,5 +13,10 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['tests/**/*.test.{ts,tsx}'],
+    // Vitest stubs CSS imports to empty strings by default, which makes
+    // `import css from './x.css?raw'` return ''. ThemeFlash.test.tsx reads
+    // theme.css that way to prove index.html's inlined critical background
+    // still matches --zg-bg, so CSS has to be processed here.
+    css: true,
   },
 })

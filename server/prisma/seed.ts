@@ -44,10 +44,10 @@ async function main() {
   console.log(`Seeded ${relatedSystems.length} related systems`)
 
   const requesters = [
-    { name: 'Jennifer Anderson', email: 'jennifer.anderson@toktickit.test', isActive: true },
-    { name: 'Marcus Lee', email: 'marcus.lee@toktickit.test', isActive: true },
-    { name: 'Priya Natarajan', email: 'priya.natarajan@toktickit.test', isActive: true },
-    { name: 'Somchai Charoenkul', email: 'somchai.charoenkul@toktickit.test', isActive: true },
+    { name: 'Peter Parker', email: 'peter.parker@toktickit.test', isActive: true },
+    { name: 'Ned Leeds', email: 'ned.leeds@toktickit.test', isActive: true },
+    { name: 'Michelle Jones', email: 'michelle.jones@toktickit.test', isActive: true },
+    { name: 'Roronoa Zoro', email: 'roronoa.zoro@toktickit.test', isActive: true },
     { name: 'David Kim', email: 'david.kim@toktickit.test', isActive: false },
   ]
 

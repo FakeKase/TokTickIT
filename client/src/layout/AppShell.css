@@ -11,7 +11,7 @@
 }
 
 .ttk-shell__header-inner {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   height: 64px;
   padding: 0 var(--zg-space-6);
@@ -46,10 +46,14 @@
   color: #ffffff;
 }
 
+/* The 2px bottom border is the only active indicator — no text-decoration, so
+   the marker is the green rule under the item rather than an underlined word.
+   Width matches the transparent border on the base rule, so activating an item
+   never shifts the text. `aria-current="page"` carries the same state
+   non-visually, so colour is not the sole signal. */
 .ttk-shell__nav-link--active {
   color: #ffffff;
-  border-bottom-color: var(--zg-secondary);
-  text-decoration: underline;
+  border-bottom-color: var(--zg-nav-active);
 }
 
 .ttk-shell__requester {
@@ -67,6 +71,27 @@
 
 .ttk-shell__change-requester.ttk-btn--tertiary {
   color: #ffffff;
+}
+
+/* Light/dark switch. Sits in the header's right-hand cluster and keeps a 44px
+   touch target at every viewport (ui-spec.md §8). */
+.ttk-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: #ffffff;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--zg-radius);
+  cursor: pointer;
+}
+
+.ttk-theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .ttk-shell__nav-toggle {
@@ -91,7 +116,7 @@
 .ttk-shell__main {
   flex: 1;
   width: 100%;
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: var(--zg-space-6);
   box-sizing: border-box;
@@ -129,9 +154,18 @@
     padding: 0 var(--zg-space-4) var(--zg-space-2);
   }
 
+  /* Longhand, not the `border-bottom` shorthand: this rule comes after
+     --active in the file and at equal specificity, so a shorthand here would
+     reset the active item's green line back to the separator colour and leave
+     the open menu with no active indicator at all. */
   .ttk-shell__nav-link {
     padding: var(--zg-space-3) 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .ttk-shell__nav-link--active {
+    border-bottom-color: var(--zg-nav-active);
   }
 
   .ttk-shell__requester {

@@ -17,7 +17,7 @@ scaffolding, not authentication, per BR-03/BR-29).
 
 Retrieve active Development Requesters for the Selector screen.
 
-- **Response `200`**: `[{ "id": 1, "name": "Jennifer Anderson", "email": "jennifer.anderson@example.com" }, ...]`, ordered by `name` asc, `isActive = true` only (BR-04).
+- **Response `200`**: `[{ "id": 1, "name": "Peter Parker", "email": "peter.parker@toktickit.test" }, ...]`, ordered by `name` asc, `isActive = true` only (BR-04).
 - **`500`**: `{ "error": "Unable to load Development Requesters" }`
 
 ## 2. `GET /api/categories`
@@ -116,7 +116,7 @@ Retrieve one owned Ticket in full, for Ticket Detail.
 {
   "id": 42,
   "ticketNumber": "TKT-2026-000042",
-  "requester": { "id": 1, "name": "Jennifer Anderson" },
+  "requester": { "id": 1, "name": "Peter Parker" },
   "category": { "id": 2, "name": "Hardware" },
   "relatedSystem": { "id": 3, "name": "Corporate Laptop" },
   "summary": "Laptop battery drains quickly",

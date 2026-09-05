@@ -5,6 +5,10 @@
 Fixed by the course handout; implemented as CSS custom properties on `:root` in a shared
 `theme.css` (not left as ad-hoc inline styles like Lab 1's `App.tsx`, which this sprint replaces).
 
+The values below are the light appearance. A dark appearance redefines the same token names —
+and only the colour tokens, never typography or spacing — so no component contains a
+theme-aware rule.
+
 | Token | Value | Use |
 | --- | --- | --- |
 | `--zg-primary` | `#006B3C` | App header, primary buttons, strong emphasis |
@@ -18,6 +22,41 @@ Fixed by the course handout; implemented as CSS custom properties on `:root` in 
 | `--zg-error` | `#8A1F1F` | Error text/border |
 | `--zg-warning` | `#B7791F` | Amber warning callouts/badges only — not decoration |
 | `--zg-success` | `#0B7A46` | Success confirmation text |
+
+### 1.1 Dark Appearance
+
+Selected by `<html data-theme="dark">` rather than by a `prefers-color-scheme` media query, so
+an explicit light choice still wins on a dark-set OS. First visit follows the OS preference;
+after that the user's choice is remembered.
+
+Avoiding a flash of the wrong theme on load takes two things in `index.html`, because React
+mounts from a deferred module script and every stylesheet is imported from `main.tsx`:
+
+1. An inlined critical `background` for both themes — in dev, Vite injects all CSS from
+   JavaScript, so the document otherwise reaches first paint with no stylesheet attached at all
+   and shows unstyled white whatever the theme says.
+2. A parser-blocking script that stamps `data-theme` during head parsing, so rule 1 resolves to
+   the right colour.
+
+`ThemeProvider` then keeps the attribute in step with state from a layout effect. The inlined
+background duplicates `--zg-bg`; `ThemeFlash.test.tsx` fails if the two drift apart.
+
+| Token | Dark value | Contrast |
+| --- | --- | --- |
+| `--zg-primary` | `#006B3C` (unchanged) | White label 6.6:1 |
+| `--zg-secondary` | `#4CC98A` | 8.8:1 on `--zg-bg` |
+| `--zg-pale` | `#14301F` | Body text 12.2:1 |
+| `--zg-bg` | `#101613` | Body text 15.6:1 |
+| `--zg-surface` | `#18211C` | Body text 14.1:1 |
+| `--zg-text` | `#E6EFE9` | — |
+| `--zg-field-editable-bg` | `#1E2A23` | Body text 12.7:1 |
+| `--zg-field-readonly-bg` | `#353027` | Separated from editable by the same 1.14 step the light theme uses |
+| `--zg-error` | `#F08A8A` | 6.8:1 on `--zg-surface` |
+| `--zg-warning` | `#E0A94A` | 7.8:1 on `--zg-surface` |
+| `--zg-success` | `#5FD39B` | 8.9:1 on `--zg-surface` |
+| `--zg-neutral-tint` | `#303A34` | Body text 10.1:1 |
+| `--zg-nav-active` | `#6FE3AB` *(not redefined — see §5)* | 4.2:1 on the header |
+| `--zg-border` | `#5C7169` | 3.2:1 on `--zg-surface` |
 
 ## 2. Typography & Spacing
 
@@ -52,8 +91,20 @@ validation message below the control.
 ## 5. Application Shell
 
 - Header: `--zg-primary` background, "TokTickIT" wordmark left, nav center (`My Tickets`,
-  `Create Ticket`), current Requester name + `Change Requester` action right.
-- Active nav item: underline + `--zg-secondary` text.
+  `Create Ticket`), light/dark theme switch + current Requester name + `Change Requester`
+  action right.
+- Theme switch: 44px icon button; its icon and accessible name both describe the theme it
+  switches *to*, and `aria-pressed` reports whether dark is active. Switching cross-fades the
+  colour tokens over 220ms — armed only for the switch itself, so first paint and ordinary
+  hover changes are never animated — and is suppressed under `prefers-reduced-motion: reduce`.
+- Active nav item: a 2px `--zg-nav-active` rule beneath the item, white text, and
+  `aria-current="page"`. No `text-decoration` — the marker is the rule under the item, not an
+  underlined word. `--zg-nav-active` is one value in both themes on purpose: it sits on the
+  header, which is `--zg-primary` in both. `--zg-secondary` cannot be used here — in the light
+  theme it is `#0B7A46` on `#006B3C`, 1.23:1, so the indicator would be invisible. Exactly one
+  item is active at a time: **Create Ticket** owns `/tickets/new` alone, **My Tickets** owns
+  `/tickets` and every Ticket Detail route, so the current section stays indicated while
+  reading one ticket.
 - Mobile (<768px): nav collapses into a hamburger menu; header stays fixed height.
 
 ## 6. Screens
@@ -61,9 +112,14 @@ validation message below the control.
 ### 6.1 Development Requester Selection
 
 - Centered card on `--zg-bg`, max-width 480px.
-- Title, one-sentence "testing only, not login" explanation (exact text from handout §8.1), a
-  labeled `<select>` of active Requesters, a muted "Authentication coming in Lab 3" callout, and a
-  primary **Continue** button (disabled until a Requester is chosen).
+- Title, "testing only, not login" explanation, a labeled `<select>` of active Requesters, a
+  muted "Authentication coming in Lab 3" callout, and a primary **Continue** button (disabled
+  until a Requester is chosen).
+- The explanation and the callout together carry handout §8.1's suggested text verbatim, split
+  at the sentence that is about Lab 3: the explanation paragraph is "Select a Development
+  Requester to test requester-specific ticket behavior. This is not a login screen.", and the
+  muted callout is "Authentication and role-based access will be introduced in Lab 3." All
+  three sentences ship; only their placement is ours.
 - **Loading**: skeleton dropdown + disabled Continue.
 - **Empty** (`GET /api/requesters` → `[]`): pale-green info box — "No active Development
   Requesters are available. Contact your instructor." No dropdown rendered.
@@ -130,7 +186,7 @@ Badges never rely on color alone — each carries its text label.
 
 | Viewport | Behavior |
 | --- | --- |
-| Desktop ≥992px | Multi-column layout, content max-width ~1200px, centered |
+| Desktop ≥992px | Multi-column layout, content max-width 1600px, centered (raised from 1200px so wide monitors are not left with large empty gutters; still a bounded, centered measure per handout §8.7) |
 | Tablet 768–991px | Two-column where practical; Summary/Description get full available width |
 | Mobile <768px | Everything stacks vertically; buttons remain ≥44px touch targets; no horizontal page scroll |
 | All sizes | No clipped labels, overlapping messages, hidden buttons, or unreadable attachment filenames (truncate with `title` tooltip instead) |

@@ -48,7 +48,7 @@ describe('Primary nav active state', () => {
     vi.restoreAllMocks()
     window.localStorage.clear()
     window.localStorage.setItem(REQUESTER_STORAGE_KEY, JSON.stringify(REQUESTER))
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json([]))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json([])))
   })
 
   afterEach(() => {

@@ -31,7 +31,7 @@ describe('Theme toggle', () => {
     window.localStorage.clear()
     delete document.documentElement.dataset.theme
     document.documentElement.classList.remove(THEME_TRANSITION_CLASS)
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json([]))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json([])))
   })
 
   afterEach(() => {

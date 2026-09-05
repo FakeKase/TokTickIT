@@ -34,7 +34,7 @@ describe('Development Requester Selection', () => {
   it('UI-01 (BR-04): lists only the active Requesters the API returned', async () => {
     // The API filters inactive rows (API-18); the screen must not reintroduce
     // one, so the inactive seed Requester never reaches the dropdown.
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(ACTIVE_REQUESTERS))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json(ACTIVE_REQUESTERS)))
 
     renderSelector()
 
@@ -52,7 +52,7 @@ describe('Development Requester Selection', () => {
   })
 
   it('explains that this is testing scaffolding, not a login (BR-03, handout §8.1)', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(ACTIVE_REQUESTERS))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json(ACTIVE_REQUESTERS)))
 
     renderSelector()
 
@@ -68,7 +68,7 @@ describe('Development Requester Selection', () => {
   })
 
   it('keeps Continue disabled until a Requester is chosen', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(ACTIVE_REQUESTERS))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json(ACTIVE_REQUESTERS)))
     const user = userEvent.setup()
 
     renderSelector()
@@ -85,7 +85,7 @@ describe('Development Requester Selection', () => {
   })
 
   it('stores the chosen Requester and shows it in the header (BR-05)', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(ACTIVE_REQUESTERS))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json(ACTIVE_REQUESTERS)))
     const user = userEvent.setup()
 
     renderSelector()
@@ -106,7 +106,7 @@ describe('Development Requester Selection', () => {
   })
 
   it('UI-02 (AC-23, BR-27): shows a safe empty state with nothing selectable', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json([]))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json([])))
 
     renderSelector()
 
@@ -141,7 +141,7 @@ describe('Development Requester Selection', () => {
   })
 
   it('treats a non-2xx response as a failure too', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 500 }))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response('', { status: 500 })))
 
     renderSelector()
 

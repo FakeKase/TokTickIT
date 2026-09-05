@@ -1,0 +1,161 @@
+/* My Tickets (ui-spec.md §6.3): table on desktop and tablet, cards on mobile.
+   Both markups are rendered and one is switched off by media query. `display:
+   none` also removes it from the accessibility tree, so exactly one copy of
+   each row is announced at any width — the duplication is visual only, and is
+   bounded by the 50-row maximum page size. */
+
+.ttk-my-tickets__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zg-space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--zg-space-4);
+}
+
+.ttk-my-tickets__head h2 {
+  margin: 0;
+}
+
+.ttk-my-tickets__toolbar {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  align-items: end;
+  gap: var(--zg-space-3);
+  padding: var(--zg-space-4);
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+  margin-bottom: var(--zg-space-4);
+}
+
+.ttk-my-tickets__toolbar-actions {
+  display: flex;
+  gap: var(--zg-space-2);
+}
+
+/* Hidden wherever the table's sortable headers are available; the two would
+   otherwise be duplicate controls for the same state. */
+.ttk-my-tickets__sort {
+  display: none;
+}
+
+/* ---------- Desktop / tablet table ---------- */
+
+.ttk-my-tickets__table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+  overflow: hidden;
+}
+
+.ttk-my-tickets__table th,
+.ttk-my-tickets__table td {
+  text-align: left;
+  padding: var(--zg-space-3);
+  border-bottom: 1px solid var(--zg-border);
+  vertical-align: top;
+}
+
+.ttk-my-tickets__table thead th {
+  background: var(--zg-pale);
+  font-size: var(--zg-font-size-label);
+  font-weight: var(--zg-font-weight-label);
+  white-space: nowrap;
+}
+
+/* Sort controls are real buttons so they are keyboard-operable; they inherit
+   the header's type rather than looking like page-level actions. */
+.ttk-my-tickets__table thead button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ttk-my-tickets__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ttk-my-tickets__cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ttk-my-tickets__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zg-space-4);
+  margin-top: var(--zg-space-4);
+  flex-wrap: wrap;
+}
+
+/* Tablet (768–991px): the two date columns condense to keep the table from
+   scrolling sideways (ui-spec.md §6.3). */
+@media (max-width: 991px) {
+  .ttk-my-tickets__toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ttk-my-tickets__toolbar-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .ttk-my-tickets__table th,
+  .ttk-my-tickets__table td {
+    padding: var(--zg-space-2);
+  }
+}
+
+/* Mobile (<768px): one card per Ticket, no horizontal scroll anywhere. */
+@media (max-width: 767px) {
+  .ttk-my-tickets__toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .ttk-my-tickets__table {
+    display: none;
+  }
+
+  /* The table went with its sort headers, so the standalone control takes
+     over here (FR-07 applies at every width). */
+  .ttk-my-tickets__sort {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: var(--zg-space-2);
+  }
+
+  .ttk-my-tickets__cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--zg-space-3);
+  }
+
+  .ttk-my-tickets__card-title {
+    font-weight: var(--zg-font-weight-label);
+    overflow-wrap: anywhere;
+  }
+
+  .ttk-my-tickets__card-badges,
+  .ttk-my-tickets__card-meta {
+    margin: var(--zg-space-2) 0 0;
+  }
+
+  .ttk-my-tickets__card-meta {
+    font-size: 13px;
+    opacity: 0.75;
+  }
+
+  .ttk-my-tickets__pagination {
+    justify-content: space-between;
+  }
+}

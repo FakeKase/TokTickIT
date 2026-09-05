@@ -175,3 +175,61 @@ export async function uploadAttachment(
 
   return (await response.json()) as Attachment
 }
+
+export interface TicketListItem {
+  id: number
+  ticketNumber: string
+  summary: string
+  categoryName: string
+  requestedPriority: RequestedPriority
+  currentStatus: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TicketListResponse {
+  data: TicketListItem[]
+  pagination: {
+    page: number
+    pageSize: number
+    totalItems: number
+    totalPages: number
+  }
+  /** True when a narrowing parameter was supplied — distinguishes BR-28's
+   *  Empty state from No-Results. */
+  filtered: boolean
+}
+
+export interface TicketListParams {
+  search?: string
+  categoryId?: number
+  requestedPriority?: RequestedPriority
+  sortBy?: 'createdAt' | 'ticketNumber' | 'requestedPriority' | 'currentStatus'
+  sortDir?: 'asc' | 'desc'
+  page?: number
+  pageSize?: number
+}
+
+/**
+ * The selected Requester's own Tickets (api-spec.md §5).
+ *
+ * Unset params are omitted rather than sent empty, so the server sees the
+ * same request the user would get from a clean load.
+ */
+export async function fetchTickets(
+  requesterId: number,
+  params: TicketListParams = {},
+): Promise<TicketListResponse> {
+  const query = new URLSearchParams({ requesterId: String(requesterId) })
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') query.set(key, String(value))
+  }
+
+  const response = await fetch(`${API_URL}/api/tickets?${query.toString()}`)
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to load your Tickets')
+  }
+
+  return (await response.json()) as TicketListResponse
+}

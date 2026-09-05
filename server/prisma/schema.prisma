@@ -41,6 +41,12 @@ model RelatedSystem {
   tickets Ticket[]
 }
 
+// Declaration order is load-bearing: Postgres sorts a native enum by the
+// order its values are declared, not alphabetically, so `requestedPriority
+// desc` yields HIGH -> MEDIUM -> LOW purely because of the sequence below.
+// AC-16 depends on that. Reordering these values silently changes the sort;
+// my-tickets.api.test.ts asserts the resulting order so it cannot happen
+// unnoticed.
 enum RequestedPriority {
   LOW
   MEDIUM

@@ -13,6 +13,7 @@ import {
   placeholderTicketNumber,
 } from "./lib/ticket-number.js";
 import { validateTicketInput } from "./lib/ticket-validation.js";
+import { parseTicketQuery } from "./lib/ticket-query.js";
 import {
   ALLOWED_TYPES_LABEL,
   MAX_ACTIVE_ATTACHMENTS,
@@ -196,6 +197,100 @@ export function createApp(prisma = createPrismaClient()) {
       res.status(201).json(ticket);
     } catch {
       res.status(500).json({ error: "Unable to create the Ticket" });
+    }
+  });
+
+  // api-spec.md §5. Ownership is a WHERE clause, never a post-filter: a
+  // Ticket belonging to someone else is not fetched at all (BR-07/BR-08).
+  app.get("/api/tickets", async (req, res) => {
+    const requesterId = Number(
+      Array.isArray(req.query.requesterId)
+        ? req.query.requesterId[0]
+        : req.query.requesterId,
+    );
+    if (!Number.isInteger(requesterId) || requesterId <= 0) {
+      return res.status(400).json({ error: "A valid requesterId is required" });
+    }
+
+    const query = parseTicketQuery(req.query as Record<string, unknown>);
+
+    const where = {
+      requesterId,
+      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(query.requestedPriority
+        ? { requestedPriority: query.requestedPriority }
+        : {}),
+      // BR-09: matches Ticket Number or Summary. Nested under AND with
+      // requesterId above, so the OR can never widen past the owner.
+      ...(query.search
+        ? {
+            OR: [
+              {
+                ticketNumber: {
+                  contains: query.search,
+                  mode: "insensitive" as const,
+                },
+              },
+              {
+                summary: {
+                  contains: query.search,
+                  mode: "insensitive" as const,
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+
+    try {
+      const [totalItems, rows] = await Promise.all([
+        prisma.ticket.count({ where }),
+        prisma.ticket.findMany({
+          where,
+          orderBy: [
+            { [query.sortBy]: query.sortDir },
+            // AC-16: ties on the chosen key break by Created Date descending.
+            // Skipped when that IS the chosen key, where it would be a no-op.
+            ...(query.sortBy === "createdAt"
+              ? []
+              : [{ createdAt: "desc" as const }]),
+            // BR-11: id last as the stable key. Without it, rows sharing both
+            // the sort key and createdAt can reorder between requests, and the
+            // same Ticket can appear on two pages or none.
+            { id: "desc" as const },
+          ],
+          skip: (query.page - 1) * query.pageSize,
+          take: query.pageSize,
+          select: {
+            id: true,
+            ticketNumber: true,
+            summary: true,
+            requestedPriority: true,
+            currentStatus: true,
+            createdAt: true,
+            updatedAt: true,
+            category: { select: { name: true } },
+          },
+        }),
+      ]);
+
+      res.json({
+        data: rows.map(({ category, ...ticket }) => ({
+          ...ticket,
+          categoryName: category.name,
+        })),
+        pagination: {
+          page: query.page,
+          pageSize: query.pageSize,
+          totalItems,
+          totalPages: Math.ceil(totalItems / query.pageSize),
+        },
+        // BR-28: lets the client tell the Empty state from No-Results without
+        // a second request.
+        filtered: query.filtered,
+      });
+    } catch {
+      res.status(500).json({ error: "Unable to load your Tickets" });
     }
   });
 

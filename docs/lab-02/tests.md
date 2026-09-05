@@ -22,10 +22,10 @@ E2E/visual tests use Playwright against a running dev stack.
 | API-02 | API | AC-04, BR-15 | Create ticket missing Category/RelatedSystem/Priority | `400` with per-field messages; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-03 | API | AC-05, BR-13 | Summary below 5 chars | `400`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-04 | API | BR-04, BR-15 | `requesterId` inactive or unknown | `404`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
-| API-05 | API | AC-11, BR-06/07 | List tickets scoped to requester | Only the asserted requester's tickets returned | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-06 | API | AC-13, BR-09 | Search with no match | `200`; empty `data`, `totalItems: 0` | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-07 | API | AC-15, BR-12 | Pagination page 2 | Distinct, non-overlapping rows; correct `pagination` block | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-08 | API | AC-16, BR-11 | Sort by priority desc | High → Medium → Low, tie-broken by createdAt desc | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
+| API-05 | API | AC-11, BR-06/07 | List tickets scoped to requester | Only the asserted requester's tickets returned | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-06 | API | AC-13, BR-09 | Search with no match | `200`; empty `data`, `totalItems: 0` | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-07 | API | AC-15, BR-12 | Pagination page 2 | Distinct, non-overlapping rows; correct `pagination` block | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-08 | API | AC-16, BR-11 | Sort by priority desc | High → Medium → Low, tie-broken by createdAt desc | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
 | API-09 | API | AC-03, BR-08 | Fetch a ticket owned by a different requester | `404`, no data leaked | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
 | API-10 | API | AC-18, BR-19 | Upload valid attachment | `201`; attachment appears in ticket detail | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-11 | API | AC-08, BR-20 | Upload file >5MB | `413`; not stored | `server/tests/lab-02/attachments.api.test.ts` | Pass |
@@ -41,23 +41,24 @@ E2E/visual tests use Playwright against a running dev stack.
 | API-20 | API | AC-27, BR-14 | Description below 10 chars and above 2000 chars | `400` in both cases; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-21 | API | AC-28, BR-13 | Summary above 120 chars | `400`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-22 | API | AC-29, BR-15 | Unrecognized `categoryId`/`relatedSystemId` (valid shape, no matching row) | `404`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
-| API-23 | API | AC-30, BR-10/FR-06 | Filter My Tickets by Category and Requested Priority combined with `search` | Only tickets matching all three criteria returned | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-24 | API | AC-31, BR-11 | List tickets with no `sortBy`/`sortDir` supplied | Default order: Created Date desc, id desc tie-break | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-25 | API | AC-32, BR-12 | Out-of-range `page` (e.g. `0`, `-1`) and oversized `pageSize` (e.g. `500`) | Values clamped to nearest valid bound, not rejected | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
-| API-26 | API | AC-33, BR-09 | Search term matching an existing ticket's Number or Summary | Only the matching, owned ticket(s) returned | `server/tests/lab-02/my-tickets.api.test.ts` | Pending |
+| API-23 | API | AC-30, BR-10/FR-06 | Filter My Tickets by Category and Requested Priority combined with `search` | Only tickets matching all three criteria returned | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-24 | API | AC-31, AC-16, BR-11 | Sorting: default order, Requested Priority order, and tie-breaks | Default is Created Date desc; Priority desc is High→Medium→Low (pinning the Postgres enum declaration order it depends on); ties break by Created Date desc then id desc | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-25 | API | AC-32, BR-12 | Out-of-range `page` (e.g. `0`, `-1`) and oversized `pageSize` (e.g. `500`) | Values clamped to nearest valid bound, not rejected | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
+| API-26 | API | AC-33, BR-09 | Search term matching an existing ticket's Number or Summary | Only the matching, owned ticket(s) returned | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
 | API-27 | API | AC-34, BR-08/BR-25 | Requester B requests Requester A's Attachment metadata, download, and removal | `404` on all three, identical to a nonexistent attachment | `server/tests/lab-02/attachments.api.test.ts` | Pending |
 | API-28 | API | AC-35, BR-22 | Ticket created successfully, then its attachment upload fails (e.g. oversized/invalid file) | Ticket still exists and is fetchable; failed file not attached; retry succeeds from Ticket Detail | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | UI-01 | UI | BR-04 | Selector lists only active requesters | Inactive seed row never rendered | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
 | UI-02 | UI | AC-23 | Selector empty state | Safe empty message; no selectable dropdown | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
 | UI-03 | UI | AC-24 | Selector API failure | Failure state + retry; no crash | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
-| UI-04 | UI | AC-02 | My Tickets with no requester selected | Redirects to Selector | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
+| UI-04 | UI | AC-02 | My Tickets with no requester selected | Redirects to Selector | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
 | UI-05 | UI | AC-04, AC-05 | Create Ticket inline validation | Field-level messages; no fetch call fired | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
 | UI-06 | UI | AC-06 | Submit busy state | Button disabled + busy label while pending | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
 | UI-07 | UI | AC-07, BR-18 | API failure on submit | Error banner shown; field values retained | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
 | UI-08 | UI | AC-08, AC-09 | Invalid attachment selection | Inline rejection message; file not queued | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
 | UI-09 | UI | AC-01 | Successful submission | Confirmation card shows generated Ticket Number | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
-| UI-10 | UI | AC-13, AC-14, BR-28 | Empty vs. No-Results | Distinct copy/actions for each zero-result case | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
-| UI-11 | UI | AC-12, BR-05 | Switching requester | List reloads to the new requester's own tickets; an in-progress Create Ticket draft is discarded on switch | `client/tests/lab-02/MyTickets.test.tsx` | Pending |
+| UI-10 | UI | AC-13, AC-14, BR-28 | Empty vs. No-Results | Distinct copy/actions for each zero-result case | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
+| UI-11 | UI | AC-12, BR-05 | Switching requester | List reloads to the new requester's own tickets; an in-progress Create Ticket draft is discarded on switch | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
+| UI-21 | UI | FR-07 | Sorting is reachable at every width | A sort control lives outside the table, so hiding the table under 768px does not remove sorting | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
 | UI-12 | UI | AC-17 | Ticket Detail header | All fields render read-only, no editable controls | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
 | UI-13 | UI | AC-18, AC-20 | Attachment add/remove controls | New attachment appears without reload; removed shows badge, no Download | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
 | UI-14 | UI | AC-26 | Keyboard focus | Visible focus ring on every Create Ticket control incl. Requester field | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
@@ -137,6 +138,8 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | Shell polish (theme switch, 1600px width, nav active state) | `cd client && npm test` | 8 files, 54 tests passed |
 | 15 — Create Ticket | `cd server && npm test` | 8 files, 62 tests passed |
 | 15 — Create Ticket | `cd client && npm test` | 9 files, 71 tests passed |
+| 16 — My Tickets | `cd server && npm test` | 9 files, 87 tests passed |
+| 16 — My Tickets | `cd client && npm test` | 10 files, 85 tests passed |
 
 ## 7. Known Limitations or Deferred Tests
 

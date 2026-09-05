@@ -233,3 +233,50 @@ export async function fetchTickets(
 
   return (await response.json()) as TicketListResponse
 }
+
+export interface TicketAttachment {
+  id: number
+  originalFilename: string
+  mimeType: string
+  sizeBytes: number
+  isRemoved: boolean
+  removedAt: string | null
+  removedReason: string | null
+  createdAt: string
+}
+
+export interface TicketDetail {
+  id: number
+  ticketNumber: string
+  requester: { id: number; name: string }
+  category: { id: number; name: string }
+  relatedSystem: { id: number; name: string }
+  summary: string
+  description: string
+  requestedPriority: RequestedPriority
+  currentStatus: string
+  createdAt: string
+  updatedAt: string
+  attachments: TicketAttachment[]
+}
+
+/**
+ * One owned Ticket in full (api-spec.md §6).
+ *
+ * A Ticket owned by someone else answers 404, identically to one that does
+ * not exist (BR-08) — so callers must not treat "not found" as "no access".
+ */
+export async function fetchTicket(
+  ticketId: number,
+  requesterId: number,
+): Promise<TicketDetail> {
+  const response = await fetch(
+    `${API_URL}/api/tickets/${ticketId}?requesterId=${requesterId}`,
+  )
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to load the Ticket')
+  }
+
+  return (await response.json()) as TicketDetail
+}

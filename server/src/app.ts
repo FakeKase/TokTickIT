@@ -294,6 +294,70 @@ export function createApp(prisma = createPrismaClient()) {
     }
   });
 
+  // api-spec.md §6. BR-08: a Ticket owned by someone else is indistinguishable
+  // from one that does not exist, so id enumeration reveals nothing.
+  app.get("/api/tickets/:id", async (req, res) => {
+    const requesterId = Number(
+      Array.isArray(req.query.requesterId)
+        ? req.query.requesterId[0]
+        : req.query.requesterId,
+    );
+    if (!Number.isInteger(requesterId) || requesterId <= 0) {
+      return res.status(400).json({ error: "A valid requesterId is required" });
+    }
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+      // Same 404 as a well-formed id that is not theirs — a different status
+      // here would tell a prober which ids are even plausible.
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    try {
+      const ticket = await prisma.ticket.findUnique({
+        where: { id: ticketId },
+        select: {
+          id: true,
+          ticketNumber: true,
+          requesterId: true,
+          summary: true,
+          description: true,
+          requestedPriority: true,
+          currentStatus: true,
+          createdAt: true,
+          updatedAt: true,
+          requester: { select: { id: true, name: true } },
+          category: { select: { id: true, name: true } },
+          relatedSystem: { select: { id: true, name: true } },
+          attachments: {
+            orderBy: { id: "asc" },
+            select: {
+              id: true,
+              originalFilename: true,
+              mimeType: true,
+              sizeBytes: true,
+              isRemoved: true,
+              removedAt: true,
+              removedReason: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+
+      if (!ticket || ticket.requesterId !== requesterId) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      // requesterId is dropped from the payload: the nested `requester` object
+      // carries the same fact in the shape api-spec.md §6 documents.
+      const { requesterId: _owner, ...detail } = ticket;
+      res.json(detail);
+    } catch {
+      res.status(500).json({ error: "Unable to load the Ticket" });
+    }
+  });
+
   // api-spec.md §7. multer runs first so the multipart body is parsed, then
   // every rejection path discards the file it wrote.
   app.post(

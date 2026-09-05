@@ -21,7 +21,7 @@ describe('Selected Requester context and guard', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     window.localStorage.clear()
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json(REQUESTERS))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json(REQUESTERS)))
   })
 
   afterEach(() => {

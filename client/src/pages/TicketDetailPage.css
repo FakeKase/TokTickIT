@@ -1,0 +1,86 @@
+/* Requester Ticket Detail (ui-spec.md §6.4): one read-only header card.
+   The Attachments panel arrives in Issue #18 as a separate card, never mixed
+   into this grid. */
+
+.ttk-detail {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.ttk-detail__back {
+  margin: 0 0 var(--zg-space-4);
+}
+
+.ttk-detail__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zg-space-4);
+  flex-wrap: wrap;
+  padding-bottom: var(--zg-space-4);
+  border-bottom: 1px solid var(--zg-border);
+}
+
+.ttk-detail__heading h2 {
+  margin: 0;
+}
+
+.ttk-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--zg-space-4);
+  margin: var(--zg-space-4) 0 0;
+}
+
+.ttk-detail__wide {
+  display: grid;
+  gap: var(--zg-space-4);
+  margin: var(--zg-space-4) 0 0;
+}
+
+.ttk-detail__field {
+  min-width: 0;
+}
+
+/* Read-only shading marks these as values rather than empty inputs, matching
+   the read-only field state in §3 without pretending to be a form control. */
+.ttk-detail__value {
+  margin: var(--zg-space-1) 0 0;
+  padding: var(--zg-space-2) var(--zg-space-3);
+  background: var(--zg-field-readonly-bg);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius);
+  overflow-wrap: anywhere;
+}
+
+/* Descriptions keep the line breaks the Requester typed. */
+.ttk-detail__description {
+  white-space: pre-wrap;
+}
+
+/* A badge carries its own fill; the surrounding value box would double it. */
+.ttk-detail__value:has(.ttk-badge) {
+  background: none;
+  border-color: transparent;
+  padding-left: 0;
+}
+
+/* Tablet (768–991px): three columns squeeze the labels, so drop to two. */
+@media (max-width: 991px) {
+  .ttk-detail__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile (<768px): everything stacks, no horizontal scroll. */
+@media (max-width: 767px) {
+  .ttk-detail__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ttk-detail__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--zg-space-2);
+  }
+}

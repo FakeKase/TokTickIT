@@ -26,7 +26,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | API-06 | API | AC-13, BR-09 | Search with no match | `200`; empty `data`, `totalItems: 0` | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
 | API-07 | API | AC-15, BR-12 | Pagination page 2 | Distinct, non-overlapping rows; correct `pagination` block | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
 | API-08 | API | AC-16, BR-11 | Sort by priority desc | High → Medium → Low, tie-broken by createdAt desc | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
-| API-09 | API | AC-03, BR-08 | Fetch a ticket owned by a different requester | `404`, no data leaked | `server/tests/lab-02/ticket-detail.api.test.ts` | Pending |
+| API-09 | API | AC-03, BR-08 | Fetch a ticket owned by a different requester | `404`, no data leaked | `server/tests/lab-02/ticket-detail.api.test.ts` | Pass |
 | API-10 | API | AC-18, BR-19 | Upload valid attachment | `201`; attachment appears in ticket detail | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-11 | API | AC-08, BR-20 | Upload file >5MB | `413`; not stored | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-12 | API | AC-09, BR-19 | Upload unsupported type | `415`; not stored | `server/tests/lab-02/attachments.api.test.ts` | Pass |
@@ -59,7 +59,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | UI-10 | UI | AC-13, AC-14, BR-28 | Empty vs. No-Results | Distinct copy/actions for each zero-result case | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
 | UI-11 | UI | AC-12, BR-05 | Switching requester | List reloads to the new requester's own tickets; an in-progress Create Ticket draft is discarded on switch | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
 | UI-21 | UI | FR-07 | Sorting is reachable at every width | A sort control lives outside the table, so hiding the table under 768px does not remove sorting | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
-| UI-12 | UI | AC-17 | Ticket Detail header | All fields render read-only, no editable controls | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pending |
+| UI-12 | UI | AC-17 | Ticket Detail header | All fields render read-only, no editable controls | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pass |
 | UI-13 | UI | AC-18, AC-20 | Attachment add/remove controls | New attachment appears without reload; removed shows badge, no Download | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
 | UI-14 | UI | AC-26 | Keyboard focus | Visible focus ring on every Create Ticket control incl. Requester field | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
 | UI-15 | UI | AC-02 | Guard on every Requester-scoped route | `/tickets`, `/tickets/new`, and `/tickets/:id` all redirect to the Selector when nothing is selected; the blocked path is resumed after Continue | `client/tests/lab-02/RequesterContext.test.tsx` | Pass |
@@ -140,6 +140,8 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | 15 — Create Ticket | `cd client && npm test` | 9 files, 71 tests passed |
 | 16 — My Tickets | `cd server && npm test` | 9 files, 87 tests passed |
 | 16 — My Tickets | `cd client && npm test` | 10 files, 85 tests passed |
+| 17 — Ticket Detail | `cd server && npm test` | 10 files, 98 tests passed |
+| 17 — Ticket Detail | `cd client && npm test` | 11 files, 96 tests passed |
 
 ## 7. Known Limitations or Deferred Tests
 

@@ -90,11 +90,19 @@ export interface CreateTicketInput {
  * it belongs to (BR-16).
  */
 export class ApiError extends Error {
+  /**
+   * The HTTP status that produced this error. Callers branch on it rather
+   * than on `message`: the wording is presentation and can change, whereas
+   * the status is the contract. A 404 in particular means something specific
+   * on ownership-scoped routes (BR-08) and must not be retried.
+   */
+  readonly status: number
   readonly fields: Record<string, string>
 
-  constructor(message: string, fields: Record<string, string> = {}) {
+  constructor(status: number, message: string, fields: Record<string, string> = {}) {
     super(message)
     this.name = 'ApiError'
+    this.status = status
     this.fields = fields
   }
 }
@@ -105,10 +113,11 @@ async function readError(response: Response, fallback: string): Promise<ApiError
       error?: string
       fields?: Record<string, string>
     }
-    return new ApiError(body.error ?? fallback, body.fields ?? {})
+    return new ApiError(response.status, body.error ?? fallback, body.fields ?? {})
   } catch {
-    // A non-JSON body (proxy error page, empty 502) must not mask the failure.
-    return new ApiError(fallback)
+    // A non-JSON body (proxy error page, empty 502) must not mask the failure,
+    // and the status is still meaningful even when the body is not.
+    return new ApiError(response.status, fallback)
   }
 }
 
@@ -232,4 +241,51 @@ export async function fetchTickets(
   }
 
   return (await response.json()) as TicketListResponse
+}
+
+export interface TicketAttachment {
+  id: number
+  originalFilename: string
+  mimeType: string
+  sizeBytes: number
+  isRemoved: boolean
+  removedAt: string | null
+  removedReason: string | null
+  createdAt: string
+}
+
+export interface TicketDetail {
+  id: number
+  ticketNumber: string
+  requester: { id: number; name: string }
+  category: { id: number; name: string }
+  relatedSystem: { id: number; name: string }
+  summary: string
+  description: string
+  requestedPriority: RequestedPriority
+  currentStatus: string
+  createdAt: string
+  updatedAt: string
+  attachments: TicketAttachment[]
+}
+
+/**
+ * One owned Ticket in full (api-spec.md §6).
+ *
+ * A Ticket owned by someone else answers 404, identically to one that does
+ * not exist (BR-08) — so callers must not treat "not found" as "no access".
+ */
+export async function fetchTicket(
+  ticketId: number,
+  requesterId: number,
+): Promise<TicketDetail> {
+  const response = await fetch(
+    `${API_URL}/api/tickets/${ticketId}?requesterId=${requesterId}`,
+  )
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to load the Ticket')
+  }
+
+  return (await response.json()) as TicketDetail
 }

@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import App from '../../src/App'
 import { REQUESTER_STORAGE_KEY } from '../../src/requester/requesterContext'
 import shellCss from '../../src/layout/AppShell.css?raw'
@@ -25,12 +25,19 @@ function renderAt(path: string) {
   return render(<App />)
 }
 
+// Scoped to the Primary nav landmark: pages may legitimately link to the same
+// destinations in their own body (Create Ticket has a "Back to My Tickets"
+// link), and those are not what the active-state rule is about.
+function primaryNav() {
+  return within(screen.getByRole('navigation', { name: 'Primary' }))
+}
+
 function navLink(name: RegExp) {
-  return screen.getByRole('link', { name })
+  return primaryNav().getByRole('link', { name })
 }
 
 function activeLinkNames() {
-  return screen
+  return primaryNav()
     .getAllByRole('link')
     .filter((link) => link.classList.contains(ACTIVE_CLASS))
     .map((link) => link.textContent)

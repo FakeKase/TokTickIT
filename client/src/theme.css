@@ -25,6 +25,15 @@
   --zg-neutral-tint: #e6e8e6;
   --zg-border: #cbd5ce;
 
+  /*
+   * Active nav underline. Deliberately NOT redefined in the dark block: it
+   * sits on the header, which is --zg-primary in both themes, so a single
+   * value is what actually makes it theme-independent. --zg-secondary cannot
+   * be used here — in the light theme it is #0b7a46 on #006b3c, 1.23:1, so
+   * the indicator is invisible. This is 4.2:1 on the header.
+   */
+  --zg-nav-active: #6fe3ab;
+
   /* Typography (ui-spec.md §2) */
   --zg-font-sans: -apple-system, 'Segoe UI', Roboto, sans-serif;
   --zg-font-size-base: 16px;

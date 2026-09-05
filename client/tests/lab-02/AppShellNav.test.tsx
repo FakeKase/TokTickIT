@@ -2,6 +2,8 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import App from '../../src/App'
 import { REQUESTER_STORAGE_KEY } from '../../src/requester/requesterContext'
+import shellCss from '../../src/layout/AppShell.css?raw'
+import themeCss from '../../src/theme.css?raw'
 
 // UI-18 (ui-spec.md §5, handout §8 "clear active-page indication"): exactly one
 // primary nav item is marked active on any Requester-scoped screen.
@@ -84,5 +86,53 @@ describe('Primary nav active state', () => {
     renderAt('/select-requester')
 
     expect(activeLinkNames()).toEqual([])
+  })
+})
+
+// UI-20: the active item is marked by the green rule under it, not by an
+// underlined word, and that rule stays visible in both themes.
+//
+// The header is --zg-primary in both themes, so --zg-nav-active is a single
+// theme-independent value — asserted here, because reaching for --zg-secondary
+// instead would be invisible in the light theme (#0b7a46 on #006b3c, 1.23:1).
+describe('Active nav underline styling', () => {
+  function activeRules() {
+    return [...shellCss.matchAll(/\.ttk-shell__nav-link--active\s*\{([^}]*)\}/g)].map((m) => m[1])
+  }
+
+  it('never underlines the text', () => {
+    for (const rule of activeRules()) {
+      expect(rule).not.toMatch(/text-decoration:\s*underline/)
+    }
+    expect(shellCss).not.toMatch(/text-decoration:\s*underline/)
+  })
+
+  it('marks the active item with the green rule at every breakpoint', () => {
+    const rules = activeRules()
+
+    // Desktop and the mobile dropdown both need it: the mobile block re-declares
+    // the link border after the desktop rule, so a missing override there would
+    // leave the open menu with no indicator at all.
+    expect(rules.length).toBeGreaterThanOrEqual(2)
+    for (const rule of rules) {
+      expect(rule).toMatch(/border-bottom-color:\s*var\(--zg-nav-active\)/)
+    }
+  })
+
+  it('does not let the mobile shorthand reset the active border', () => {
+    const mobileBlock = shellCss.slice(shellCss.indexOf('@media (max-width: 767px)'))
+
+    expect(mobileBlock).not.toMatch(/\.ttk-shell__nav-link\s*\{[^}]*border-bottom:\s/)
+  })
+
+  it('uses a theme-independent colour, since the header is the same in both themes', () => {
+    const light = themeCss.match(/:root\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+    const dark = themeCss.match(/:root\[data-theme='dark'\]\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+
+    expect(light).toMatch(/--zg-nav-active:/)
+    // Redefining it per theme would mean it had been tuned against something
+    // other than the header, which does not change between themes.
+    expect(dark).not.toMatch(/--zg-nav-active:/)
+    expect(dark).toMatch(/--zg-primary:\s*#006b3c/i)
   })
 })

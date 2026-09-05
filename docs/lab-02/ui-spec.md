@@ -55,6 +55,7 @@ background duplicates `--zg-bg`; `ThemeFlash.test.tsx` fails if the two drift ap
 | `--zg-warning` | `#E0A94A` | 7.8:1 on `--zg-surface` |
 | `--zg-success` | `#5FD39B` | 8.9:1 on `--zg-surface` |
 | `--zg-neutral-tint` | `#303A34` | Body text 10.1:1 |
+| `--zg-nav-active` | `#6FE3AB` *(not redefined — see §5)* | 4.2:1 on the header |
 | `--zg-border` | `#5C7169` | 3.2:1 on `--zg-surface` |
 
 ## 2. Typography & Spacing
@@ -96,7 +97,11 @@ validation message below the control.
   switches *to*, and `aria-pressed` reports whether dark is active. Switching cross-fades the
   colour tokens over 220ms — armed only for the switch itself, so first paint and ordinary
   hover changes are never animated — and is suppressed under `prefers-reduced-motion: reduce`.
-- Active nav item: underline + `--zg-secondary` text, and `aria-current="page"`. Exactly one
+- Active nav item: a 2px `--zg-nav-active` rule beneath the item, white text, and
+  `aria-current="page"`. No `text-decoration` — the marker is the rule under the item, not an
+  underlined word. `--zg-nav-active` is one value in both themes on purpose: it sits on the
+  header, which is `--zg-primary` in both. `--zg-secondary` cannot be used here — in the light
+  theme it is `#0B7A46` on `#006B3C`, 1.23:1, so the indicator would be invisible. Exactly one
   item is active at a time: **Create Ticket** owns `/tickets/new` alone, **My Tickets** owns
   `/tickets` and every Ticket Detail route, so the current section stays indicated while
   reading one ticket.

@@ -141,7 +141,7 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | 16 — My Tickets | `cd server && npm test` | 9 files, 87 tests passed |
 | 16 — My Tickets | `cd client && npm test` | 10 files, 85 tests passed |
 | 17 — Ticket Detail | `cd server && npm test` | 10 files, 98 tests passed |
-| 17 — Ticket Detail | `cd client && npm test` | 11 files, 94 tests passed |
+| 17 — Ticket Detail | `cd client && npm test` | 11 files, 96 tests passed |
 
 ## 7. Known Limitations or Deferred Tests
 

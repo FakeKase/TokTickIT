@@ -121,6 +121,40 @@ describe('Requester Ticket Detail', () => {
     expect(alert).toHaveTextContent(/does not exist, or it belongs to a different Requester/i)
   })
 
+  it('BR-08: keys off the 404 status, not the wording of the message', async () => {
+    // The previous version regex-matched "not found" in the message, so this
+    // reworded-but-still-404 response fell into the generic failure branch and
+    // offered a Retry that can never succeed. Nothing tied the client's string
+    // to the server's, so the old test only checked the client against itself.
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({ error: 'No such ticket for this requester' }, { status: 404 }),
+      ),
+    )
+
+    renderDetail()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/Ticket not found/i)
+    expect(screen.queryByRole('button', { name: /Retry/i })).not.toBeInTheDocument()
+  })
+
+  it('treats a 500 that happens to say "not found" as a retryable failure', async () => {
+    // The mirror image: matching on wording also mislabelled genuine server
+    // errors whose text merely contained the phrase.
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({ error: 'Upstream not found' }, { status: 500 }),
+      ),
+    )
+
+    renderDetail()
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(/Unable to load the Ticket/i)
+    expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument()
+  })
+
   it('offers a retry for a genuine failure, but not for a 404', async () => {
     mockApi(() => Promise.reject(new TypeError('Failed to fetch')))
 

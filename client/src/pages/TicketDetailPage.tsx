@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { fetchTicket } from '../api'
+import { ApiError, fetchTicket } from '../api'
 import type { RequestedPriority, TicketDetail } from '../api'
 import { Badge } from '../components/Badge'
 import type { BadgeTone } from '../components/Badge'
@@ -91,9 +91,12 @@ export function TicketDetailPage() {
     try {
       setTicket(await fetchTicket(ticketId, requesterId))
     } catch (error) {
-      // BR-08 makes 404 mean "not found OR not yours", indistinguishable on
-      // purpose — so the copy must not claim the Ticket exists.
-      if (error instanceof Error && /not found/i.test(error.message)) {
+      // Branch on the status, not the message: the wording is presentation
+      // and either side could reword it, whereas 404 is the contract.
+      // BR-08 makes that 404 mean "not found OR not yours", indistinguishable
+      // on purpose — so the copy must not claim the Ticket exists, and it
+      // must not offer a Retry that can never succeed.
+      if (error instanceof ApiError && error.status === 404) {
         setNotFound(true)
       } else {
         setFailed(true)

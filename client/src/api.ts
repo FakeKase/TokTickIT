@@ -90,11 +90,19 @@ export interface CreateTicketInput {
  * it belongs to (BR-16).
  */
 export class ApiError extends Error {
+  /**
+   * The HTTP status that produced this error. Callers branch on it rather
+   * than on `message`: the wording is presentation and can change, whereas
+   * the status is the contract. A 404 in particular means something specific
+   * on ownership-scoped routes (BR-08) and must not be retried.
+   */
+  readonly status: number
   readonly fields: Record<string, string>
 
-  constructor(message: string, fields: Record<string, string> = {}) {
+  constructor(status: number, message: string, fields: Record<string, string> = {}) {
     super(message)
     this.name = 'ApiError'
+    this.status = status
     this.fields = fields
   }
 }
@@ -105,10 +113,11 @@ async function readError(response: Response, fallback: string): Promise<ApiError
       error?: string
       fields?: Record<string, string>
     }
-    return new ApiError(body.error ?? fallback, body.fields ?? {})
+    return new ApiError(response.status, body.error ?? fallback, body.fields ?? {})
   } catch {
-    // A non-JSON body (proxy error page, empty 502) must not mask the failure.
-    return new ApiError(fallback)
+    // A non-JSON body (proxy error page, empty 502) must not mask the failure,
+    // and the status is still meaningful even when the body is not.
+    return new ApiError(response.status, fallback)
   }
 }
 

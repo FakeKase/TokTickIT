@@ -289,3 +289,30 @@ export async function fetchTicket(
 
   return (await response.json()) as TicketDetail
 }
+
+/** The download URL for an active Attachment (api-spec.md §9).
+ *
+ *  Built here rather than in a component so the requesterId seam stays in one
+ *  place — a plain <a href> would otherwise bypass it. */
+export function attachmentDownloadUrl(attachmentId: number, requesterId: number): string {
+  return `${API_URL}/api/attachments/${attachmentId}/download?requesterId=${requesterId}`
+}
+
+/** Soft-removes an owned Attachment (api-spec.md §10, BR-23/BR-25). */
+export async function removeAttachment(
+  attachmentId: number,
+  requesterId: number,
+  reason: string,
+): Promise<TicketAttachment> {
+  const response = await fetch(`${API_URL}/api/attachments/${attachmentId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requesterId, reason }),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to remove the Attachment')
+  }
+
+  return (await response.json()) as TicketAttachment
+}

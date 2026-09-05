@@ -4,6 +4,7 @@ import { ApiError, fetchTicket } from '../api'
 import type { RequestedPriority, TicketDetail } from '../api'
 import { Badge } from '../components/Badge'
 import type { BadgeTone } from '../components/Badge'
+import { AttachmentSection } from '../components/AttachmentSection'
 import { Card } from '../components/Card'
 import { ErrorState } from '../components/ErrorState'
 import { LoadingSpinner } from '../components/LoadingSpinner'
@@ -57,12 +58,12 @@ function ReadOnlyField({
 }
 
 /**
- * Requester Ticket Detail (ui-spec.md §6.4): the header card, read-only.
+ * Requester Ticket Detail (ui-spec.md §6.4): a read-only header card plus the
+ * Attachments panel, kept in separate cards so the acting controls are never
+ * mixed into fields AC-17 requires to be inert.
  *
- * The Attachments panel is Issue #18 and is deliberately absent rather than
- * stubbed — a disabled-looking panel would imply an action that does not
- * exist yet. Public Comments, Internal Notes, Actions Taken and any status
- * control stay out entirely (handout §4.2).
+ * Public Comments, Internal Notes, Actions Taken and any status control stay
+ * out entirely (handout §4.2).
  */
 export function TicketDetailPage() {
   const { id } = useParams()
@@ -171,6 +172,15 @@ export function TicketDetailPage() {
             </ReadOnlyField>
           </dl>
         </Card>
+      )}
+
+      {!loading && ticket && (
+        <AttachmentSection
+          ticketId={ticket.id}
+          requesterId={requester.id}
+          attachments={ticket.attachments}
+          onChange={(attachments) => setTicket({ ...ticket, attachments })}
+        />
       )}
     </div>
   )

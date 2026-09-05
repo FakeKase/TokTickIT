@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '../../src/App'
 import { REQUESTER_STORAGE_KEY } from '../../src/requester/requesterContext'
@@ -68,10 +68,15 @@ describe('Requester Ticket Detail', () => {
     expect(screen.getByText('Corporate Laptop')).toBeInTheDocument()
     expect(screen.getByText('Hardware')).toBeInTheDocument()
 
-    // AC-17: read-only means no form controls at all, not disabled ones.
-    expect(screen.queryAllByRole('textbox')).toHaveLength(0)
-    expect(screen.queryAllByRole('combobox')).toHaveLength(0)
-    expect(document.querySelectorAll('input, select, textarea')).toHaveLength(0)
+    // AC-17 governs the header card's fields. Scoped to that card rather than
+    // the document, because the Attachments panel below it is an acting area
+    // and legitimately owns a file input.
+    const header = document.querySelector('.ttk-detail__card')!
+    expect(header).toBeTruthy()
+    // Read-only means no form control at all here, not a disabled one.
+    expect(header.querySelectorAll('input, select, textarea')).toHaveLength(0)
+    expect(within(header as HTMLElement).queryAllByRole('textbox')).toHaveLength(0)
+    expect(within(header as HTMLElement).queryAllByRole('combobox')).toHaveLength(0)
   })
 
   it('shows both badges with their text label', async () => {

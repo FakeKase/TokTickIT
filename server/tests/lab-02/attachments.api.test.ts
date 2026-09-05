@@ -352,3 +352,274 @@ describe("API-13 the cap holds under concurrent uploads (BR-21)", () => {
     expect(created).toBe(stored);
   });
 });
+
+// API-14, API-15, API-16, API-17, API-27: metadata, download and soft removal
+// (api-spec.md §8-10). The ownership rule is the same one the upload endpoint
+// enforces, so these assert what a non-owner cannot learn from any of them.
+
+/**
+ * Uploads one Attachment, to its own fresh Ticket unless told otherwise.
+ * Sharing `ticketId` with the cases above would run into the 5-active cap
+ * they have already partly consumed, so each case here starts clean.
+ */
+async function makeAttachment(ticket?: number, filename = "doc.pdf") {
+  const target = ticket ?? (await makeTicket(requesterId));
+  const response = await upload(target, requesterId).attach(
+    "file",
+    Buffer.from("%PDF-1.4 fixture"),
+    { filename, contentType: "application/pdf" },
+  );
+  return response.body.id as number;
+}
+
+describe("API-14 GET /api/attachments/:id/download (AC-19)", () => {
+  it("returns the stored bytes with a filename header", async () => {
+    const id = await makeAttachment(undefined, "battery-report.pdf");
+
+    const response = await request(app)
+      .get(`/api/attachments/${id}/download?requesterId=${requesterId}`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers["content-type"]).toContain("application/pdf");
+    expect(response.headers["content-disposition"]).toContain(
+      'filename="battery-report.pdf"',
+    );
+    expect(response.body.toString()).toContain("%PDF-1.4 fixture");
+  });
+
+  it("strips quotes and newlines from a hostile filename", async () => {
+    // originalFilename is client-supplied; unescaped it could break the header.
+    const id = await makeAttachment(undefined, 'ev"il\nname.pdf');
+
+    const response = await request(app)
+      .get(`/api/attachments/${id}/download?requesterId=${requesterId}`);
+
+    const header = response.headers["content-disposition"];
+    expect(header).not.toContain('"il');
+    expect(header.split("\n")).toHaveLength(1);
+  });
+
+  it("returns metadata separately, without the stored filename", async () => {
+    const id = await makeAttachment();
+
+    const response = await request(app)
+      .get(`/api/attachments/${id}?requesterId=${requesterId}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.storedFilename).toBeUndefined();
+    expect(response.body.originalFilename).toBe("doc.pdf");
+  });
+});
+
+describe("API-15 removed Attachments are not downloadable (AC-21, BR-26)", () => {
+  it("answers 404, identically to one that never existed", async () => {
+    const id = await makeAttachment();
+    await request(app)
+      .delete(`/api/attachments/${id}`)
+      .send({ requesterId, reason: "Uploaded the wrong file" });
+
+    const removed = await request(app)
+      .get(`/api/attachments/${id}/download?requesterId=${requesterId}`);
+    const nonexistent = await request(app)
+      .get(`/api/attachments/2000000000/download?requesterId=${requesterId}`);
+
+    // BR-26: a distinct status would confirm the file was once there.
+    expect(removed.status).toBe(404);
+    expect(removed.status).toBe(nonexistent.status);
+    expect(removed.body).toEqual(nonexistent.body);
+  });
+
+  it("BR-24: still serves its metadata after removal", async () => {
+    const id = await makeAttachment();
+    await request(app)
+      .delete(`/api/attachments/${id}`)
+      .send({ requesterId, reason: "Superseded by a clearer scan" });
+
+    const response = await request(app)
+      .get(`/api/attachments/${id}?requesterId=${requesterId}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      isRemoved: true,
+      removedReason: "Superseded by a clearer scan",
+    });
+    expect(response.body.removedAt).not.toBeNull();
+  });
+
+  it("BR-23: leaves the file on disk", async () => {
+    const before = (await uploadedFiles()).length;
+    const id = await makeAttachment();
+    await request(app)
+      .delete(`/api/attachments/${id}`)
+      .send({ requesterId, reason: "Wrong screenshot" });
+
+    // Lab 2 keeps the bytes; only the row is marked.
+    expect((await uploadedFiles()).length).toBe(before + 1);
+  });
+});
+
+describe("API-16 removal requires a reason (AC-22, BR-25)", () => {
+  it("rejects a missing reason and changes nothing", async () => {
+    const id = await makeAttachment();
+
+    const response = await request(app)
+      .delete(`/api/attachments/${id}`)
+      .send({ requesterId });
+
+    expect(response.status).toBe(400);
+    expect(response.body.fields.reason).toBeTruthy();
+    const still = await prisma.attachment.findUnique({ where: { id } });
+    expect(still?.isRemoved).toBe(false);
+  });
+
+  it("rejects a reason under 3 characters, including one that is only spaces", async () => {
+    const id = await makeAttachment();
+
+    for (const reason of ["ab", "   ", ""]) {
+      const response = await request(app)
+        .delete(`/api/attachments/${id}`)
+        .send({ requesterId, reason });
+      expect(response.status).toBe(400);
+    }
+
+    const still = await prisma.attachment.findUnique({ where: { id } });
+    expect(still?.isRemoved).toBe(false);
+  });
+
+  it("stores the trimmed reason", async () => {
+    const id = await makeAttachment();
+
+    const response = await request(app)
+      .delete(`/api/attachments/${id}`)
+      .send({ requesterId, reason: "   Wrong file uploaded   " });
+
+    expect(response.body.removedReason).toBe("Wrong file uploaded");
+  });
+});
+
+describe("API-17 soft removal keeps the row (AC-20, BR-23)", () => {
+  it("returns the removed metadata and never deletes the row", async () => {
+    const id = await makeAttachment();
+
+    const response = await request(app)
+      .delete(`/api/attachments/${id}`)
+      .send({ requesterId, reason: "Replaced with a clearer photo" });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ id, isRemoved: true });
+    expect(await prisma.attachment.findUnique({ where: { id } })).not.toBeNull();
+  });
+
+  it("is not silently repeatable", async () => {
+    const id = await makeAttachment();
+    const first = await request(app)
+      .delete(`/api/attachments/${id}`)
+      .send({ requesterId, reason: "First removal" });
+    const second = await request(app)
+      .delete(`/api/attachments/${id}`)
+      .send({ requesterId, reason: "Second attempt" });
+
+    expect(first.status).toBe(200);
+    // 409 rather than a 404: the owner already knows it exists, so this
+    // reveals nothing the ownership checks are protecting.
+    expect(second.status).toBe(409);
+
+    const stored = await prisma.attachment.findUnique({ where: { id } });
+    expect(stored?.removedReason).toBe("First removal");
+  });
+
+  it("frees a slot under the 5-attachment cap", async () => {
+    const capTicket = await makeTicket(requesterId);
+    const ids: number[] = [];
+    for (let i = 0; i < 5; i += 1) ids.push(await makeAttachment(capTicket, `f${i}.pdf`));
+
+    const blocked = await upload(capTicket, requesterId).attach("file", PNG, {
+      filename: "sixth.png",
+      contentType: "image/png",
+    });
+    expect(blocked.status).toBe(409);
+
+    await request(app)
+      .delete(`/api/attachments/${ids[0]}`)
+      .send({ requesterId, reason: "Making room" });
+
+    const allowed = await upload(capTicket, requesterId).attach("file", PNG, {
+      filename: "replacement.png",
+      contentType: "image/png",
+    });
+    expect(allowed.status).toBe(201);
+  });
+});
+
+describe("API-27 cross-Requester access (AC-34, BR-08/BR-25)", () => {
+  it("answers 404 for metadata, download and removal alike", async () => {
+    const id = await makeAttachment();
+
+    const metadata = await request(app)
+      .get(`/api/attachments/${id}?requesterId=${otherRequesterId}`);
+    const download = await request(app)
+      .get(`/api/attachments/${id}/download?requesterId=${otherRequesterId}`);
+    const removal = await request(app)
+      .delete(`/api/attachments/${id}`)
+      .send({ requesterId: otherRequesterId, reason: "Not mine to remove" });
+
+    expect([metadata.status, download.status, removal.status]).toEqual([404, 404, 404]);
+  });
+
+  it("is indistinguishable from a nonexistent Attachment", async () => {
+    const id = await makeAttachment();
+
+    const notOwned = await request(app)
+      .get(`/api/attachments/${id}?requesterId=${otherRequesterId}`);
+    const nonexistent = await request(app)
+      .get(`/api/attachments/2000000000?requesterId=${otherRequesterId}`);
+
+    expect(notOwned.body).toEqual(nonexistent.body);
+  });
+
+  it("does not remove the Attachment a non-owner asked to remove", async () => {
+    const id = await makeAttachment();
+
+    await request(app)
+      .delete(`/api/attachments/${id}`)
+      .send({ requesterId: otherRequesterId, reason: "Not mine to remove" });
+
+    const stored = await prisma.attachment.findUnique({ where: { id } });
+    expect(stored?.isRemoved).toBe(false);
+  });
+
+  it("requires a requesterId on every one of the three", async () => {
+    const id = await makeAttachment();
+
+    const metadata = await request(app).get(`/api/attachments/${id}`);
+    const download = await request(app).get(`/api/attachments/${id}/download`);
+    const removal = await request(app)
+      .delete(`/api/attachments/${id}`)
+      .send({ reason: "No requester supplied" });
+
+    expect([metadata.status, download.status, removal.status]).toEqual([400, 400, 400]);
+  });
+});
+
+describe("API-17 removal is atomic under concurrency (BR-23)", () => {
+  it("admits exactly one removal when several land at once", async () => {
+    const id = await makeAttachment();
+
+    // Sequential deletes cannot expose a check-then-update race: the first
+    // commits before the second reads. These overlap deliberately.
+    const responses = await Promise.all(
+      ["First reason", "Second reason", "Third reason"].map((reason) =>
+        request(app).delete(`/api/attachments/${id}`).send({ requesterId, reason }),
+      ),
+    );
+
+    const statuses = responses.map((r) => r.status).sort();
+    expect(statuses).toEqual([200, 409, 409]);
+
+    // The winner's reason must survive — a later update overwriting it would
+    // mean two callers both believed they had removed it.
+    const winner = responses.find((r) => r.status === 200)!;
+    const stored = await prisma.attachment.findUnique({ where: { id } });
+    expect(stored?.removedReason).toBe(winner.body.removedReason);
+  });
+});

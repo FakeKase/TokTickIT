@@ -1,0 +1,114 @@
+/* Ticket Detail attachment panel (ui-spec.md §6.4): its own card, sectioned
+   away from the read-only header so the acting controls are never mixed in
+   with fields AC-17 requires to be inert. */
+
+.ttk-attachments {
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+  box-shadow: 0 1px 3px rgba(31, 46, 39, 0.08);
+  padding: var(--zg-space-6);
+  margin-top: var(--zg-space-4);
+}
+
+.ttk-attachments h3 {
+  margin-top: 0;
+}
+
+.ttk-attachments__add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-2);
+  padding-bottom: var(--zg-space-4);
+  border-bottom: 1px solid var(--zg-border);
+}
+
+.ttk-attachments__hint {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.ttk-attachments__empty {
+  margin: var(--zg-space-4) 0 0;
+  opacity: 0.75;
+}
+
+.ttk-attachments__list {
+  list-style: none;
+  margin: var(--zg-space-4) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-3);
+}
+
+.ttk-attachments__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--zg-space-3);
+  flex-wrap: wrap;
+  padding: var(--zg-space-3);
+  background: var(--zg-pale);
+  border-radius: var(--zg-radius);
+}
+
+/* Removed rows read as archived metadata, not as something still actionable. */
+.ttk-attachments__row--removed {
+  background: var(--zg-field-readonly-bg);
+}
+
+.ttk-attachments__meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-1);
+  min-width: 0;
+}
+
+/* Long filenames wrap rather than pushing the actions off the row
+   (ui-spec.md §8: no unreadable attachment names). */
+.ttk-attachments__name {
+  font-weight: var(--zg-font-weight-label);
+  overflow-wrap: anywhere;
+}
+
+.ttk-attachments__actions {
+  display: flex;
+  gap: var(--zg-space-2);
+  flex-shrink: 0;
+}
+
+.ttk-attachments__confirm {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-2);
+  padding-top: var(--zg-space-3);
+  border-top: 1px solid var(--zg-border);
+}
+
+.ttk-attachments__confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--zg-space-2);
+}
+
+/* Mobile (<768px): actions drop below the metadata instead of squeezing it. */
+@media (max-width: 767px) {
+  .ttk-attachments__row {
+    flex-direction: column;
+  }
+
+  .ttk-attachments__actions {
+    width: 100%;
+  }
+
+  .ttk-attachments__confirm-actions {
+    flex-direction: column-reverse;
+  }
+
+  .ttk-attachments__confirm-actions .ttk-btn {
+    width: 100%;
+  }
+}

@@ -31,10 +31,10 @@ E2E/visual tests use Playwright against a running dev stack.
 | API-11 | API | AC-08, BR-20 | Upload file >5MB | `413`; not stored | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-12 | API | AC-09, BR-19 | Upload unsupported type | `415`; not stored | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-13 | API | AC-10, BR-21 | Upload 6th active attachment, sequentially and concurrently | `409`; the cap holds at 5 even when six uploads overlap | `server/tests/lab-02/attachments.api.test.ts` | Pass |
-| API-14 | API | AC-19 | Download active attachment | `200`; correct bytes + `Content-Disposition` | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-15 | API | AC-21, BR-26 | Download removed attachment | `404` | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-16 | API | AC-22, BR-25 | Soft-remove without reason | `400`; attachment still active | `server/tests/lab-02/attachments.api.test.ts` | Pending |
-| API-17 | API | AC-20, BR-23 | Soft-remove with reason | `200`; `isRemoved: true`, metadata retained | `server/tests/lab-02/attachments.api.test.ts` | Pending |
+| API-14 | API | AC-19 | Download active attachment | `200`; correct bytes + `Content-Disposition` | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-15 | API | AC-21, BR-26 | Download removed attachment | `404` | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-16 | API | AC-22, BR-25 | Soft-remove without reason | `400`; attachment still active | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-17 | API | AC-20, BR-23 | Soft-remove with reason | `200`; `isRemoved: true`, metadata retained | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-18 | API | BR-04 | Inactive requester excluded | `GET /api/requesters` omits inactive seed row | `server/tests/lab-02/requesters.api.test.ts` | Pass |
 | API-29 | API | BR-03, BR-29, api-spec §1 | `GET /api/requesters` contract | Returns only `id`/`name`/`email`, ordered by name asc; a database failure returns a safe `500` message with no internal detail | `server/tests/lab-02/requesters.api.test.ts` | Pass |
 | API-19 | API | FR-14 | Reference data endpoints | Categories + related systems return seeded rows | `server/tests/lab-02/reference-data.api.test.ts` | Pass |
@@ -45,7 +45,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | API-24 | API | AC-31, AC-16, BR-11 | Sorting: default order, Requested Priority order, and tie-breaks | Default is Created Date desc; Priority desc is High→Medium→Low (pinning the Postgres enum declaration order it depends on); ties break by Created Date desc then id desc | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
 | API-25 | API | AC-32, BR-12 | Out-of-range `page` (e.g. `0`, `-1`) and oversized `pageSize` (e.g. `500`) | Values clamped to nearest valid bound, not rejected | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
 | API-26 | API | AC-33, BR-09 | Search term matching an existing ticket's Number or Summary | Only the matching, owned ticket(s) returned | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
-| API-27 | API | AC-34, BR-08/BR-25 | Requester B requests Requester A's Attachment metadata, download, and removal | `404` on all three, identical to a nonexistent attachment | `server/tests/lab-02/attachments.api.test.ts` | Pending |
+| API-27 | API | AC-34, BR-08/BR-25 | Requester B requests Requester A's Attachment metadata, download, and removal | `404` on all three, identical to a nonexistent attachment | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-28 | API | AC-35, BR-22 | Ticket created successfully, then its attachment upload fails (e.g. oversized/invalid file) | Ticket still exists and is fetchable; failed file not attached; retry succeeds from Ticket Detail | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | UI-01 | UI | BR-04 | Selector lists only active requesters | Inactive seed row never rendered | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
 | UI-02 | UI | AC-23 | Selector empty state | Safe empty message; no selectable dropdown | `client/tests/lab-02/RequesterSelector.test.tsx` | Pass |
@@ -60,7 +60,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | UI-11 | UI | AC-12, BR-05 | Switching requester | List reloads to the new requester's own tickets; an in-progress Create Ticket draft is discarded on switch | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
 | UI-21 | UI | FR-07 | Sorting is reachable at every width | A sort control lives outside the table, so hiding the table under 768px does not remove sorting | `client/tests/lab-02/MyTickets.test.tsx` | Pass |
 | UI-12 | UI | AC-17 | Ticket Detail header | All fields render read-only, no editable controls | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | Pass |
-| UI-13 | UI | AC-18, AC-20 | Attachment add/remove controls | New attachment appears without reload; removed shows badge, no Download | `client/tests/lab-02/AttachmentSection.test.tsx` | Pending |
+| UI-13 | UI | AC-18, AC-20 | Attachment add/remove controls | New attachment appears without reload; removed shows badge, no Download | `client/tests/lab-02/AttachmentSection.test.tsx` | Pass |
 | UI-14 | UI | AC-26 | Keyboard focus | Visible focus ring on every Create Ticket control incl. Requester field | `client/tests/lab-02/CreateTicket.test.tsx` | Pass |
 | UI-15 | UI | AC-02 | Guard on every Requester-scoped route | `/tickets`, `/tickets/new`, and `/tickets/:id` all redirect to the Selector when nothing is selected; the blocked path is resumed after Continue | `client/tests/lab-02/RequesterContext.test.tsx` | Pass |
 | UI-16 | UI | BR-03, BR-05 | Selection persistence and replacement | Selection survives a reload, switching replaces the previous Requester outright, and corrupted stored data falls back to "nothing selected" instead of crashing | `client/tests/lab-02/RequesterContext.test.tsx` | Pass |
@@ -142,6 +142,8 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | 16 — My Tickets | `cd client && npm test` | 10 files, 85 tests passed |
 | 17 — Ticket Detail | `cd server && npm test` | 10 files, 98 tests passed |
 | 17 — Ticket Detail | `cd client && npm test` | 11 files, 96 tests passed |
+| 18 — Attachments | `cd server && npm test` | 10 files, 114 tests passed |
+| 18 — Attachments | `cd client && npm test` | 12 files, 111 tests passed |
 
 ## 7. Known Limitations or Deferred Tests
 

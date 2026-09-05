@@ -460,5 +460,152 @@ export function createApp(prisma = createPrismaClient()) {
     },
   );
 
+  /**
+   * Resolves an Attachment the caller owns, or null.
+   *
+   * BR-08/BR-25/AC-34: not-owned and nonexistent are the same answer, so every
+   * caller below turns null into an identical 404 — metadata, download and
+   * removal included. Ownership runs through the parent Ticket, since that is
+   * where it lives.
+   */
+  async function findOwnedAttachment(rawId: unknown, requesterId: number) {
+    const id = Number(rawId);
+    if (!Number.isInteger(id) || id <= 0) return null;
+
+    const attachment = await prisma.attachment.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        ticketId: true,
+        originalFilename: true,
+        storedFilename: true,
+        mimeType: true,
+        sizeBytes: true,
+        isRemoved: true,
+        removedAt: true,
+        removedReason: true,
+        createdAt: true,
+        ticket: { select: { requesterId: true } },
+      },
+    });
+
+    if (!attachment || attachment.ticket.requesterId !== requesterId) return null;
+    return attachment;
+  }
+
+  /** The metadata shape api-spec.md §8 documents — never the stored filename. */
+  function attachmentPayload(
+    attachment: Awaited<ReturnType<typeof findOwnedAttachment>>,
+  ) {
+    if (!attachment) return null;
+    const { storedFilename: _stored, ticket: _ticket, ...payload } = attachment;
+    return payload;
+  }
+
+  function requesterIdFrom(value: unknown): number | null {
+    const id = Number(Array.isArray(value) ? value[0] : value);
+    return Number.isInteger(id) && id > 0 ? id : null;
+  }
+
+  // api-spec.md §8: one Attachment's metadata, active or removed.
+  app.get("/api/attachments/:id", async (req, res) => {
+    const requesterId = requesterIdFrom(req.query.requesterId);
+    if (requesterId === null) {
+      return res.status(400).json({ error: "A valid requesterId is required" });
+    }
+
+    const attachment = await findOwnedAttachment(req.params.id, requesterId);
+    if (!attachment) {
+      return res.status(404).json({ error: "Attachment not found" });
+    }
+
+    res.json(attachmentPayload(attachment));
+  });
+
+  // api-spec.md §9: the file itself.
+  app.get("/api/attachments/:id/download", async (req, res) => {
+    const requesterId = requesterIdFrom(req.query.requesterId);
+    if (requesterId === null) {
+      return res.status(400).json({ error: "A valid requesterId is required" });
+    }
+
+    const attachment = await findOwnedAttachment(req.params.id, requesterId);
+
+    // BR-26/AC-21: a removed Attachment answers exactly as a nonexistent one
+    // does. Deliberately not 410 — a distinct status would confirm to anyone
+    // probing the URL that the file was once there.
+    if (!attachment || attachment.isRemoved) {
+      return res.status(404).json({ error: "Attachment not found" });
+    }
+
+    res.type(attachment.mimeType);
+    res.setHeader(
+      "Content-Disposition",
+      // The original name is client-supplied, so quotes and control characters
+      // are stripped before it reaches a header.
+      `attachment; filename="${attachment.originalFilename.replace(/[\r\n"\\]/g, "")}"`,
+    );
+    res.sendFile(path.join(UPLOADS_DIR, attachment.storedFilename), (error) => {
+      // The row can outlive its file (BR-23 keeps rows forever). Answer 404
+      // rather than leaking a stack trace through the default handler.
+      if (error && !res.headersSent) {
+        res.status(404).json({ error: "Attachment not found" });
+      }
+    });
+  });
+
+  // api-spec.md §10: soft removal (BR-23/BR-24/BR-25).
+  app.delete("/api/attachments/:id", async (req, res) => {
+    const requesterId = requesterIdFrom(req.body?.requesterId);
+    if (requesterId === null) {
+      return res.status(400).json({ error: "A valid requesterId is required" });
+    }
+
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
+    // BR-25. Checked before the lookup so a bad reason cannot be used to probe
+    // which Attachment ids exist.
+    if (reason.length < 3) {
+      return res.status(400).json({
+        error: "Validation failed",
+        fields: { reason: "A removal reason of at least 3 characters is required." },
+      });
+    }
+
+    const attachment = await findOwnedAttachment(req.params.id, requesterId);
+    if (!attachment) {
+      return res.status(404).json({ error: "Attachment not found" });
+    }
+
+    // BR-23: the owner already knows this one exists, so 409 reveals nothing
+    // new — unlike the ownership 404s above.
+    if (attachment.isRemoved) {
+      return res.status(409).json({ error: "This Attachment was already removed" });
+    }
+
+    try {
+      const removed = await prisma.attachment.update({
+        where: { id: attachment.id },
+        data: { isRemoved: true, removedAt: new Date(), removedReason: reason },
+        select: {
+          id: true,
+          ticketId: true,
+          originalFilename: true,
+          mimeType: true,
+          sizeBytes: true,
+          isRemoved: true,
+          removedAt: true,
+          removedReason: true,
+          createdAt: true,
+        },
+      });
+
+      // BR-23 is explicit that the file stays on disk in Lab 2; nothing here
+      // unlinks it.
+      res.json(removed);
+    } catch {
+      res.status(500).json({ error: "Unable to remove the Attachment" });
+    }
+  });
+
   return app;
 }

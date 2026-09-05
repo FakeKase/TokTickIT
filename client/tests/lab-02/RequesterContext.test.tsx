@@ -9,8 +9,8 @@ import { REQUESTER_STORAGE_KEY } from '../../src/requester/requesterContext'
 // (UI-04) lands with that screen in Issue 16.
 
 const REQUESTERS = [
-  { id: 1, name: 'Jennifer Anderson', email: 'jennifer.anderson@toktickit.test' },
-  { id: 2, name: 'Marcus Lee', email: 'marcus.lee@toktickit.test' },
+  { id: 1, name: 'Peter Parker', email: 'peter.parker@toktickit.test' },
+  { id: 2, name: 'Ned Leeds', email: 'ned.leeds@toktickit.test' },
 ]
 
 function goTo(path: string) {
@@ -64,7 +64,7 @@ describe('Selected Requester context and guard', () => {
 
     render(<App />)
 
-    expect(await screen.findByText('Jennifer Anderson')).toBeInTheDocument()
+    expect(await screen.findByText('Peter Parker')).toBeInTheDocument()
     expect(window.location.pathname).toBe('/tickets')
   })
 
@@ -82,9 +82,9 @@ describe('Selected Requester context and guard', () => {
     await user.click(screen.getByRole('button', { name: /Continue/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('Marcus Lee')).toBeInTheDocument()
+      expect(screen.getByText('Ned Leeds')).toBeInTheDocument()
     })
-    expect(screen.queryByText('Jennifer Anderson')).not.toBeInTheDocument()
+    expect(screen.queryByText('Peter Parker')).not.toBeInTheDocument()
     expect(JSON.parse(window.localStorage.getItem(REQUESTER_STORAGE_KEY) ?? 'null')).toEqual(
       REQUESTERS[1],
     )

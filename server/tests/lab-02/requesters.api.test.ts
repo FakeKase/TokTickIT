@@ -19,17 +19,18 @@ describe("API-18 GET /api/requesters", () => {
 
     const emails = response.body.map((r: { email: string }) => r.email);
     expect(emails).not.toContain("david.kim@toktickit.test");
-    expect(emails).toContain("jennifer.anderson@toktickit.test");
+    expect(emails).toContain("peter.parker@toktickit.test");
   });
 
   it("returns every active seeded Requester", async () => {
     const response = await request(createApp()).get("/api/requesters");
 
+    // Ordered by name asc (BR-04), not by id.
     expect(response.body.map((r: { name: string }) => r.name)).toEqual([
-      "Jennifer Anderson",
-      "Marcus Lee",
-      "Priya Natarajan",
-      "Somchai Charoenkul",
+      "Michelle Jones",
+      "Ned Leeds",
+      "Peter Parker",
+      "Roronoa Zoro",
     ]);
   });
 

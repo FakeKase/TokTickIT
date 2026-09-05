@@ -9,10 +9,10 @@ import { REQUESTER_STORAGE_KEY } from '../../src/requester/requesterContext'
 // route, provider, and screen are exercised together rather than in isolation.
 
 const ACTIVE_REQUESTERS = [
-  { id: 1, name: 'Jennifer Anderson', email: 'jennifer.anderson@toktickit.test' },
-  { id: 2, name: 'Marcus Lee', email: 'marcus.lee@toktickit.test' },
-  { id: 3, name: 'Priya Natarajan', email: 'priya.natarajan@toktickit.test' },
-  { id: 4, name: 'Somchai Charoenkul', email: 'somchai.charoenkul@toktickit.test' },
+  { id: 1, name: 'Peter Parker', email: 'peter.parker@toktickit.test' },
+  { id: 2, name: 'Ned Leeds', email: 'ned.leeds@toktickit.test' },
+  { id: 3, name: 'Michelle Jones', email: 'michelle.jones@toktickit.test' },
+  { id: 4, name: 'Roronoa Zoro', email: 'roronoa.zoro@toktickit.test' },
 ]
 
 function renderSelector() {
@@ -43,10 +43,10 @@ describe('Development Requester Selection', () => {
 
     expect(optionLabels).toEqual([
       'Choose a Requester…',
-      'Jennifer Anderson',
-      'Marcus Lee',
-      'Priya Natarajan',
-      'Somchai Charoenkul',
+      'Peter Parker',
+      'Ned Leeds',
+      'Michelle Jones',
+      'Roronoa Zoro',
     ])
     expect(screen.queryByText('David Kim')).not.toBeInTheDocument()
   })
@@ -97,7 +97,7 @@ describe('Development Requester Selection', () => {
     await user.click(screen.getByRole('button', { name: /Continue/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('Marcus Lee')).toBeInTheDocument()
+      expect(screen.getByText('Ned Leeds')).toBeInTheDocument()
     })
     expect(JSON.parse(window.localStorage.getItem(REQUESTER_STORAGE_KEY) ?? 'null')).toEqual(
       ACTIVE_REQUESTERS[1],

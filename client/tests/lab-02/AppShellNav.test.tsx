@@ -14,8 +14,8 @@ import themeCss from '../../src/theme.css?raw'
 
 const REQUESTER = {
   id: 1,
-  name: 'Jennifer Anderson',
-  email: 'jennifer.anderson@toktickit.test',
+  name: 'Peter Parker',
+  email: 'peter.parker@toktickit.test',
 }
 
 const ACTIVE_CLASS = 'ttk-shell__nav-link--active'

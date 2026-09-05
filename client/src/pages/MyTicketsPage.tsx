@@ -214,6 +214,40 @@ export function MyTicketsPage() {
             )}
           </Field>
 
+          {/* Mobile only: the table header carries the sort buttons, and the
+              table is hidden under 768px, so FR-07 would otherwise be
+              unreachable on a phone. Sorting applies immediately here, the
+              same as clicking a column header — it is not a pending filter. */}
+          <div className="ttk-my-tickets__sort">
+            <Field id="sort-by" label="Sort by">
+              {(attrs) => (
+                <select
+                  {...attrs}
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value as NonNullable<SortField>)
+                    setPage(1)
+                  }}
+                >
+                  {SORT_COLUMNS.map((column) => (
+                    <option key={column.field} value={column.field}>
+                      {column.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </Field>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))
+                setPage(1)
+              }}
+            >
+              {sortDir === 'asc' ? 'Ascending' : 'Descending'}
+            </Button>
+          </div>
+
           <div className="ttk-my-tickets__toolbar-actions">
             <Button type="submit">Apply</Button>
             <Button variant="secondary" onClick={clearFilters}>

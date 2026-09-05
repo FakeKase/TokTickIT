@@ -253,6 +253,35 @@ describe('My Tickets', () => {
     expect(header).toHaveAttribute('aria-sort', 'ascending')
   })
 
+  it('FR-07: keeps a sort control outside the table, for widths where it is hidden', async () => {
+    const user = userEvent.setup()
+    mockApi(() => listResponse([ticket(1)]))
+
+    renderList()
+    await screen.findByText('TKT-2026-000001')
+
+    // Under 768px the table — and every sort button in its header — is
+    // display:none, so a control that lives outside it is the only thing
+    // keeping sorting reachable on a phone.
+    // Re-query the toolbar each time rather than holding a `within` handle:
+    // the form remounts across these updates, which detaches the old node.
+    const toolbar = () => within(screen.getByRole('search'))
+
+    expect(toolbar().getByLabelText(/Sort by/i)).toBeInTheDocument()
+
+    await user.selectOptions(toolbar().getByLabelText(/Sort by/i), 'requestedPriority')
+    await waitFor(() => {
+      expect(requestedQueries[requestedQueries.length - 1]).toContain(
+        'sortBy=requestedPriority',
+      )
+    })
+
+    await user.click(toolbar().getByText(/^(Descending|Ascending)$/))
+    await waitFor(() => {
+      expect(requestedQueries[requestedQueries.length - 1]).toContain('sortDir=asc')
+    })
+  })
+
   it('renders both priority and status badges with their text label', async () => {
     mockApi(() => listResponse([ticket(1, { requestedPriority: 'HIGH' })]))
 

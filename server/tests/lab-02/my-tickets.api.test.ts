@@ -99,6 +99,17 @@ beforeAll(async () => {
     );
   }
 
+  // Deliberately out of step: the newest row by id carries the OLDEST
+  // createdAt. Without it, id-desc and createdAt-desc produce identical
+  // output on this data and the AC-16 tie-break test cannot tell them apart.
+  owned.push(
+    await seedTicket(ownerId, {
+      summary: "Backdated ticket",
+      requestedPriority: "MEDIUM",
+      createdAt: new Date("2020-01-01T00:00:00.000Z"),
+    }),
+  );
+
   await seedTicket(otherId, { summary: "VPN keeps dropping for someone else" });
 });
 
@@ -115,8 +126,8 @@ describe("API-05 ownership scoping (AC-11, BR-07/BR-08)", () => {
     const response = await list({ pageSize: 50 });
 
     expect(response.status).toBe(200);
-    expect(response.body.data).toHaveLength(12);
-    expect(response.body.pagination.totalItems).toBe(12);
+    expect(response.body.data).toHaveLength(13);
+    expect(response.body.pagination.totalItems).toBe(13);
   });
 
   it("never leaks another Requester's Ticket, even on a matching search", async () => {
@@ -225,7 +236,7 @@ describe("API-23 filters (AC-30, BR-10)", () => {
     const response = await list({ categoryId: "not-a-number", pageSize: 50 });
 
     expect(response.status).toBe(200);
-    expect(response.body.data).toHaveLength(12);
+    expect(response.body.data).toHaveLength(13);
     expect(response.body.filtered).toBe(false);
   });
 });
@@ -255,6 +266,46 @@ describe("API-24 sorting (AC-31, AC-16, BR-11)", () => {
     const dates = response.body.data.map((t: { createdAt: string }) =>
       new Date(t.createdAt).getTime(),
     );
+    expect(dates).toEqual([...dates].sort((a, b) => b - a));
+  });
+
+  it("AC-16: sorts Requested Priority High -> Medium -> Low, not alphabetically", async () => {
+    // This is also the guard on schema.prisma's enum declaration order:
+    // Postgres sorts a native enum by declaration sequence, so reordering
+    // LOW/MEDIUM/HIGH there would silently invert this and fail here.
+    // Alphabetically descending would be MEDIUM, LOW, HIGH — nothing like it.
+    const response = await list({
+      sortBy: "requestedPriority",
+      sortDir: "desc",
+      pageSize: 50,
+    });
+
+    const priorities = response.body.data.map(
+      (t: { requestedPriority: string }) => t.requestedPriority,
+    );
+    const rank = { HIGH: 0, MEDIUM: 1, LOW: 2 } as Record<string, number>;
+
+    expect(priorities[0]).toBe("HIGH");
+    expect(priorities.at(-1)).toBe("LOW");
+    expect(priorities.map((p: string) => rank[p])).toEqual(
+      [...priorities.map((p: string) => rank[p])].sort((a, b) => a - b),
+    );
+  });
+
+  it("AC-16: breaks a Requested Priority tie by Created Date descending", async () => {
+    const response = await list({
+      sortBy: "requestedPriority",
+      sortDir: "desc",
+      requestedPriority: "MEDIUM",
+      pageSize: 50,
+    });
+
+    // Every row here shares a priority, so only the tie-break orders them —
+    // and AC-16 names Created Date, not id.
+    const dates = response.body.data.map((t: { createdAt: string }) =>
+      new Date(t.createdAt).getTime(),
+    );
+    expect(dates.length).toBeGreaterThan(1);
     expect(dates).toEqual([...dates].sort((a, b) => b - a));
   });
 
@@ -295,7 +346,7 @@ describe("API-25 pagination (AC-15, AC-32, BR-12)", () => {
     expect(response.body.pagination).toMatchObject({
       page: 1,
       pageSize: 5,
-      totalItems: 12,
+      totalItems: 13,
       totalPages: 3,
     });
   });
@@ -321,7 +372,7 @@ describe("API-25 pagination (AC-15, AC-32, BR-12)", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual([]);
-    expect(response.body.pagination.totalItems).toBe(12);
+    expect(response.body.pagination.totalItems).toBe(13);
   });
 });
 

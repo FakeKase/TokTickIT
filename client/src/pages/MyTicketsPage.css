@@ -34,6 +34,12 @@
   gap: var(--zg-space-2);
 }
 
+/* Hidden wherever the table's sortable headers are available; the two would
+   otherwise be duplicate controls for the same state. */
+.ttk-my-tickets__sort {
+  display: none;
+}
+
 /* ---------- Desktop / tablet table ---------- */
 
 .ttk-my-tickets__table {
@@ -117,6 +123,15 @@
 
   .ttk-my-tickets__table {
     display: none;
+  }
+
+  /* The table went with its sort headers, so the standalone control takes
+     over here (FR-07 applies at every width). */
+  .ttk-my-tickets__sort {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: var(--zg-space-2);
   }
 
   .ttk-my-tickets__cards {

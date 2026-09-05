@@ -247,10 +247,18 @@ export function createApp(prisma = createPrismaClient()) {
         prisma.ticket.count({ where }),
         prisma.ticket.findMany({
           where,
-          // BR-11: id as a stable secondary key. Without it, rows sharing a
-          // createdAt can reorder between requests and the same Ticket can
-          // appear on two pages, or none.
-          orderBy: [{ [query.sortBy]: query.sortDir }, { id: "desc" }],
+          orderBy: [
+            { [query.sortBy]: query.sortDir },
+            // AC-16: ties on the chosen key break by Created Date descending.
+            // Skipped when that IS the chosen key, where it would be a no-op.
+            ...(query.sortBy === "createdAt"
+              ? []
+              : [{ createdAt: "desc" as const }]),
+            // BR-11: id last as the stable key. Without it, rows sharing both
+            // the sort key and createdAt can reorder between requests, and the
+            // same Ticket can appear on two pages or none.
+            { id: "desc" as const },
+          ],
           skip: (query.page - 1) * query.pageSize,
           take: query.pageSize,
           select: {

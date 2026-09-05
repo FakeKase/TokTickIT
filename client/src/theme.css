@@ -122,10 +122,8 @@ body,
   height: 100%;
 }
 
-/* Painted on <html> as well as <body>: index.css (Lab 1 boilerplate) still
-   carries its own prefers-color-scheme block that sets a root background, and
-   without this an explicit light theme on a dark-OS machine would show that
-   colour behind the page. */
+/* Painted on <html> as well as <body> so the token owns the page background
+   outright, matching the critical background inlined in index.html. */
 html {
   background: var(--zg-bg);
 }

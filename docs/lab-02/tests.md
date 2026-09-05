@@ -30,7 +30,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | API-10 | API | AC-18, BR-19 | Upload valid attachment | `201`; attachment appears in ticket detail | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-11 | API | AC-08, BR-20 | Upload file >5MB | `413`; not stored | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-12 | API | AC-09, BR-19 | Upload unsupported type | `415`; not stored | `server/tests/lab-02/attachments.api.test.ts` | Pass |
-| API-13 | API | AC-10, BR-21 | Upload 6th active attachment | `409`; 5-attachment cap enforced | `server/tests/lab-02/attachments.api.test.ts` | Pass |
+| API-13 | API | AC-10, BR-21 | Upload 6th active attachment, sequentially and concurrently | `409`; the cap holds at 5 even when six uploads overlap | `server/tests/lab-02/attachments.api.test.ts` | Pass |
 | API-14 | API | AC-19 | Download active attachment | `200`; correct bytes + `Content-Disposition` | `server/tests/lab-02/attachments.api.test.ts` | Pending |
 | API-15 | API | AC-21, BR-26 | Download removed attachment | `404` | `server/tests/lab-02/attachments.api.test.ts` | Pending |
 | API-16 | API | AC-22, BR-25 | Soft-remove without reason | `400`; attachment still active | `server/tests/lab-02/attachments.api.test.ts` | Pending |
@@ -135,7 +135,7 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | 14 — Development Requester context | `cd server && npm test` | 4 files, 14 tests passed |
 | 14 — Development Requester context | `cd client && npm test` | 5 files, 24 tests passed |
 | Shell polish (theme switch, 1600px width, nav active state) | `cd client && npm test` | 8 files, 54 tests passed |
-| 15 — Create Ticket | `cd server && npm test` | 8 files, 61 tests passed |
+| 15 — Create Ticket | `cd server && npm test` | 8 files, 62 tests passed |
 | 15 — Create Ticket | `cd client && npm test` | 9 files, 71 tests passed |
 
 ## 7. Known Limitations or Deferred Tests

@@ -246,8 +246,18 @@ export function createApp(prisma = createPrismaClient()) {
 
       try {
         const attachment = await prisma.$transaction(async (tx) => {
-          // BR-21. Counting and inserting in one transaction so two concurrent
-          // uploads cannot both read 4 and both write a 5th.
+          // BR-21. A transaction alone does not make count-then-insert safe:
+          // $transaction runs at Postgres's default READ COMMITTED, under
+          // which two concurrent uploads can both read 4 and both insert,
+          // landing 6 on a Ticket capped at 5.
+          //
+          // Locking the Ticket row first serializes uploads per Ticket, so the
+          // second one blocks here and then counts the first one's row. Chosen
+          // over Serializable because that aborts the loser with a
+          // serialization failure, which would need retry handling to avoid
+          // surfacing as a 500 on a request that should simply wait.
+          await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${ticket.id} FOR UPDATE`;
+
           const activeCount = await tx.attachment.count({
             where: { ticketId: ticket.id, isRemoved: false },
           });

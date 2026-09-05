@@ -327,3 +327,28 @@ describe("API-28 a failed upload leaves the Ticket intact (BR-22)", () => {
     ).toBe(1);
   });
 });
+
+describe("API-13 the cap holds under concurrent uploads (BR-21)", () => {
+  it("admits at most five when six upload at once", async () => {
+    const raceTicket = await makeTicket(requesterId);
+
+    // Sequential uploads cannot expose a check-then-insert race: each one
+    // commits before the next reads. These overlap deliberately.
+    const results = await Promise.all(
+      Array.from({ length: 6 }, (_, i) =>
+        upload(raceTicket, requesterId).attach("file", PNG, {
+          filename: `race-${i}.png`,
+          contentType: "image/png",
+        }),
+      ),
+    );
+
+    const created = results.filter((r) => r.status === 201).length;
+    const stored = await prisma.attachment.count({
+      where: { ticketId: raceTicket, isRemoved: false },
+    });
+
+    expect(stored).toBeLessThanOrEqual(5);
+    expect(created).toBe(stored);
+  });
+});

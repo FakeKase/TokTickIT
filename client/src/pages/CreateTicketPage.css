@@ -1,0 +1,153 @@
+/* Create Ticket (ui-spec.md §6.2): single column on mobile, multi-column on
+   tablet and desktop. */
+
+.ttk-create-ticket {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.ttk-create-ticket form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-4);
+}
+
+.ttk-create-ticket__banner {
+  margin-bottom: var(--zg-space-4);
+}
+
+.ttk-create-ticket__row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--zg-space-4);
+}
+
+.ttk-create-ticket__row--three {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.ttk-create-ticket__attachments {
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius);
+  padding: var(--zg-space-4);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-2);
+}
+
+.ttk-create-ticket__attachments legend {
+  font-size: var(--zg-font-size-label);
+  font-weight: var(--zg-font-weight-label);
+  padding: 0 var(--zg-space-2);
+}
+
+.ttk-create-ticket__attachments-hint {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.ttk-create-ticket__file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-2);
+}
+
+.ttk-create-ticket__file-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zg-space-3);
+  padding: var(--zg-space-2) var(--zg-space-3);
+  background: var(--zg-pale);
+  border-radius: var(--zg-radius);
+}
+
+/* Long filenames must stay readable rather than pushing the Remove control
+   off the row (ui-spec.md §8). */
+.ttk-create-ticket__file-list li > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ttk-muted {
+  opacity: 0.7;
+}
+
+.ttk-create-ticket__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--zg-space-3);
+}
+
+.ttk-create-ticket__success {
+  text-align: center;
+  background: var(--zg-pale);
+}
+
+.ttk-create-ticket__number-label {
+  margin: var(--zg-space-4) 0 0;
+  font-size: var(--zg-font-size-label);
+  font-weight: var(--zg-font-weight-label);
+}
+
+.ttk-create-ticket__number {
+  margin: var(--zg-space-1) 0 var(--zg-space-4);
+  font-size: 28px;
+  font-weight: var(--zg-font-weight-heading);
+  color: var(--zg-primary);
+  letter-spacing: 0.5px;
+}
+
+.ttk-create-ticket__upload-failures {
+  text-align: left;
+  background: var(--zg-warning-tint);
+  border-radius: var(--zg-radius);
+  padding: var(--zg-space-3);
+  margin-bottom: var(--zg-space-4);
+}
+
+.ttk-create-ticket__upload-failures ul {
+  margin: var(--zg-space-2) 0 0;
+  padding-left: var(--zg-space-4);
+}
+
+.ttk-create-ticket__success-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--zg-space-3);
+  flex-wrap: wrap;
+}
+
+.ttk-create-ticket__foot {
+  margin-top: var(--zg-space-4);
+  text-align: center;
+}
+
+/* Tablet (768-991px): the three-up classification row would squeeze the
+   selects too narrow, so it drops to two columns (ui-spec.md §8). */
+@media (max-width: 991px) {
+  .ttk-create-ticket__row--three {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile (<768px): everything stacks, actions go full width. */
+@media (max-width: 767px) {
+  .ttk-create-ticket__row,
+  .ttk-create-ticket__row--three {
+    grid-template-columns: 1fr;
+  }
+
+  .ttk-create-ticket__actions {
+    flex-direction: column-reverse;
+  }
+
+  .ttk-create-ticket__actions .ttk-btn {
+    width: 100%;
+  }
+}

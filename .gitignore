@@ -36,3 +36,7 @@ Desktop.ini
 .vscode/
 .idea/
 *.swp
+
+# Uploaded attachment files (BR-23 keeps them on disk; never committed)
+server/uploads/*
+!server/uploads/.gitkeep

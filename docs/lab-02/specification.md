@@ -174,6 +174,28 @@ See `docs/lab-02/api-spec.md` for the full endpoint-by-endpoint contract.
 - `docs/lab-02/reviewer.md` and `docs/lab-02/ai-use.md` completed.
 - GitHub Project Kanban shows all Lab 2 Issues in Done.
 
+### Verified state at release
+
+| Item | Status |
+| --- | --- |
+| Every AC traceable to a passing test | Met — `tests.md` §3; no row left Pending |
+| No test skipped, disabled or commented out | Met — verified by grep across all three test trees |
+| Ownership enforced server-side | Met — API-09, API-27, E2E-02; not-owned and nonexistent return byte-identical 404s |
+| All screen states match `ui-spec.md` | Met — captured at `artifacts/lab-02/screenshots/` |
+| Responsive, no clipping or horizontal scroll | Met — asserted on three screens at three widths, not eyeballed |
+| README current for Lab 2 | Met — Issue #21 |
+| Feature branch → `lab2-staging` → `main` via peer review | Met — 12 PRs, all reviewed by @gxjakkap; 7 required changes before approval |
+| `reviewer.md` and `ai-use.md` complete | `reviewer.md` met; `ai-use.md` complete except the personal reflection |
+| Kanban shows all Issues in Done | To confirm after the release PR merges |
+
+Final suite output on `lab2-staging`, the commit the release PR proposes:
+
+```
+cd server && npm test    10 files, 116 tests passed
+cd client && npm test    12 files, 111 tests passed
+npm run e2e              22 specs passed
+```
+
 ## 11. Assumptions and Decisions
 
 - **"Active" Categories/Related Systems**: unlike Requesters, the handout never describes deactivating a Category or Related System. Lab 2 does not add an `isActive` column to either — all seeded rows are returned by their `GET` endpoints. Documented here per §5.2's requirement to justify at least one design decision.

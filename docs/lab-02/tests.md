@@ -113,6 +113,29 @@ E2E/visual tests use Playwright against a running dev stack.
 | AC-34 | API-27 |
 | AC-35 | API-28 |
 
+## 3.1 Screenshot inventory
+
+39 captures under `artifacts/lab-02/screenshots/`, produced by
+`e2e/lab-02/visual-regression.spec.ts` (layout evidence) and
+`e2e/lab-02/submission-evidence.spec.ts` (the behaviours handout §14 Parts 5-8 ask a
+marker to look for). Every capture is preceded by an assertion that the state is on
+screen, so a file cannot show the wrong moment and still pass.
+
+**One known duplicate pair.** `ticket-detail/add-attachment.png` and
+`ticket-detail/download-active.png` are byte-identical, and cannot differ: downloading a
+file changes nothing on the page. The download itself is evidenced in the same test by
+`page.waitForEvent('download')` asserting the browser received a file named
+`evidence-photo.png` — driven by clicking the link, not by calling the API. Focus and
+hover were both tried to force a visual difference; the tertiary control has no hover
+style, and `:focus-visible` does not apply after a pointer click, so the only way to make
+the two files differ would have been to fake it.
+
+The other two pairs that previously existed were fixed rather than documented:
+`blocked-removed-download.png` now navigates the browser to the download URL so the 404
+is what the image shows, and `create-ticket/initial.png` now focuses the Category select
+with its options loaded, which is separately required by Part 6 ("reference data loaded
+from the database").
+
 ## 4. Responsive and Visual Checklist
 
 See `docs/lab-02/ui-spec.md` §10 — executed and checked off during Issue 9, with screenshots

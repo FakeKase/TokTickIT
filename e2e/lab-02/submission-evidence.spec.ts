@@ -42,21 +42,31 @@ test.describe('Part 6 — Development Requester Selection', () => {
     await expect(page.getByText(/not a login screen/i)).toBeVisible()
     await page.screenshot({ path: shot('dev-requester-selection', 'screen'), fullPage: true })
 
-    // --- The dropdown, open, listing active Requesters -------------------
+    // --- The Requester options, loaded and selectable --------------------
+    // A native <select> popup is painted by the browser's own UI layer rather
+    // than by the page, so page.screenshot() cannot photograph it expanded on
+    // any browser. Focusing it only draws a focus ring, which is why the
+    // earlier capture was 0.017% different from 'screen' above and showed the
+    // "Choose a Requester…" placeholder rather than any Requester at all.
+    // The option list is proven by assertion; the capture carries the part a
+    // screenshot honestly can — a real Requester chosen and displayed.
     const dropdown = page.getByLabel('Development Requester')
     const options = await dropdown.locator('option').allInnerTexts()
     // BR-04: only active Requesters are offered. The inactive seed row must
     // not appear among them.
     expect(options.length).toBeGreaterThan(1)
     expect(options.join('|')).not.toContain('David Kim')
-    await dropdown.focus()
+    await dropdown.selectOption(String(requester.id))
+    await expect(dropdown).toHaveValue(String(requester.id))
+    // The chosen Requester's name must be on screen, so the file cannot drift
+    // from what its name claims.
+    await expect(dropdown.locator('option:checked')).toContainText(requester.name)
     await page.screenshot({
-      path: shot('dev-requester-selection', 'active-dropdown'),
+      path: shot('dev-requester-selection', 'requester-options-loaded'),
       fullPage: true,
     })
 
     // --- Continue, and the selected user showing in the shell ------------
-    await dropdown.selectOption(String(requester.id))
     await page.getByRole('button', { name: 'Continue' }).click()
     await expect(page).toHaveURL(/\/tickets$/)
     const header = page.locator('.ttk-shell__requester')

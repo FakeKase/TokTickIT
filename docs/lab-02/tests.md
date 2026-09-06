@@ -21,7 +21,7 @@ E2E/visual tests use Playwright against a running dev stack.
 | API-01 | API | AC-01, BR-02 | Create valid ticket | `201`; ticket saved; number returned; `currentStatus` is `NEW` even if a client-supplied `currentStatus` is present in the request body | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-02 | API | AC-04, BR-15 | Create ticket missing Category/RelatedSystem/Priority | `400` with per-field messages; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-03 | API | AC-05, BR-13 | Summary below 5 chars | `400`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
-| API-04 | API | BR-04, BR-15 | `requesterId` inactive or unknown | `404`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pending |
+| API-04 | API | BR-04, BR-15 | `requesterId` inactive or unknown | `404`; nothing saved | `server/tests/lab-02/create-ticket.api.test.ts` | Pass |
 | API-05 | API | AC-11, BR-06/07 | List tickets scoped to requester | Only the asserted requester's tickets returned | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
 | API-06 | API | AC-13, BR-09 | Search with no match | `200`; empty `data`, `totalItems: 0` | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
 | API-07 | API | AC-15, BR-12 | Pagination page 2 | Distinct, non-overlapping rows; correct `pagination` block | `server/tests/lab-02/my-tickets.api.test.ts` | Pass |
@@ -152,6 +152,14 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | 18 — Attachments | `cd client && npm test` | 12 files, 111 tests passed |
 | 19 — Responsive/visual QA | `npm run e2e` | 18 specs passed, 19 screenshots captured |
 | 20 — End-to-end flows | `npm run e2e` | 22 specs passed (18 visual + 4 flow), stable across three runs |
+| 21 — Final pass, all suites | `cd server && npm test` | 10 files, 116 tests passed |
+| 21 — Final pass, all suites | `cd client && npm test` | 12 files, 111 tests passed |
+| 21 — Final pass, all suites | `npm run e2e` | 22 specs passed |
+
+**Every planned test now reports Pass; no row is left Pending, skipped or disabled.**
+The final audit found one row that was not honestly Pass-able: API-04 covers
+"`requesterId` inactive **or** unknown", and only the inactive half had a test. The
+unknown-requester case was added rather than marking the row Pass on partial evidence.
 
 ## 7. Known Limitations or Deferred Tests
 

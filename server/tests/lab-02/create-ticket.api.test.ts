@@ -294,6 +294,19 @@ describe("API-22 POST /api/tickets — unrecognized references", () => {
     ).toBe(0);
   });
 
+  it("BR-12: returns 404 for a requesterId with no row at all", async () => {
+    // API-04 covers "inactive OR unknown". The inactive half is above; this is
+    // the other half, which was missing until the final tests.md audit.
+    const before = await prisma.ticket.count();
+
+    const response = await request(app)
+      .post("/api/tickets")
+      .send(validBody({ requesterId: 2_000_000_000 }));
+
+    expect(response.status).toBe(404);
+    expect(await prisma.ticket.count()).toBe(before);
+  });
+
   it("returns a safe message that leaks no internal detail", async () => {
     const response = await request(app)
       .post("/api/tickets")

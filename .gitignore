@@ -40,3 +40,7 @@ Desktop.ini
 # Uploaded attachment files (BR-23 keeps them on disk; never committed)
 server/uploads/*
 !server/uploads/.gitkeep
+
+# Playwright
+test-results/
+artifacts/lab-02/playwright-report/

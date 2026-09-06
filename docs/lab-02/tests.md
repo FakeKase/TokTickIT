@@ -68,8 +68,8 @@ E2E/visual tests use Playwright against a running dev stack.
 | UI-18 | UI | ui-spec §5, handout §8 | Primary nav active-page indication | Exactly one nav item is active per screen: My Tickets on `/tickets` and on a Ticket Detail route, Create Ticket on `/tickets/new` only; the active item also carries `aria-current="page"` | `client/tests/lab-02/AppShellNav.test.tsx` | Pass |
 | UI-19 | UI | ui-spec §1.1 | No flash of the wrong theme on load | `index.html` inlines a critical background for both themes (matching `--zg-bg`) and stamps `data-theme` before first paint, resolving stored-then-OS identically to `initialTheme()` | `client/tests/lab-02/ThemeFlash.test.tsx` | Pass |
 | UI-20 | UI | ui-spec §5 | Active nav marker is the green rule, not underlined text | No `text-decoration: underline` anywhere in the shell; the active rule uses `--zg-nav-active` at both breakpoints, and that token is theme-independent because the header is | `client/tests/lab-02/AppShellNav.test.tsx` | Pass |
-| RESP-01 | Responsive/Visual | AC-25 | Desktop/tablet/mobile screenshots | No clipping/overlap/horizontal scroll on any of the 3 screens | `e2e/lab-02/visual-regression.spec.ts` | Pending |
-| RESP-02 | Responsive/Visual | ui-spec §7 | Badge consistency | Priority/status badges render identically across My Tickets and Ticket Detail | `e2e/lab-02/visual-regression.spec.ts` | Pending |
+| RESP-01 | Responsive/Visual | AC-25 | Desktop/tablet/mobile screenshots | No clipping/overlap/horizontal scroll on any of the 3 screens | `e2e/lab-02/visual-regression.spec.ts` | Pass |
+| RESP-02 | Responsive/Visual | ui-spec §7 | Badge consistency | Priority/status badges render identically across My Tickets and Ticket Detail | `e2e/lab-02/visual-regression.spec.ts` | Pass |
 | E2E-01 | E2E | AC-01, AC-11, AC-17, AC-18, AC-20 | Full requester flow | Select requester → create ticket → find it in My Tickets → open Detail → add attachment → soft-remove it | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
 | E2E-02 | E2E | AC-03 | Cross-requester access blocked end-to-end | Requester B cannot open Requester A's ticket via direct navigation | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
 
@@ -123,8 +123,14 @@ saved to `artifacts/lab-02/screenshots/`.
 ```bash
 cd server && npm test    # unit + API tests (server/tests/lab-02/*)
 cd client && npm test    # UI component tests (client/tests/lab-02/*)
-npx playwright test e2e/lab-02   # responsive/visual + E2E specs
+npm run e2e              # responsive/visual specs (starts the API and client itself)
 ```
+
+`npm run e2e` from the repository root starts both servers, runs against the real
+stack, writes the §11 screenshots, and removes the Tickets it created afterwards so
+the demo database does not fill with fixtures. Every Ticket the suite creates —
+including the ones submitted through the form — carries a marker the teardown filters
+on, and `cleanup-contract.spec.ts` fails if a creating path ever stops carrying it.
 
 ## 6. Final Results
 
@@ -144,6 +150,7 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | 17 — Ticket Detail | `cd client && npm test` | 11 files, 96 tests passed |
 | 18 — Attachments | `cd server && npm test` | 10 files, 115 tests passed |
 | 18 — Attachments | `cd client && npm test` | 12 files, 111 tests passed |
+| 19 — Responsive/visual QA | `npm run e2e` | 18 specs passed, 19 screenshots captured |
 
 ## 7. Known Limitations or Deferred Tests
 

@@ -73,6 +73,13 @@
   color: #ffffff;
 }
 
+/* Only one of these is ever rendered; the hidden one leaves the
+   accessibility tree with it, and the link's aria-label carries the full
+   phrase regardless of which is visible. */
+.ttk-shell__change-short {
+  display: none;
+}
+
 /* Light/dark switch. Sits in the header's right-hand cluster and keeps a 44px
    touch target at every viewport (ui-spec.md §8). */
 .ttk-theme-toggle {
@@ -127,7 +134,18 @@
    item, so it never affects header-inner's box and the header height never changes on toggle. */
 @media (max-width: 767px) {
   .ttk-shell__header-inner {
+    /* 24px between four children costs 72px of a 375px viewport, which the
+       header cannot spare once the Requester controls are in the row. */
+    gap: var(--zg-space-2);
     padding: var(--zg-space-2) var(--zg-space-4);
+  }
+
+  .ttk-shell__change-long {
+    display: none;
+  }
+
+  .ttk-shell__change-short {
+    display: inline;
   }
 
   .ttk-shell__nav-toggle {

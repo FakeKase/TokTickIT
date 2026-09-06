@@ -99,12 +99,21 @@ export function AppShell() {
                 'No Requester selected'
               )}
             </span>
+            {/* The full label does not fit beside the wordmark, toggle and
+                menu control at 375px, so mobile shows a shortened one. The
+                accessible name stays the full phrase either way. */}
             <Link
               to="/select-requester"
               className="ttk-btn ttk-btn--tertiary ttk-shell__change-requester"
+              aria-label={requester ? 'Change Requester' : 'Select Requester'}
               onClick={closeNav}
             >
-              {requester ? 'Change Requester' : 'Select Requester'}
+              <span className="ttk-shell__change-long">
+                {requester ? 'Change Requester' : 'Select Requester'}
+              </span>
+              <span className="ttk-shell__change-short" aria-hidden="true">
+                {requester ? 'Change' : 'Select'}
+              </span>
             </Link>
           </div>
         </div>

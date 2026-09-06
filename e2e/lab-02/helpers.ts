@@ -30,12 +30,37 @@ export async function firstRequester(request: APIRequestContext): Promise<SeedRe
   return requesters[0]
 }
 
-/** A second Requester, for the states that need an account with no Tickets. */
+/** A second Requester, for anything needing two distinct identities. */
 export async function secondRequester(request: APIRequestContext): Promise<SeedRequester> {
   const response = await request.get(`${API}/api/requesters`)
   const requesters = (await response.json()) as SeedRequester[]
   expect(requesters.length).toBeGreaterThan(1)
   return requesters[1]
+}
+
+/**
+ * An active Requester who currently owns nothing, for the Empty state.
+ *
+ * Found by asking rather than by index: other specs create Tickets for the
+ * Requesters they use, so a fixed position is only empty until something else
+ * in the run touches it.
+ */
+export async function requesterWithoutTickets(
+  request: APIRequestContext,
+): Promise<SeedRequester> {
+  const response = await request.get(`${API}/api/requesters`)
+  const requesters = (await response.json()) as SeedRequester[]
+
+  for (const requester of requesters) {
+    const list = await request.get(`${API}/api/tickets?requesterId=${requester.id}&pageSize=1`)
+    const { pagination } = (await list.json()) as { pagination: { totalItems: number } }
+    if (pagination.totalItems === 0) return requester
+  }
+
+  throw new Error(
+    'every seeded Requester owns Tickets, so the Empty state cannot be shown — ' +
+      'seed another active Requester, or run the teardown first',
+  )
 }
 
 /**
@@ -119,6 +144,27 @@ export async function selectRequester(page: Page, requester: SeedRequester) {
   await page.addInitScript((value) => {
     window.localStorage.setItem('toktickit.selectedRequester', value)
   }, JSON.stringify(requester))
+}
+
+/**
+ * Signs in the way a person does: through the Development Requester Selection
+ * screen (AC-02).
+ *
+ * The localStorage shortcut above is right for the visual specs, where the
+ * selector is not what is under test — but an end-to-end flow that skips the
+ * selector never proves the selector works, so E2E-01 uses this instead.
+ */
+export async function signInThroughSelector(page: Page, requester: SeedRequester) {
+  // Landing on a guarded route must send us to the selector (AC-02).
+  await page.goto('/tickets')
+  await expect(page).toHaveURL(/\/select-requester$/)
+
+  await page.getByLabel('Development Requester').selectOption(String(requester.id))
+  await page.getByRole('button', { name: 'Continue' }).click()
+
+  // Resumes the route the guard interrupted.
+  await expect(page).toHaveURL(/\/tickets$/)
+  await expect(page.getByText(requester.name).first()).toBeVisible()
 }
 
 /**

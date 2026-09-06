@@ -70,8 +70,8 @@ E2E/visual tests use Playwright against a running dev stack.
 | UI-20 | UI | ui-spec §5 | Active nav marker is the green rule, not underlined text | No `text-decoration: underline` anywhere in the shell; the active rule uses `--zg-nav-active` at both breakpoints, and that token is theme-independent because the header is | `client/tests/lab-02/AppShellNav.test.tsx` | Pass |
 | RESP-01 | Responsive/Visual | AC-25 | Desktop/tablet/mobile screenshots | No clipping/overlap/horizontal scroll on any of the 3 screens | `e2e/lab-02/visual-regression.spec.ts` | Pass |
 | RESP-02 | Responsive/Visual | ui-spec §7 | Badge consistency | Priority/status badges render identically across My Tickets and Ticket Detail | `e2e/lab-02/visual-regression.spec.ts` | Pass |
-| E2E-01 | E2E | AC-01, AC-11, AC-17, AC-18, AC-20 | Full requester flow | Select requester → create ticket → find it in My Tickets → open Detail → add attachment → soft-remove it | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
-| E2E-02 | E2E | AC-03 | Cross-requester access blocked end-to-end | Requester B cannot open Requester A's ticket via direct navigation | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pending |
+| E2E-01 | E2E | AC-01, AC-11, AC-17, AC-18, AC-20 | Full requester flow | Select requester → create ticket → find it in My Tickets → open Detail → add attachment → soft-remove it | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pass |
+| E2E-02 | E2E | AC-03 | Cross-requester access blocked end-to-end | Requester B cannot open Requester A's ticket via direct navigation | `e2e/lab-02/requester-ticket-flow.spec.ts` | Pass |
 
 ## 3. Acceptance-Criterion Traceability
 
@@ -151,6 +151,7 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | 18 — Attachments | `cd server && npm test` | 10 files, 115 tests passed |
 | 18 — Attachments | `cd client && npm test` | 12 files, 111 tests passed |
 | 19 — Responsive/visual QA | `npm run e2e` | 18 specs passed, 19 screenshots captured |
+| 20 — End-to-end flows | `npm run e2e` | 22 specs passed (18 visual + 4 flow), stable across three runs |
 
 ## 7. Known Limitations or Deferred Tests
 

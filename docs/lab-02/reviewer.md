@@ -11,9 +11,12 @@ The classmate who reviews my pull requests.
 | GitHub username | [@gxjakkap](https://github.com/gxjakkap) |
 | Repository reviewed | [FakeKase/TokTickIT](https://github.com/FakeKase/TokTickIT) |
 
-Every Lab 2 pull request was reviewed by @gxjakkap. Twelve PRs, of which **seven came
-back with changes requested** before approval. Every one of those seven findings was a
-real defect, and none was a matter of taste.
+Every Lab 2 pull request was reviewed by @gxjakkap. Twelve PRs, of which **nine came back
+with changes requested** before approval and three were approved first time (#23, #25,
+#27). Every one of those nine findings was a real defect, and none was a matter of taste.
+
+Counts in this document were produced by querying the GitHub reviews API for each PR, not
+by reading the table below and estimating.
 
 ### Pull requests they reviewed for me
 
@@ -46,12 +49,18 @@ real defect, and none was a matter of taste.
 | [#32](https://github.com/FakeKase/TokTickIT/pull/32) | *Changes requested:* the success-path e2e test submits a real Ticket through the form, and its description didn't carry the marker the cleanup script filters on — so it leaked into the database on every run, the exact problem that script exists to prevent. | Counted before fixing: five had accumulated, one per run. The marker is now exported once and used by every path that creates a Ticket. Since the failure was that nothing connected the two sides, added `cleanup-contract.spec.ts`, which asserts the cleanup script's `MARKER` still equals the suite's and that every description fill goes through it. |
 | [#33](https://github.com/FakeKase/TokTickIT/pull/33) | *Changes requested:* the empty-state test resolved an "empty" Requester before creating a Ticket for the first one — and on a clean database, or when run alone under `--grep`, those are the same person. The full suite only passed because an earlier test in the file happened to run first. | Reproduced by running the test alone, where it failed. Moved the ticket creation before the lookup. His observation that this was incidental file ordering was the part worth acting on, so I ran all 22 specs individually; all 22 pass alone, so nothing else is leaning on a neighbour for its state. |
 
-**The pattern across these.** Five of the seven findings were not about the code but about
-the *evidence* for it: a concurrency fix with a sequential test, an AC named but never
-tested, a test comparing the client to itself, a cleanup script leaking around itself, a
-spec depending on file order. In every case the implementation was defensible and the
-test could not have failed for the reason it claimed to check. That is the single most
-useful thing this review relationship produced.
+**The pattern across these.** Of the nine findings, **six included a point that the test
+could not have failed for the reason it claimed to check** — the attachment-cap race and
+the soft-removal race both covered by sequential tests (#28, #31), an AC named in a
+describe block that never exercised it (#29), a test comparing the client to itself
+(#30), a cleanup script leaking around itself (#32), and a spec depending on file order
+(#33). Two were purely code defects: the mobile header height (#24) and the theme flash
+(#26). One was a test-plan coverage gap found before any code existed (#22).
+
+So in two thirds of the rounds the implementation was defensible and the evidence for it
+was not. That is the single most useful thing this review relationship produced, and it
+is the reason the Definition of Done in `specification.md` §10 now records *how* each item
+was verified rather than only that it was.
 
 ## Reviews I gave
 
@@ -64,9 +73,10 @@ Pull requests I reviewed for my partner.
 | GitHub username | [@gxjakkap](https://github.com/gxjakkap) |
 | Repository | [gxjakkap/soften-toktickit](https://github.com/gxjakkap/soften-toktickit) |
 
-Eight pull requests, of which **three came back with changes requested** before approval.
-Each review was written after reading the diff against his own `specification.md` and
-`api-spec.md`, rather than against his PR description.
+Eight pull requests, of which **three came back with changes requested** before approval
+(#28, #29, #32) and five were approved first time. Each review was written after reading
+the diff against his own `specification.md` and `api-spec.md`, rather than against his PR
+description.
 
 | PR | Title | My comment | How they responded |
 | :-: | :-- | :-- | :-- |

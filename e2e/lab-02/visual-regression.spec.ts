@@ -194,7 +194,15 @@ test.describe('ui-spec §11: the named state captures', () => {
     await selectRequester(page, requester)
 
     await page.goto('/tickets/new')
-    await expect(page.getByLabel(/^Category/)).toBeVisible()
+    const category = page.getByLabel(/^Category/)
+    await expect(category).toBeVisible()
+
+    // Part 6 asks for reference data visibly loaded from the database. Showing
+    // the options also keeps this distinct from the responsive desktop capture,
+    // which is otherwise the same blank form at the same width.
+    const options = await category.locator('option').allInnerTexts()
+    expect(options.length).toBeGreaterThan(1)
+    await category.focus()
     await page.screenshot({ path: shot('create-ticket', 'initial'), fullPage: true })
 
     await page.getByLabel('Add files').setInputFiles({
@@ -325,7 +333,10 @@ test.describe('ui-spec §11: the named state captures', () => {
     await page.getByRole('button', { name: 'Confirm removal' }).click()
 
     // AC-20/BR-24: still listed, with its reason, and no Download.
-    await expect(removable.getByText('Removed')).toBeVisible()
+    // Scoped to the badge: getByText('Removed') also matches the filename
+    // "to-be-removed.png", since Playwright's string matching is a
+    // case-insensitive substring.
+    await expect(removable.locator('.ttk-badge', { hasText: 'Removed' })).toBeVisible()
     await expect(removable.getByText(/Uploaded the wrong screenshot/)).toBeVisible()
     await expect(removable.getByRole('link', { name: 'Download' })).toHaveCount(0)
     await page.screenshot({ path: shot('ticket-detail', 'attachments-removed'), fullPage: true })

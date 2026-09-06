@@ -258,10 +258,18 @@ test.describe('ui-spec §11: the named state captures', () => {
   }) => {
     await page.setViewportSize(VIEWPORTS.desktop)
     const withTickets = await firstRequester(request)
+
+    // Give this one its Ticket *before* asking for an empty Requester.
+    // requesterWithoutTickets returns the first Requester currently owning
+    // nothing — which, on a clean database or when this test runs alone under
+    // --grep, is this same Requester. Resolving it first and creating after
+    // would hand a Ticket to the account the test needs to be empty, and the
+    // assertion below would then be checking the wrong state.
+    await createTicket(request, withTickets.id)
+
     // Asked for, not assumed: other specs in this run create Tickets for the
     // Requesters they use, so a fixed index is not reliably empty.
     const withNone = await requesterWithoutTickets(request)
-    await createTicket(request, withTickets.id)
 
     // Empty: an account that owns nothing, with no filters applied.
     await selectRequester(page, withNone)

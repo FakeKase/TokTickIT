@@ -6,6 +6,10 @@ node_modules/
 .env.local
 .env.*.local
 
+# Local docker-compose overrides (e.g. port remaps for machine-specific conflicts)
+docker-compose.override.yaml
+docker-compose.override.yml
+
 # Build output
 dist/
 build/
@@ -32,3 +36,11 @@ Desktop.ini
 .vscode/
 .idea/
 *.swp
+
+# Uploaded attachment files (BR-23 keeps them on disk; never committed)
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Playwright
+test-results/
+artifacts/lab-02/playwright-report/

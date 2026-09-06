@@ -38,6 +38,16 @@ export async function secondRequester(request: APIRequestContext): Promise<SeedR
   return requesters[1]
 }
 
+/**
+ * Written into every Ticket this suite creates, however it is created, so the
+ * teardown can find them all. server/src/scripts/e2e-cleanup.ts filters on the
+ * same string, and a spec asserts the two still match.
+ *
+ * A Ticket submitted through the form counts too: it is a real row in the same
+ * database, and one that skips this marker leaks on every run.
+ */
+export const FIXTURE_MARKER = 'Lab 2 walkthrough'
+
 /** Rotated so a captured list looks like real tickets, not one fixture repeated. */
 const SUMMARIES = [
   'Projector will not power on in LX-204',
@@ -66,8 +76,7 @@ export async function createTicket(
       relatedSystemId: systems[0].id,
       requestedPriority: 'HIGH',
       summary: SUMMARIES[summaryCursor++ % SUMMARIES.length],
-      description:
-        'Reported by the Requester during the Lab 2 walkthrough. Steps tried so far are noted here so the Detail screen has realistic body text to render.',
+      description: `Reported by the Requester during the ${FIXTURE_MARKER}. Steps tried so far are noted here so the Detail screen has realistic body text to render.`,
       ...overrides,
     },
   })

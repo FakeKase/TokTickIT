@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  FIXTURE_MARKER,
   VIEWPORTS,
   attachFile,
   createTicket,
@@ -215,9 +216,11 @@ test.describe('ui-spec §11: the named state captures', () => {
     await page.getByLabel(/^Related System/).selectOption({ index: 1 })
     await page.getByLabel(/^Requested Priority/).selectOption('MEDIUM')
     await page.getByLabel(/^Summary/).fill('Wi-Fi drops in the library basement')
+    // Carries the fixture marker: this submits a real Ticket through the form,
+    // and one without the marker would survive the teardown and leak.
     await page
       .getByLabel(/^Description/)
-      .fill('Signal disappears entirely near the study rooms, on two different laptops.')
+      .fill(`Signal disappears near the study rooms, on two laptops. ${FIXTURE_MARKER}.`)
     await page.getByRole('button', { name: 'Create Ticket' }).click()
 
     // AC-01: the number comes from the backend and is shown on success.
@@ -238,7 +241,7 @@ test.describe('ui-spec §11: the named state captures', () => {
     await page.getByLabel(/^Summary/).fill('Values must survive a failed submit')
     await page
       .getByLabel(/^Description/)
-      .fill('This submission is made to fail so the retained-values rule can be seen.')
+      .fill(`This submission is made to fail so the retained-values rule can be seen. ${FIXTURE_MARKER}.`)
 
     // Simulate the backend being unreachable at the moment of submit.
     await page.route('**/api/tickets', (route) => route.abort('failed'))

@@ -128,7 +128,9 @@ npm run e2e              # responsive/visual specs (starts the API and client it
 
 `npm run e2e` from the repository root starts both servers, runs against the real
 stack, writes the §11 screenshots, and removes the Tickets it created afterwards so
-the demo database does not fill with fixtures.
+the demo database does not fill with fixtures. Every Ticket the suite creates —
+including the ones submitted through the form — carries a marker the teardown filters
+on, and `cleanup-contract.spec.ts` fails if a creating path ever stops carrying it.
 
 ## 6. Final Results
 
@@ -148,7 +150,7 @@ Updated as each Issue's PR lands in `lab2-staging`; a full final run is recorded
 | 17 — Ticket Detail | `cd client && npm test` | 11 files, 96 tests passed |
 | 18 — Attachments | `cd server && npm test` | 10 files, 115 tests passed |
 | 18 — Attachments | `cd client && npm test` | 12 files, 111 tests passed |
-| 19 — Responsive/visual QA | `npm run e2e` | 16 specs passed, 19 screenshots captured |
+| 19 — Responsive/visual QA | `npm run e2e` | 18 specs passed, 19 screenshots captured |
 
 ## 7. Known Limitations or Deferred Tests
 

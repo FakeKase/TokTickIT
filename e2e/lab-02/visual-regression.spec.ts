@@ -6,7 +6,7 @@ import {
   createTicket,
   expectNoHorizontalScroll,
   firstRequester,
-  secondRequester,
+  requesterWithoutTickets,
   selectRequester,
   shot,
 } from './helpers'
@@ -258,7 +258,9 @@ test.describe('ui-spec §11: the named state captures', () => {
   }) => {
     await page.setViewportSize(VIEWPORTS.desktop)
     const withTickets = await firstRequester(request)
-    const withNone = await secondRequester(request)
+    // Asked for, not assumed: other specs in this run create Tickets for the
+    // Requesters they use, so a fixed index is not reliably empty.
+    const withNone = await requesterWithoutTickets(request)
     await createTicket(request, withTickets.id)
 
     // Empty: an account that owns nothing, with no filters applied.

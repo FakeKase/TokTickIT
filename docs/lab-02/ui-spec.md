@@ -200,15 +200,35 @@ Badges never rely on color alone — each carries its text label.
   `App.tsx` offline banner).
 - Color is never the sole indicator of state (badges/messages always carry text).
 
-## 10. Visual Inspection Checklist (completed during Issue 9 — Responsive & Visual QA)
+## 10. Visual Inspection Checklist (completed during Issue 19 — Responsive & Visual QA)
 
-- [ ] No clipping/overlap/unintended horizontal scroll at 375px, 820px, 1280px widths
-- [ ] Editable vs. read-only fields are visually distinguishable at a glance
-- [ ] Validation messages sit directly below their field, not only at the top of the form
-- [ ] Button hierarchy (primary/secondary/tertiary/destructive/disabled/busy) is consistent across all three screens
-- [ ] Priority/status badges render consistently in My Tickets and Ticket Detail
-- [ ] Filters, pagination, and attachment controls remain usable at all three breakpoints
-- [ ] Screenshots compared against this document, not personal memory
+Every item below is backed by an assertion in `e2e/lab-02/visual-regression.spec.ts`,
+not by having looked at a screenshot. A capture on its own passes just as happily
+when the layout is broken, so the images are evidence *alongside* the checks rather
+than instead of them.
+
+- [x] No clipping/overlap/unintended horizontal scroll at 375px, 820px, 1280px widths —
+      `expectNoHorizontalScroll` runs on all three screens at all three widths, and names
+      the offending element rather than only failing
+- [x] Editable vs. read-only fields are visually distinguishable at a glance — computed
+      `background-color` compared, so two states that merely carry different class names
+      would still fail
+- [x] Validation messages sit directly below their field, not only at the top of the form —
+      asserted by bounding box, not by presence
+- [x] Button hierarchy (primary/secondary/tertiary/destructive) is consistent across all
+      three screens — all four variants compared by computed colour and required to be
+      mutually distinct
+- [x] Priority/status badges render consistently in My Tickets and Ticket Detail — RESP-02
+      compares text *and* class for the same Ticket across both screens
+- [x] Filters, pagination, and attachment controls remain usable at all three breakpoints —
+      asserted visible at 375px, with a touch-target height check on the destructive control
+- [x] Screenshots compared against this document, not personal memory — captures live at the
+      §11 paths and were reviewed against §3, §4, §6 and §7 while writing the assertions above
+
+Two real defects were found by this pass and fixed in the same PR: the app shell header
+overflowed its viewport by 48px at 375px (the Requester controls could not fit beside the
+wordmark, toggle and menu control), and My Tickets' pagination wrapped into a stranded
+"Next" on its own row.
 
 ## 11. Screenshot Paths
 

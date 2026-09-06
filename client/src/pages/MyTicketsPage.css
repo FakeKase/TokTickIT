@@ -155,7 +155,22 @@
     opacity: 0.75;
   }
 
+  /* space-between wrapped the three children into "Previous + label" then a
+     stranded "Next". A two-column grid keeps the controls paired and puts the
+     count on its own line. */
   .ttk-my-tickets__pagination {
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--zg-space-2) var(--zg-space-3);
+  }
+
+  .ttk-my-tickets__pagination span {
+    grid-column: 1 / -1;
+    order: -1;
+    text-align: center;
+  }
+
+  .ttk-my-tickets__pagination .ttk-btn {
+    width: 100%;
   }
 }

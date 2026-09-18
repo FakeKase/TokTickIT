@@ -97,6 +97,7 @@ is under test.
 | API-42 | API | AC-41, BR-36 | Set a new initial password | `200`; the old password fails; the new one works and demands a change; existing sessions are gone | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-43 | API | BR-35 | No delete endpoint | `DELETE /api/users/:id` returns `404`/`405`, never removes a row | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-44 | API | AC-44, BR-17 | Safe errors across the surface | No response body contains a stack trace, SQL fragment, hash, or internal identifier | `server/tests/lab-03/authorization.api.test.ts` | Planned |
+| API-45 | API | AC-45, BR-18 | Staff attachment access | IT Staff read and download an Attachment on a Ticket they do not own (`200`); upload and removal are `403`; a removed Attachment is still `404` for staff | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 
 ### UI component
 
@@ -189,6 +190,7 @@ is under test.
 | AC-42 | RESP-01 |
 | AC-43 | RESP-05, UI-21 |
 | AC-44 | API-44, UI-04, UI-13 |
+| AC-45 | API-45 |
 
 Every AC has at least one test, and every test names a file that will exist. Rows are flipped from
 Planned to Pass by the PR that implements them, never in advance.

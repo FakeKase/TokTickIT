@@ -77,7 +77,7 @@ backend, and the tests that prove it call the API directly rather than clicking 
 
 ### IT Staff
 - **FR-13** Provide a Ticket Queue listing all Tickets with search, filters, sorting, and pagination.
-- **FR-14** Open any Ticket in an IT Staff Ticket Detail screen.
+- **FR-14** Open any Ticket in an IT Staff Ticket Detail screen, including reading and downloading its existing Attachments.
 - **FR-15** Claim an unassigned Ticket, or reassign ownership to another active IT Staff or Administrator user.
 - **FR-16** Set a Ticket's IT Priority independently of the Requested Priority submitted by the Requester.
 - **FR-17** Move a Ticket through the permitted status transitions defined in §5.2.
@@ -151,7 +151,8 @@ Every row is enforced in the backend. "Own" means the authenticated user is the 
 | Create a Ticket | Yes | No | No |
 | List Tickets | Own only | Queue (all) | Queue (all) |
 | Read one Ticket | Own only | Any | Any |
-| Upload / download / remove an Attachment | Own only | Read any | Read any |
+| Upload or remove an Attachment | Own only | No | No |
+| Read or download an Attachment | Own only | Any Ticket | Any Ticket |
 | Post a Public Comment | Own only | Any | Any |
 | Read Public Comments | Own only | Any | Any |
 | Create or read an Internal Note | No | Any | Any |
@@ -161,6 +162,13 @@ Every row is enforced in the backend. "Own" means the authenticated user is the 
 | Change Ticket status | No | Yes | Yes |
 | List, create, or edit users | No | No | Yes |
 | Set a new initial password | No | No | Yes |
+
+Attachment reads are the one place where a staff role reaches a Lab 2 endpoint. IT Staff need
+to open the screenshot a Requester attached — Part 7 of the handout asks for attachment
+continuity on the IT Staff Ticket Detail screen — but they never upload or remove one, because
+Actions Taken is a Lab 4 concern and an attachment on a Ticket is the Requester's evidence.
+`api-spec.md` §5 gives the two read endpoints a staff path and leaves the other five
+Requester-only.
 
 An Administrator is deliberately **not** given ticket-creation rights: Administrators manage
 accounts, IT Staff manage Tickets. Administrators do inherit IT Staff ticket-operation rights,
@@ -308,6 +316,7 @@ status-code table.
 | AC-42 | Given a mobile viewport (<768px), when Login, Change Password, Ticket Queue, IT Staff Ticket Detail, or User Management render, then no control is clipped and the page does not scroll horizontally. |
 | AC-43 | Given a keyboard-only user tabs through Login, Change Password, and User Management, then a visible focus indicator appears on every interactive control. |
 | AC-44 | Given the API is unreachable, when any Lab 3 screen loads or submits, then a safe failure state is shown with no stack trace, SQL, or internal identifier. |
+| AC-45 | Given a Ticket with an Attachment, when IT Staff open it, then the Attachment's metadata and download succeed; when they attempt to upload or remove one, the request is rejected with 403 and nothing changes. |
 
 ## 10. Definition of Done
 

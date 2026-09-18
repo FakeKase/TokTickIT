@@ -85,7 +85,8 @@ incompatible with credentialed requests, which is the intended safety net.
 Contract as in `docs/lab-02/api-spec.md` §4–§10, with these changes:
 
 - `requesterId` is removed from the `POST /api/tickets` body and from the `GET /api/tickets` query. Both take the Requester from the session.
-- All seven require an authenticated Requester: `401` unauthenticated, `403` for IT Staff or an Administrator attempting to create a Ticket, `404` for anything owned by another Requester (BR-18).
+- **Requester-only (five):** `POST /api/tickets`, `GET /api/tickets`, `GET /api/tickets/:id`, `POST /api/tickets/:id/attachments`, `DELETE /api/attachments/:id`. `401` unauthenticated, `403` for IT Staff or an Administrator, `404` for anything owned by another Requester (BR-18).
+- **Requester or staff (two):** `GET /api/attachments/:id` and `GET /api/attachments/:id/download` serve the owning Requester for their own Ticket, and IT Staff or an Administrator for **any** Ticket (§5.1 of `specification.md`, AC-45). The role decides which rule applies: a Requester who is not the owner still gets `404`, while staff get `200`. A removed Attachment is still `404` for everyone (Lab 2 BR-26) — the staff path widens *whose* Attachments are readable, not *which*.
 - `POST /api/tickets` responses gain `itPriority` (initialised from `requestedPriority`), `ownerId` (`null`), and `requesterResolvedAt` (`null`).
 - `GET /api/requesters` is **removed**. Nothing outside Administrator user management lists people any more.
 

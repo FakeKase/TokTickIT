@@ -33,6 +33,10 @@ async function main() {
   });
 
   const attachments = await prisma.attachment.deleteMany({ where: { ticket: where } });
+  // Comments hold a RESTRICT foreign key to their Ticket, the same as
+  // Attachments do, so they have to go first. Without this the whole teardown
+  // throws the moment a spec posts a comment - which Lab 3's specs will.
+  const comments = await prisma.ticketComment.deleteMany({ where: { ticket: where } });
   const tickets = await prisma.ticket.deleteMany({ where });
 
   // The rows are gone, so nothing can reach these files any more.
@@ -41,7 +45,7 @@ async function main() {
   }
 
   console.log(
-    `e2e cleanup: removed ${tickets.count} tickets, ${attachments.count} attachments, ${doomed.length} files`,
+    `e2e cleanup: removed ${tickets.count} tickets, ${attachments.count} attachments, ${comments.count} comments, ${doomed.length} files`,
   );
   await prisma.$disconnect();
 }

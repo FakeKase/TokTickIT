@@ -263,6 +263,10 @@ async function seedTickets() {
   for (const spec of tickets) {
     const [cat, sys] = await Promise.all([category(spec.category), system(spec.system)])
 
+    // Unlike the user upsert above, this one does restore the demo state on
+    // every run. A password someone changed is their data; a seeded Ticket
+    // someone dragged through three statuses while demonstrating the queue is
+    // scenery, and the next demo wants it back where it started.
     const ticket = await prisma.ticket.upsert({
       where: { ticketNumber: spec.number },
       update: {

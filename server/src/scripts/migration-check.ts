@@ -44,6 +44,18 @@ function runFile(sql: string) {
   );
 }
 
+try {
+  execFileSync("docker", ["inspect", "-f", "{{.State.Running}}", CONTAINER], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+} catch {
+  console.error(
+    `Cannot reach the "${CONTAINER}" container. Start the database first:\n  docker compose up -d`,
+  );
+  process.exit(1);
+}
+
 const failures: string[] = [];
 function check(label: string, actual: unknown, expected: unknown) {
   const ok = String(actual) === String(expected);

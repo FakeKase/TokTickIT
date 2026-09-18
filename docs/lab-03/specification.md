@@ -259,9 +259,20 @@ Idempotent `upsert` by email, as in Lab 2, so re-running never duplicates:
 - Tickets spread across every status, both priorities, and owned as well as unassigned;
 - example Public Comments and Internal Notes containing no sensitive information.
 
-All seeded accounts share a single documented development password and are created with
-`mustChangePassword` set, so the first-login flow is exercised by anyone running the project
-locally. The password lives in the README, not in a `.env` file pretending to be a secret.
+All seeded accounts share a single documented development password, which lives in the README
+rather than in a `.env` file pretending to be a secret.
+
+Two of them — one Requester and one IT Staff account — are seeded *holding an initial password*,
+so the mandatory first-login change is demonstrable without an Administrator having to issue one
+first. Everybody else is onboarded. The contract originally said every seeded account would carry
+the flag; implementing it showed that to be unworkable, because a seed in which every account is
+mid-onboarding cannot be used to demonstrate anything else — every E2E spec would have to change a
+password before it could begin. Recorded here rather than quietly diverged from.
+
+Re-running the seed updates only name, role, and activation on an existing row. It deliberately
+does not rewrite `passwordHash` or clear `mustChangePassword`: a password somebody has since
+changed must survive a reseed, and so must the flag the migration set on the accounts carried over
+from Lab 2.
 
 ## 8. API Contract
 

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import { createApp } from "../../src/app.js";
 import { createPrismaClient } from "../../src/prisma.js";
+import { fixtureUser } from "../helpers/users.js";
 
 // API-01, API-02, API-03, API-20, API-21, API-22: POST /api/tickets.
 // Runs against the real database, like the other API tests, so BR-18's
@@ -40,17 +41,13 @@ beforeAll(async () => {
   const stale = { email: { contains: TAG } };
   await prisma.attachment.deleteMany({ where: { ticket: { requester: stale } } });
   await prisma.ticket.deleteMany({ where: { requester: stale } });
-  await prisma.requester.deleteMany({ where: stale });
+  await prisma.user.deleteMany({ where: stale });
 
-  const active = await prisma.requester.create({
-    data: { name: `Active ${TAG}`, email: `active.${TAG}@toktickit.test` },
+  const active = await prisma.user.create({
+    data: fixtureUser({ name: `Active ${TAG}`, email: `active.${TAG}@toktickit.test` }),
   });
-  const inactive = await prisma.requester.create({
-    data: {
-      name: `Inactive ${TAG}`,
-      email: `inactive.${TAG}@toktickit.test`,
-      isActive: false,
-    },
+  const inactive = await prisma.user.create({
+    data: fixtureUser({ name: `Inactive ${TAG}`, email: `inactive.${TAG}@toktickit.test`, isActive: false, }),
   });
   requesterId = active.id;
   inactiveRequesterId = inactive.id;
@@ -65,7 +62,7 @@ afterAll(async () => {
   await prisma.ticket.deleteMany({
     where: { requesterId: { in: [requesterId, inactiveRequesterId] } },
   });
-  await prisma.requester.deleteMany({ where: { email: { contains: TAG } } });
+  await prisma.user.deleteMany({ where: { email: { contains: TAG } } });
   await prisma.$disconnect();
 });
 

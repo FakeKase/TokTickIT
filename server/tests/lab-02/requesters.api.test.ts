@@ -29,9 +29,21 @@ describe("API-18 GET /api/requesters", () => {
     expect(response.body.map((r: { name: string }) => r.name)).toEqual([
       "Michelle Jones",
       "Ned Leeds",
+      "Nora Bennett",
       "Peter Parker",
       "Roronoa Zoro",
     ]);
+  });
+
+  // New in Lab 3: Requesters, IT Staff and Administrators now live in one
+  // table, so "active" alone no longer scopes this endpoint. Without the role
+  // filter it would hand the Lab 2 selector a list of staff accounts.
+  it("excludes IT Staff and Administrators", async () => {
+    const response = await request(createApp()).get("/api/requesters");
+
+    const emails = response.body.map((r: { email: string }) => r.email);
+    expect(emails).not.toContain("sarah.chen@toktickit.test");
+    expect(emails).not.toContain("alex.morgan@toktickit.test");
   });
 
   it("orders Requesters by name ascending", async () => {

@@ -23,14 +23,47 @@ model Category {
   tickets Ticket[]
 }
 
-model Requester {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  isActive  Boolean  @default(true)
+// Lab 2's `Requester` table, renamed in place rather than replaced (see
+// specification.md 7.2). Every Ticket keeps pointing at the same rows through
+// the same foreign key, so the migration cannot move ownership even by mistake.
+model User {
+  id                 Int      @id @default(autoincrement())
+  name               String
+  email              String   @unique
+  passwordHash       String
+  role               Role     @default(REQUESTER)
+  isActive           Boolean  @default(true)
+  // Default true: every account is born holding a password somebody else chose,
+  // whether it came from the seed or from an Administrator (BR-02).
+  mustChangePassword Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Two relations between the same pair of models, so both need names.
+  ticketsRequested Ticket[] @relation("TicketRequester")
+  ticketsOwned     Ticket[] @relation("TicketOwner")
+
+  comments TicketComment[]
+  sessions Session[]
+}
+
+enum Role {
+  REQUESTER
+  IT_STAFF
+  ADMINISTRATOR
+}
+
+// An opaque server-side session (BR-09). The token itself is the primary key:
+// there is nothing else to look it up by, and nothing in it to decode.
+model Session {
+  id        String   @id
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
   createdAt DateTime @default(now())
 
-  tickets Ticket[]
+  // Logout-all, deactivation, and a new initial password all delete by user.
+  @@index([userId])
 }
 
 model RelatedSystem {
@@ -53,17 +86,50 @@ enum RequestedPriority {
   HIGH
 }
 
-// Lab 2 only ever reaches NEW. Later labs extend this enum with a new
-// migration once IT Staff workflows (ASSIGNED, IN_PROGRESS, etc.) exist.
+// Extended in Lab 3, appending only: NEW keeps position 0, so no existing row
+// changes meaning and Postgres's declaration-order sort stays predictable.
+// Permitted movement between these values is the matrix in specification.md 5.2,
+// enforced in lib/status-transitions.ts - the enum says what a status can be,
+// never what it may become.
 enum TicketStatus {
   NEW
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_REQUESTER
+  RESOLVED
+  CLOSED
+  REOPENED
+  CANCELLED
+}
+
+// IT Priority is the operational judgement and carries a level above the
+// Requester-facing ceiling (specification.md 11). Declaration order is
+// load-bearing here for the same reason it is on RequestedPriority: AC-25 wants
+// URGENT -> HIGH -> MEDIUM -> LOW from a plain `itPriority desc`.
+enum ItPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum CommentVisibility {
+  PUBLIC
+  INTERNAL
 }
 
 model Ticket {
   id                Int               @id @default(autoincrement())
   ticketNumber      String            @unique
+  // Deliberately still named requesterId: renaming it would rewrite every
+  // existing row's foreign key for cosmetic benefit (specification.md 7.2).
   requesterId       Int
-  requester         Requester         @relation(fields: [requesterId], references: [id])
+  requester         User              @relation("TicketRequester", fields: [requesterId], references: [id])
+  // Null means unassigned. Constrained to active IT Staff or Administrators by
+  // BR-19, which is an application rule: the database cannot express "a User
+  // whose role is one of two values".
+  ownerId           Int?
+  owner             User?             @relation("TicketOwner", fields: [ownerId], references: [id])
   categoryId        Int
   category          Category          @relation(fields: [categoryId], references: [id])
   relatedSystemId   Int
@@ -71,13 +137,42 @@ model Ticket {
   summary           String
   description       String
   requestedPriority RequestedPriority
+  // Initialised from requestedPriority at creation, then owned by IT Staff
+  // (BR-21). The two are separate columns so the screen can show what was asked
+  // for beside what was decided.
+  itPriority        ItPriority
   currentStatus     TicketStatus      @default(NEW)
+  // The Requester's "this looks fixed" signal (BR-24). Never a status: only IT
+  // Staff resolve or close a Ticket.
+  requesterResolvedAt DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
   attachments Attachment[]
+  comments    TicketComment[]
 
   @@index([requesterId])
+  // Both are queue filters (BR-30), and the queue reads every Ticket in the
+  // system rather than one Requester's slice.
+  @@index([ownerId])
+  @@index([currentStatus])
+}
+
+// One model for both Public Comments and Internal Notes, separated by
+// visibility (specification.md 11). BR-04 is then a single filter applied in one
+// place rather than two code paths that can drift apart.
+model TicketComment {
+  id         Int               @id @default(autoincrement())
+  ticketId   Int
+  ticket     Ticket            @relation(fields: [ticketId], references: [id])
+  authorId   Int
+  author     User              @relation(fields: [authorId], references: [id])
+  visibility CommentVisibility
+  body       String
+  createdAt  DateTime          @default(now())
+
+  // Always read per ticket, and a Requester's read filters visibility as well.
+  @@index([ticketId, visibility])
 }
 
 model Attachment {

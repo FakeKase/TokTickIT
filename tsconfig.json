@@ -1,0 +1,26 @@
+{
+  // The workspace root holds only the Playwright suite. Without this file the
+  // e2e/ folder falls outside every tsconfig — server/ scopes itself to src,
+  // tests and prisma.config.ts, client/ to src, tests and vite.config.ts — so
+  // editors type it with no Node globals and report "Cannot find name 'Buffer'".
+  // Playwright transpiles without typechecking, so the suite still ran green
+  // while the folder was never typechecked at all.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // DOM is needed as well as Node: page.evaluate() callbacks are serialised
+    // and run inside the browser, so they legitimately use window, document
+    // and getComputedStyle even though the file itself executes in Node.
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "noEmit": true
+  },
+  "include": ["e2e/**/*.ts", "playwright.config.ts"],
+  "exclude": ["node_modules", "client", "server"]
+}

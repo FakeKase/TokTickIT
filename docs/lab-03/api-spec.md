@@ -27,7 +27,7 @@ Chosen and justified in `specification.md` §11.
 | Aspect | Decision |
 | :-- | :-- |
 | Credential check | `bcrypt.compare` against `User.passwordHash`, cost 10 |
-| Token | 32 bytes from `crypto.randomBytes`, base64url-encoded, stored as the `Session` primary key |
+| Token | 32 bytes from `crypto.randomBytes`, base64url-encoded. Only `sha256(token)` is stored, in `Session.tokenHash`; the token itself never touches the database, so a dump of that table yields nothing presentable as a cookie |
 | Transport | `Set-Cookie: tt_session=<token>; HttpOnly; SameSite=Lax; Path=/; Max-Age=28800` (plus `Secure` when `NODE_ENV=production`) |
 | Expiry | 8 hours absolute, held in `Session.expiresAt`; an expired row is deleted when encountered (BR-11) |
 | Invalidation | Logout deletes the row; a new initial password deletes all of that user's rows (BR-36); a deactivated user's sessions are rejected on next use (BR-12) |

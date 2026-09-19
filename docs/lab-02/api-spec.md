@@ -62,7 +62,7 @@ Create one Ticket for the selected Requester.
 }
 ```
 - **`400`**: any of BR-13/BR-14/BR-15 fails — `{ "error": "Validation failed", "fields": { ... } }`.
-- **`404`**: `requesterId` does not exist, is inactive, `categoryId`, or `relatedSystemId` does not exist — `{ "error": "Selected Requester is no longer active" }` (or category/related-system equivalent).
+- **`404`**: `requesterId` does not exist, is inactive, is not a Requester, `categoryId`, or `relatedSystemId` does not exist — `{ "error": "Selected Requester is not available" }` (or category/related-system equivalent). *(Lab 3 note: the message was "Selected Requester is no longer active" until Lab 3 put Requesters, IT Staff and Administrators in one table, at which point it was false for a staff id — the account is active, it simply is not a Requester. This endpoint is removed entirely by Lab 3 Issue #41.)*
 - **`500`**: safe error; no Ticket is persisted (BR-18).
 
 ## 5. `GET /api/tickets`

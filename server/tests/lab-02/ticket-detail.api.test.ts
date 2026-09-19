@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import { createApp } from "../../src/app.js";
 import { createPrismaClient } from "../../src/prisma.js";
+import { fixtureUser } from "../helpers/users.js";
 
 // API-09 (AC-03, BR-08): GET /api/tickets/:id. The ownership rule is the
 // point of this endpoint, so most of these assert what a non-owner cannot
@@ -21,14 +22,20 @@ beforeAll(async () => {
   const stale = { email: { contains: TAG } };
   await prisma.attachment.deleteMany({ where: { ticket: { requester: stale } } });
   await prisma.ticket.deleteMany({ where: { requester: stale } });
-  await prisma.requester.deleteMany({ where: stale });
+  await prisma.user.deleteMany({ where: stale });
 
   const [owner, other] = await Promise.all([
-    prisma.requester.create({
-      data: { name: `Owner ${TAG}`, email: `owner.${TAG}@toktickit.test` },
+    prisma.user.create({
+      data: fixtureUser({
+        name: `Owner ${TAG}`,
+        email: `owner.${TAG}@toktickit.test`,
+      }),
     }),
-    prisma.requester.create({
-      data: { name: `Other ${TAG}`, email: `other.${TAG}@toktickit.test` },
+    prisma.user.create({
+      data: fixtureUser({
+        name: `Other ${TAG}`,
+        email: `other.${TAG}@toktickit.test`,
+      }),
     }),
   ]);
   ownerId = owner.id;
@@ -63,7 +70,7 @@ afterAll(async () => {
   const owners = { in: [ownerId, otherId] };
   await prisma.attachment.deleteMany({ where: { ticket: { requesterId: owners } } });
   await prisma.ticket.deleteMany({ where: { requesterId: owners } });
-  await prisma.requester.deleteMany({ where: { email: { contains: TAG } } });
+  await prisma.user.deleteMany({ where: { email: { contains: TAG } } });
   await prisma.$disconnect();
 });
 

@@ -72,16 +72,19 @@ ALTER TABLE "Ticket"
 CREATE INDEX "Ticket_ownerId_idx" ON "Ticket"("ownerId");
 CREATE INDEX "Ticket_currentStatus_idx" ON "Ticket"("currentStatus");
 
--- 6. Sessions. The token is the primary key: there is nothing else to look it
---    up by, and nothing inside it to decode (BR-09).
+-- 6. Sessions. The row stores sha256 of the token, never the token itself, so
+--    a dump of this table yields nothing presentable as a cookie (BR-09).
 CREATE TABLE "Session" (
-    "id" TEXT NOT NULL,
+    "id" SERIAL NOT NULL,
+    "tokenHash" TEXT NOT NULL,
     "userId" INTEGER NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "Session_pkey" PRIMARY KEY ("id")
 );
+
+CREATE UNIQUE INDEX "Session_tokenHash_key" ON "Session"("tokenHash");
 
 CREATE INDEX "Session_userId_idx" ON "Session"("userId");
 

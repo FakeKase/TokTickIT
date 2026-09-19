@@ -91,10 +91,23 @@ async function main() {
     const mustChangePassword = user.mustChangePassword ?? false
     await prisma.user.upsert({
       where: { email: user.email },
-      // Deliberately narrow: re-running the seed must not reset a password
-      // somebody has since changed, nor clear the flag on a row the migration
-      // marked as holding an initial password.
-      update: { name: user.name, role: user.role, isActive: user.isActive },
+      // mustChangePassword is set on both paths on purpose. The migration marks
+      // every account it carries over from Lab 2 as holding an initial
+      // password, so without this line a machine that ran Lab 2 would end up
+      // with Peter Parker gated at first login while a fresh checkout would
+      // not - the same seed command, two different applications, and an E2E
+      // suite that passes in CI and fails on a developer's laptop. The seed
+      // defines the fixture; the migration's behaviour is proved where it
+      // belongs, by `npm run db:migration-check`.
+      //
+      // passwordHash is still never updated: a password somebody has since
+      // changed is their data, not scenery.
+      update: {
+        name: user.name,
+        role: user.role,
+        isActive: user.isActive,
+        mustChangePassword,
+      },
       create: { ...user, mustChangePassword, passwordHash },
     })
   }
@@ -299,8 +312,12 @@ async function seedTickets() {
     }
   }
 
-  const publicCount = await prisma.ticketComment.count({ where: { visibility: 'PUBLIC' } })
-  const internalCount = await prisma.ticketComment.count({ where: { visibility: 'INTERNAL' } })
+  // Counted from what this file defines, not from the table: a database that
+  // has been used has comments the seed never wrote, and a summary line that
+  // quietly includes them is a summary line nobody can trust.
+  const defined = tickets.flatMap((spec) => spec.comments ?? [])
+  const publicCount = defined.filter((comment) => comment.visibility === 'PUBLIC').length
+  const internalCount = defined.length - publicCount
   console.log(`Seeded ${tickets.length} tickets, ${publicCount} public comments, ${internalCount} internal notes`)
 }
 

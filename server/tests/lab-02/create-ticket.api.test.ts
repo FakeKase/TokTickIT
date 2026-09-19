@@ -16,6 +16,7 @@ const TAG = "create-ticket.api.test";
 
 let requesterId: number;
 let inactiveRequesterId: number;
+let staffId: number;
 let categoryId: number;
 let relatedSystemId: number;
 
@@ -44,13 +45,28 @@ beforeAll(async () => {
   await prisma.user.deleteMany({ where: stale });
 
   const active = await prisma.user.create({
-    data: fixtureUser({ name: `Active ${TAG}`, email: `active.${TAG}@toktickit.test` }),
+    data: fixtureUser({
+      name: `Active ${TAG}`,
+      email: `active.${TAG}@toktickit.test`,
+    }),
   });
   const inactive = await prisma.user.create({
-    data: fixtureUser({ name: `Inactive ${TAG}`, email: `inactive.${TAG}@toktickit.test`, isActive: false, }),
+    data: fixtureUser({
+      name: `Inactive ${TAG}`,
+      email: `inactive.${TAG}@toktickit.test`,
+      isActive: false,
+    }),
+  });
+  const staff = await prisma.user.create({
+    data: fixtureUser({
+      name: `Staff ${TAG}`,
+      email: `staff.${TAG}@toktickit.test`,
+      role: "IT_STAFF",
+    }),
   });
   requesterId = active.id;
   inactiveRequesterId = inactive.id;
+  staffId = staff.id;
 
   const category = await prisma.category.findFirstOrThrow();
   const relatedSystem = await prisma.relatedSystem.findFirstOrThrow();
@@ -60,7 +76,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.ticket.deleteMany({
-    where: { requesterId: { in: [requesterId, inactiveRequesterId] } },
+    where: { requesterId: { in: [requesterId, inactiveRequesterId, staffId] } },
   });
   await prisma.user.deleteMany({ where: { email: { contains: TAG } } });
   await prisma.$disconnect();
@@ -289,6 +305,21 @@ describe("API-22 POST /api/tickets — unrecognized references", () => {
     expect(
       await prisma.ticket.count({ where: { requesterId: inactiveRequesterId } }),
     ).toBe(0);
+  });
+
+  // New in Lab 3: Requesters, IT Staff and Administrators share one table, so
+  // "an active user with this id" is no longer the same question as "a
+  // Requester with this id". Nothing covered the gap between them.
+  it("returns 404 for an active account that is not a Requester", async () => {
+    const response = await request(app)
+      .post("/api/tickets")
+      .send(validBody({ requesterId: staffId }));
+
+    expect(response.status).toBe(404);
+    // Not "no longer active": the account is active, it is just not a
+    // Requester, and the message must not send anyone to the wrong column.
+    expect(response.body.error).toBe("Selected Requester is not available");
+    expect(await prisma.ticket.count({ where: { requesterId: staffId } })).toBe(0);
   });
 
   it("BR-12: returns 404 for a requesterId with no row at all", async () => {

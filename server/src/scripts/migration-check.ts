@@ -12,6 +12,7 @@
  * again on the way out.
  */
 import { execFileSync } from "node:child_process";
+import bcrypt from "bcryptjs";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,19 +40,45 @@ function psql(sql: string, database = DB): string {
 function runFile(sql: string) {
   execFileSync(
     "docker",
-    ["exec", "-i", CONTAINER, "psql", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", DB],
+    [
+      "exec",
+      "-i",
+      CONTAINER,
+      "psql",
+      "-v",
+      "ON_ERROR_STOP=1",
+      // Prisma applies each migration file inside one transaction. Without
+      // this, psql runs in autocommit and a file that fails halfway leaves
+      // partial state behind - so the check would be exercising something
+      // Prisma never does.
+      "--single-transaction",
+      "-U",
+      "postgres",
+      "-d",
+      DB,
+    ],
     { input: sql, encoding: "utf8", stdio: ["pipe", "ignore", "inherit"] },
   );
 }
 
-try {
-  execFileSync("docker", ["inspect", "-f", "{{.State.Running}}", CONTAINER], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-  });
-} catch {
+function containerIsRunning(): boolean {
+  try {
+    const state = execFileSync(
+      "docker",
+      ["inspect", "-f", "{{.State.Running}}", CONTAINER],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    );
+    // A stopped container prints "false" and exits 0, so the exit code alone
+    // proves nothing - only the output does.
+    return state.trim() === "true";
+  } catch {
+    return false;
+  }
+}
+
+if (!containerIsRunning()) {
   console.error(
-    `Cannot reach the "${CONTAINER}" container. Start the database first:\n  docker compose up -d`,
+    `The "${CONTAINER}" container is not running. Start the database first:\n  docker compose up -d`,
   );
   process.exit(1);
 }
@@ -108,6 +135,9 @@ try {
     attachments: psql(`SELECT count(*) FROM "Attachment"`),
     people: psql(`SELECT count(*) FROM "Requester"`),
     ownership: psql(OWNERSHIP.replace("%TABLE%", "Requester")),
+    // The oid, not the name: a constraint dropped and recreated under the same
+    // name would satisfy any check that only counted names.
+    foreignKey: psql(`SELECT oid FROM pg_constraint WHERE conname = 'Ticket_requesterId_fkey'`),
   };
   console.log(`Lab 2 data written: ${before.people} requesters, ${before.tickets} tickets, ${before.attachments} attachments`);
   console.log(`Ownership fingerprint before: ${before.ownership}`);
@@ -135,18 +165,22 @@ try {
     psql(`SELECT count(*) FROM "User" WHERE "mustChangePassword" IS NOT TRUE`),
     0,
   );
+  // Shape is not usability: a truncated or mangled hash can still start with
+  // $2 and measure 60 characters. The only proof is that the documented
+  // password actually verifies against what the migration wrote.
+  const hashes = psql(`SELECT "passwordHash" FROM "User"`).split("\n").filter(Boolean);
   check(
-    "every migrated account has a usable bcrypt hash",
-    psql(`SELECT count(*) FROM "User" WHERE "passwordHash" NOT LIKE '$2%' OR length("passwordHash") <> 60`),
-    0,
+    "the documented password verifies against every migrated hash",
+    hashes.filter((hash) => bcrypt.compareSync("ChangeMe123!", hash)).length,
+    hashes.length,
   );
   check("migrated accounts are Requesters", psql(`SELECT count(*) FROM "User" WHERE role <> 'REQUESTER'`), 0);
   check("no Ticket is owned yet", psql(`SELECT count(*) FROM "Ticket" WHERE "ownerId" IS NOT NULL`), 0);
   check("the Requester table is gone", psql(`SELECT to_regclass('public."Requester"') IS NULL`), "t");
   check(
-    "the foreign key was never rebuilt",
-    psql(`SELECT count(*) FROM pg_constraint WHERE conname = 'Ticket_requesterId_fkey'`),
-    1,
+    "the foreign key is the same constraint, not a rebuilt one",
+    psql(`SELECT oid FROM pg_constraint WHERE conname = 'Ticket_requesterId_fkey'`),
+    before.foreignKey,
   );
 } finally {
   psql(`DROP DATABASE IF EXISTS "${DB}"`, "postgres");

@@ -53,10 +53,15 @@ enum Role {
   ADMINISTRATOR
 }
 
-// An opaque server-side session (BR-09). The token itself is the primary key:
-// there is nothing else to look it up by, and nothing in it to decode.
+// An opaque server-side session (BR-09). What is stored is sha256 of the
+// token, never the token: a dump of this table then yields nothing anyone can
+// present as a cookie. sha256 rather than bcrypt because the lookup is by
+// exact value on every authenticated request - a slow hash cannot be looked
+// up, only compared, and the token is 32 random bytes so there is nothing to
+// brute-force.
 model Session {
-  id        String   @id
+  id        Int      @id @default(autoincrement())
+  tokenHash String   @unique
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
@@ -119,34 +124,34 @@ enum CommentVisibility {
 }
 
 model Ticket {
-  id                Int               @id @default(autoincrement())
-  ticketNumber      String            @unique
+  id                  Int               @id @default(autoincrement())
+  ticketNumber        String            @unique
   // Deliberately still named requesterId: renaming it would rewrite every
   // existing row's foreign key for cosmetic benefit (specification.md 7.2).
-  requesterId       Int
-  requester         User              @relation("TicketRequester", fields: [requesterId], references: [id])
+  requesterId         Int
+  requester           User              @relation("TicketRequester", fields: [requesterId], references: [id])
   // Null means unassigned. Constrained to active IT Staff or Administrators by
   // BR-19, which is an application rule: the database cannot express "a User
   // whose role is one of two values".
-  ownerId           Int?
-  owner             User?             @relation("TicketOwner", fields: [ownerId], references: [id])
-  categoryId        Int
-  category          Category          @relation(fields: [categoryId], references: [id])
-  relatedSystemId   Int
-  relatedSystem     RelatedSystem     @relation(fields: [relatedSystemId], references: [id])
-  summary           String
-  description       String
-  requestedPriority RequestedPriority
+  ownerId             Int?
+  owner               User?             @relation("TicketOwner", fields: [ownerId], references: [id])
+  categoryId          Int
+  category            Category          @relation(fields: [categoryId], references: [id])
+  relatedSystemId     Int
+  relatedSystem       RelatedSystem     @relation(fields: [relatedSystemId], references: [id])
+  summary             String
+  description         String
+  requestedPriority   RequestedPriority
   // Initialised from requestedPriority at creation, then owned by IT Staff
   // (BR-21). The two are separate columns so the screen can show what was asked
   // for beside what was decided.
-  itPriority        ItPriority
-  currentStatus     TicketStatus      @default(NEW)
+  itPriority          ItPriority
+  currentStatus       TicketStatus      @default(NEW)
   // The Requester's "this looks fixed" signal (BR-24). Never a status: only IT
   // Staff resolve or close a Ticket.
   requesterResolvedAt DateTime?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 
   attachments Attachment[]
   comments    TicketComment[]

@@ -137,6 +137,11 @@ Requesters carried over from Lab 2 keep the addresses they had, so Tickets creat
 migration still belong to the same people. Re-running the seed never rewrites a password that has
 since been changed.
 
+The table above holds whether or not your database has been through the Lab 3 migration. The
+migration marks every account it carries over as holding an initial password; seeding then puts
+the roster back into the state shown here, so only the two accounts marked above are gated. A
+database that ran Lab 2 and one created this morning behave identically once seeded.
+
 ## Running the app
 
 Two terminals are needed.

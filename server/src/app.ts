@@ -145,10 +145,14 @@ export function createApp(prisma = createPrismaClient()) {
     const requester = await prisma.user.findUnique({
       where: { id: input.requesterId },
     });
+    // One message for all three cases - unknown id, inactive Requester, or a
+    // real account that is IT Staff or an Administrator. The old wording said
+    // "no longer active", which is simply false for a staff id and would send
+    // anyone debugging it to look at the wrong column.
     if (!requester?.isActive || requester.role !== "REQUESTER") {
       return res
         .status(404)
-        .json({ error: "Selected Requester is no longer active" });
+        .json({ error: "Selected Requester is not available" });
     }
 
     const [category, relatedSystem] = await Promise.all([

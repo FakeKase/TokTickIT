@@ -269,10 +269,15 @@ the flag; implementing it showed that to be unworkable, because a seed in which 
 mid-onboarding cannot be used to demonstrate anything else — every E2E spec would have to change a
 password before it could begin. Recorded here rather than quietly diverged from.
 
-Re-running the seed updates only name, role, and activation on an existing row. It deliberately
-does not rewrite `passwordHash` or clear `mustChangePassword`: a password somebody has since
-changed must survive a reseed, and so must the flag the migration set on the accounts carried over
-from Lab 2.
+Re-running the seed updates name, role, activation, and the first-login flag on an existing row,
+but never `passwordHash` — a password somebody has since changed is their data, not scenery.
+
+The flag is deliberately included. The migration marks every account it carries over from Lab 2 as
+holding an initial password; if the seed then left that alone, a machine that had run Lab 2 would
+end up with Peter Parker gated at first login while a fresh checkout would not. One seed command,
+two different applications, and an E2E suite that passes in CI and fails on a developer's laptop.
+The seed defines the fixture, so the fixture is what it asserts. The migration's own behaviour is
+proved where it belongs, on a throwaway database, by `npm run db:migration-check`.
 
 ## 8. API Contract
 

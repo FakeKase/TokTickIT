@@ -71,15 +71,15 @@ beforeAll(async () => {
 
   const owner = await prisma.user.create({
     data: fixtureUser({
-        name: `Owner ${TAG}`,
-        email: `owner.${TAG}@toktickit.test`,
-      }),
+      name: `Owner ${TAG}`,
+      email: `owner.${TAG}@toktickit.test`,
+    }),
   });
   const other = await prisma.user.create({
     data: fixtureUser({
-        name: `Other ${TAG}`,
-        email: `other.${TAG}@toktickit.test`,
-      }),
+      name: `Other ${TAG}`,
+      email: `other.${TAG}@toktickit.test`,
+    }),
   });
   requesterId = owner.id;
   otherRequesterId = other.id;

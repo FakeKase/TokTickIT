@@ -6,8 +6,28 @@ import { mkdirSync } from "node:fs";
 import { unlink } from "node:fs/promises";
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import multer from "multer";
 import { createPrismaClient } from "./prisma.js";
+import {
+  type AuthenticatedRequest,
+  requireAuth,
+  toIdentity,
+} from "./middleware/auth.js";
+import {
+  hashPassword,
+  validatePasswordChange,
+  verifyPassword,
+} from "./lib/password.js";
+import {
+  clearSessionCookie,
+  createSession,
+  deleteSession,
+  deleteUserSessions,
+  resolveSession,
+  setSessionCookie,
+  SESSION_COOKIE,
+} from "./lib/session.js";
 import {
   formatTicketNumber,
   placeholderTicketNumber,
@@ -75,8 +95,12 @@ function allowedOrigins() {
 export function createApp(prisma = createPrismaClient()) {
   const app = express();
 
-  app.use(cors({ origin: allowedOrigins() }));
+  // credentials: true is what lets the browser send the session cookie at all.
+  // It also forbids a wildcard origin, which is the point: the allowlist is no
+  // longer advisory once cookies are in play.
+  app.use(cors({ origin: allowedOrigins(), credentials: true }));
   app.use(express.json());
+  app.use(cookieParser());
 
   app.get("/", (_req, res) => {
     res.json({ service: "TokTickIT API" });
@@ -88,6 +112,132 @@ export function createApp(prisma = createPrismaClient()) {
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", service: "TokTickIT API" });
   });
+
+
+  // A real bcrypt hash of a throwaway random value, compared against when the
+  // email matches nothing. Without it an unknown address answers in under a
+  // millisecond while a known one pays for bcrypt, and the difference is a
+  // reliable oracle for which addresses exist - which BR-08's identical
+  // response body would otherwise have hidden.
+  const ABSENT_USER_HASH =
+    "$2b$10$pG2INaystr.WUIBgNfy7yeOqWP5fJLljGki/bEzg2TgO9obRx/dPq";
+
+  // api-spec.md §1.
+  app.post("/api/auth/login", async (req, res) => {
+    const email = typeof req.body?.email === "string" ? req.body.email : "";
+    const password =
+      typeof req.body?.password === "string" ? req.body.password : "";
+
+    const fields: Record<string, string> = {};
+    if (!email.trim()) fields.email = "Enter your email address";
+    if (!password) fields.password = "Enter your password";
+    if (Object.keys(fields).length > 0) {
+      return res.status(400).json({ error: "Validation failed", fields });
+    }
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { email: email.trim().toLowerCase() },
+      });
+
+      // The password is verified before isActive is consulted, even though all
+      // three failures return the same body (BR-08). Checking the cheap
+      // condition first would answer faster for an inactive account than for a
+      // wrong password, and re-open by timing exactly what the shared message
+      // closes.
+      const passwordOk = await verifyPassword(
+        password,
+        user?.passwordHash ?? ABSENT_USER_HASH,
+      );
+
+      if (!user || !passwordOk || !user.isActive) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      const token = await createSession(prisma, user.id);
+      setSessionCookie(res, token);
+      res.json({ user: toIdentity(user) });
+    } catch {
+      res.status(500).json({ error: "Unable to sign in" });
+    }
+  });
+
+  // api-spec.md §2. Idempotent on purpose: logging out twice, or with an
+  // expired cookie, is not an error and must not report one - there is nothing
+  // for the caller to do differently, and a 401 here would tell an anonymous
+  // visitor whether the cookie they hold is live.
+  app.post("/api/auth/logout", async (req, res) => {
+    try {
+      const auth = await resolveSession(prisma, req.cookies?.[SESSION_COOKIE]);
+      if (auth) await deleteSession(prisma, auth.sessionId);
+    } catch {
+      // A 204 here would tell the caller they are signed out while the session
+      // row is still live and usable by anyone holding the token. Report the
+      // failure; the cookie is deliberately left alone, because clearing it
+      // would hide a session the user can no longer reach but an attacker can.
+      return res.status(500).json({ error: "Unable to sign out" });
+    }
+    clearSessionCookie(res);
+    res.status(204).end();
+  });
+
+  // api-spec.md §3. Permitted while mustChangePassword is set (BR-14): the
+  // client needs this response to know it must route to Change Password.
+  app.get(
+    "/api/auth/me",
+    requireAuth(prisma),
+    (req: AuthenticatedRequest, res) => {
+      res.json({ user: toIdentity(req.auth!.user) });
+    },
+  );
+
+  // api-spec.md §4.
+  app.post(
+    "/api/auth/change-password",
+    requireAuth(prisma),
+    async (req: AuthenticatedRequest, res) => {
+      const parsed = validatePasswordChange(req.body ?? {});
+      if (!parsed.ok) {
+        return res
+          .status(400)
+          .json({ error: "Validation failed", fields: parsed.fields });
+      }
+
+      const { user } = req.auth!;
+      if (!(await verifyPassword(parsed.value.currentPassword, user.passwordHash))) {
+        // 401, not 400: the input was well-formed, the credential was wrong.
+        // The body says so too - "Validation failed" beside a 401 would tell
+        // the client two different stories about what happened.
+        return res.status(401).json({
+          error: "Current password is incorrect",
+          fields: { currentPassword: "That is not your current password" },
+        });
+      }
+
+      try {
+        const passwordHash = await hashPassword(parsed.value.newPassword);
+
+        // One transaction so a user can never end up with the new password and
+        // the old sessions, or vice versa. The token is returned rather than
+        // written to the response inside the transaction: a rolled-back commit
+        // must not leave the client holding a cookie for a row that no longer
+        // exists.
+        const { updated, token } = await prisma.$transaction(async (tx) => {
+          const updated = await tx.user.update({
+            where: { id: user.id },
+            data: { passwordHash, mustChangePassword: false },
+          });
+          await deleteUserSessions(tx, user.id);
+          return { updated, token: await createSession(tx, user.id) };
+        });
+
+        setSessionCookie(res, token);
+        res.json({ user: toIdentity(updated) });
+      } catch {
+        res.status(500).json({ error: "Unable to change the password" });
+      }
+    },
+  );
 
   app.get("/api/categories", async (_req, res) => {
     const categories = await prisma.category.findMany({

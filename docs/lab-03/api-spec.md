@@ -70,9 +70,9 @@ incompatible with credentialed requests, which is the intended safety net.
 { "currentPassword": "...", "newPassword": "...", "confirmPassword": "..." }
 ```
 
-- **`200`**: `{ "user": { ..., "mustChangePassword": false } }`. The current session stays valid; other sessions are unaffected.
+- **`200`**: `{ "user": { ..., "mustChangePassword": false } }`, and a **new** session cookie. Every session the user held — including the one that made this call — is deleted first, so the response's cookie is the only live one afterwards.
 - **`400`**: new password outside 8–72 characters, not matching its confirmation, or identical to the current one (BR-13) — `{ "error": "Validation failed", "fields": { "newPassword": "..." } }`
-- **`401`**: not authenticated, or `currentPassword` is wrong.
+- **`401`**: not authenticated, or `currentPassword` is wrong — `{ "error": "Current password is incorrect", "fields": { "currentPassword": "..." } }`. The status says the credential failed; the `fields` map lets the UI put the message under the right control.
 
 ---
 

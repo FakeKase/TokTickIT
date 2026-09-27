@@ -52,7 +52,9 @@ export function requirePasswordChanged(
 ) {
   if (req.auth?.user.mustChangePassword) {
     return res.status(403).json({
-      error: "You must change your password before continuing",
+      // Wording fixed by api-spec.md's Conventions section, which is what a
+      // client is coded against.
+      error: "Password change required",
       code: "PASSWORD_CHANGE_REQUIRED",
     });
   }

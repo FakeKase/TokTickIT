@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  PASSWORD_MAX,
+  PASSWORD_MAX_BYTES,
   PASSWORD_MIN,
   hashPassword,
   validatePasswordChange,
@@ -62,30 +62,37 @@ describe("UNIT-04 validatePasswordChange (BR-13)", () => {
     }
   });
 
-  it(`enforces the ${PASSWORD_MIN}-${PASSWORD_MAX} character bounds`, () => {
-    const short = "A".repeat(PASSWORD_MIN - 1);
-    const long = "A".repeat(PASSWORD_MAX + 1);
+  const check = (newPassword: string) =>
+    validatePasswordChange({ ...valid, newPassword, confirmPassword: newPassword });
 
-    for (const newPassword of [short, long]) {
-      const result = validatePasswordChange({
-        ...valid,
-        newPassword,
-        confirmPassword: newPassword,
-      });
-      expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.fields.newPassword).toBeTruthy();
-    }
+  it(`enforces ${PASSWORD_MIN} characters minimum and ${PASSWORD_MAX_BYTES} bytes maximum`, () => {
+    expect(check("A".repeat(PASSWORD_MIN - 1)).ok).toBe(false);
+    expect(check("A".repeat(PASSWORD_MAX_BYTES + 1)).ok).toBe(false);
 
     // The bounds themselves are allowed, not just the inside of the range.
-    for (const length of [PASSWORD_MIN, PASSWORD_MAX]) {
-      const newPassword = "A".repeat(length);
-      const result = validatePasswordChange({
-        ...valid,
-        newPassword,
-        confirmPassword: newPassword,
-      });
-      expect(result.ok).toBe(true);
-    }
+    expect(check("A".repeat(PASSWORD_MIN)).ok).toBe(true);
+    expect(check("A".repeat(PASSWORD_MAX_BYTES)).ok).toBe(true);
+  });
+
+  it("measures the maximum in bytes, because bcrypt truncates in bytes", () => {
+    // 72 Thai characters are 216 bytes. Counted with `.length` this passes a
+    // 72-"character" limit, bcrypt silently keeps the first 72 bytes, and two
+    // different passwords can then unlock the same account.
+    const thai = "ก".repeat(PASSWORD_MAX_BYTES);
+    expect(thai.length).toBe(PASSWORD_MAX_BYTES);
+    expect(Buffer.byteLength(thai, "utf8")).toBeGreaterThan(PASSWORD_MAX_BYTES);
+    expect(check(thai).ok).toBe(false);
+
+    // 24 of them is exactly 72 bytes, and allowed.
+    const atTheLimit = "ก".repeat(PASSWORD_MAX_BYTES / 3);
+    expect(Buffer.byteLength(atTheLimit, "utf8")).toBe(PASSWORD_MAX_BYTES);
+    expect(check(atTheLimit).ok).toBe(true);
+
+    // An emoji is the same trap from the other direction: `.length` counts the
+    // surrogate pair as 2 while bcrypt sees 4 bytes.
+    const emoji = "🔒".repeat(19); // 76 bytes, 38 UTF-16 units
+    expect(emoji.length).toBeLessThan(PASSWORD_MAX_BYTES);
+    expect(check(emoji).ok).toBe(false);
   });
 
   it("attaches a confirmation mismatch to the confirmation field", () => {

@@ -83,11 +83,17 @@ export async function resolveSession(
   return { user: session.user, sessionId: session.id };
 }
 
-/** deleteMany so logging out twice is a no-op rather than an exception, while
- *  a genuine database failure still surfaces - swallowing that would let logout
- *  answer 204 with the session still alive. */
-export const deleteSession = (db: Db, id: number) =>
-  db.session.deleteMany({ where: { id } });
+/**
+ * Destroys the session a token belongs to, whether or not that session would
+ * currently resolve: an expired row, or one whose user has been deactivated,
+ * still gets collected.
+ *
+ * deleteMany so logging out twice is a no-op rather than an exception, while a
+ * genuine database failure still surfaces - swallowing that would let logout
+ * answer 204 with the session still alive.
+ */
+export const deleteSessionByToken = (db: Db, token: string) =>
+  db.session.deleteMany({ where: { tokenHash: hashToken(token) } });
 
 /** BR-36: used when an Administrator issues a new initial password, and by a
  *  password change, so a token captured before the change dies with it. */

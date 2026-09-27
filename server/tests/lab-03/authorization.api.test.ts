@@ -1,7 +1,7 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import request from "supertest";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createApp } from "../../src/app.js";
 import { createPrismaClient } from "../../src/prisma.js";
 import { SESSION_COOKIE } from "../../src/lib/session.js";
@@ -182,6 +182,41 @@ describe("requirePasswordChanged (BR-14, AC-02)", () => {
       (await request(realApp).post("/api/auth/logout").set("Cookie", cookie))
         .status,
     ).toBe(204);
+  });
+});
+
+// Part of API-44 (AC-44, BR-17). The rest of the surface is covered as each
+// Issue converts its endpoints; this is the case that was live and leaking.
+describe("API-44 unexpected failures stay safe", () => {
+  it("answers a database failure with JSON, not a stack trace", async () => {
+    const failing = createPrismaClient();
+    vi.spyOn(failing.session, "findUnique").mockRejectedValue(
+      new Error("connection terminated unexpectedly"),
+    );
+    const noisy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await request(createApp(failing))
+      .get("/api/auth/me")
+      .set("Cookie", `${SESSION_COOKIE}=anything`);
+
+    noisy.mockRestore();
+    await failing.$disconnect();
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({
+      error: "Something went wrong. Please try again.",
+    });
+
+    // Express's own handler renders the stack and absolute file paths as HTML
+    // whenever NODE_ENV is not production, which is every developer machine and
+    // every CI run. The assertions below are what that looked like before
+    // createApp got an error handler of its own.
+    const body = String(response.text);
+    expect(body).not.toContain("connection terminated");
+    expect(body).not.toContain("<!DOCTYPE html>");
+    expect(body).not.toMatch(/\bat .+:\d+:\d+/); // a stack frame
+    expect(body).not.toContain("/Users/");
+    expect(body).not.toContain("node_modules");
   });
 });
 

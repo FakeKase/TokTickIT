@@ -98,7 +98,7 @@ is under test.
 | API-41 | API | AC-40, BR-33 | Last active Administrator deactivated or demoted | `409` for both; with a second Administrator present, both succeed | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-42 | API | AC-41, BR-36 | Set a new initial password | `200`; the old password fails; the new one works and demands a change; existing sessions are gone | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-43 | API | BR-35 | No delete endpoint | `DELETE /api/users/:id` returns `404`/`405`, never removes a row | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
-| API-44 | API | AC-44, BR-17 | Safe errors across the surface | No response body contains a stack trace, SQL fragment, hash, or internal identifier | `server/tests/lab-03/authorization.api.test.ts` | Planned |
+| API-44 | API | AC-44, BR-17 | Safe errors across the surface | No response body contains a stack trace, SQL fragment, hash, or internal identifier | `server/tests/lab-03/authorization.api.test.ts` | Partial — the unhandled-rejection path is covered; the rest lands with each Issue's endpoints |
 | API-45 | API | AC-45, BR-18 | Staff attachment access | IT Staff read and download an Attachment on a Ticket they do not own (`200`); upload and removal are `403`; a removed Attachment is still `404` for staff | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 
 ### UI component
@@ -229,7 +229,7 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 | 38 — User model and migration | `cd server && npm test` | 10 files, 117 tests passed |
 | 38 — User model and migration | `cd client && npm test` | 12 files, 111 tests passed |
 | 38 — User model and migration | `npm run e2e` | 29 specs passed |
-| 39 — Authentication API | `cd server && npm test` | 14 files, 151 tests passed |
+| 39 — Authentication API | `cd server && npm test` | 15 files, 162 tests passed |
 | 39 — Authentication API | `cd client && npm test` | 12 files, 111 tests passed |
 | 39 — Authentication API | `npm run e2e` | 29 specs passed |
 
@@ -239,6 +239,5 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 - No automated cross-browser matrix; Playwright runs on Chromium only.
 - Password hashing cost is not benchmarked; cost 10 is taken as the documented default rather than tuned.
 - Rate limiting and account lockout after repeated failed logins are not implemented, and therefore not tested: the handout excludes account unlocking and advanced identity management. This is a known gap, recorded here rather than left to be discovered.
-- Session fixation across a password change is out of scope: the current session survives a change by design (`api-spec.md` §4), and rotating it is deferred with the rest of session hardening.
 - The dark appearance is asserted at the `data-theme` level, as in Lab 2, not by computed contrast ratio.
 - **BR-06's "stored lower-cased" is not yet enforced anywhere.** Login lower-cases what it is given before looking a user up, and every row written so far is lower-case, so nothing is broken today. But no constraint or write path prevents a future endpoint storing `Alex.Morgan@…`, and the moment one does, that user cannot log in — the lookup would normalise while the stored value would not. Issue #45 owns the write paths (`POST`/`PATCH /api/users`) and must normalise there; a `CHECK (email = lower(email))` would make it impossible to get wrong, at the cost of turning a mistyped address into a constraint violation the API has to translate.

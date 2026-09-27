@@ -45,6 +45,8 @@ beforeAll(async () => {
       fixtureUser({ name: `Changer ${TAG}`, email: email("changer") }),
       fixtureUser({ name: `Expiry ${TAG}`, email: email("expiry") }),
       fixtureUser({ name: `Logout ${TAG}`, email: email("logout") }),
+      fixtureUser({ name: `Multi ${TAG}`, email: email("multi") }),
+      fixtureUser({ name: `Deactivated ${TAG}`, email: email("deactivated") }),
     ],
   });
 });
@@ -164,6 +166,23 @@ describe("API-04 POST /api/auth/logout (AC-08, BR-10)", () => {
 
     const reused = await request(app).get("/api/auth/me").set("Cookie", cookie);
     expect(reused.status).toBe(401);
+  });
+
+  it("destroys the token even when the account has since been deactivated", async () => {
+    const cookie = requireSessionCookie(await login("deactivated"));
+    const token = tokenFrom(cookie);
+    await prisma.user.update({
+      where: { email: email("deactivated") },
+      data: { isActive: false },
+    });
+
+    expect((await request(app).post("/api/auth/logout").set("Cookie", cookie)).status).toBe(204);
+
+    // Without this the row would survive, and reactivating the account inside
+    // the 8-hour window would hand the old token back its access.
+    expect(
+      await prisma.session.findUnique({ where: { tokenHash: hashToken(token) } }),
+    ).toBeNull();
   });
 
   it("is idempotent, with no cookie and with a stale one", async () => {
@@ -321,5 +340,38 @@ describe("API-07 change-password success (AC-12)", () => {
 
     expect((await login("changer")).status).toBe(401); // old password
     expect((await login("changer", "Replacement1!")).status).toBe(200);
+  });
+
+  it("kills every other session the user holds, not just the calling one (BR-41)", async () => {
+    // Two independent sign-ins: a laptop and a phone, or the user and whoever
+    // they are changing their password because of.
+    const laptop = requireSessionCookie(await login("multi"));
+    const phone = requireSessionCookie(await login("multi"));
+    expect(laptop).not.toBe(phone);
+    expect(
+      (await request(app).get("/api/auth/me").set("Cookie", phone)).status,
+    ).toBe(200);
+
+    const response = await request(app)
+      .post("/api/auth/change-password")
+      .set("Cookie", laptop)
+      .send({
+        currentPassword: FIXTURE_PASSWORD,
+        newPassword: "Replacement1!",
+        confirmPassword: "Replacement1!",
+      });
+    expect(response.status).toBe(200);
+
+    // The session that was never involved has to be gone: that is the whole
+    // point of the rule, and the reason a password change is worth doing at all
+    // when you suspect somebody else has it.
+    expect(
+      (await request(app).get("/api/auth/me").set("Cookie", phone)).status,
+    ).toBe(401);
+
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: email("multi") },
+    });
+    expect(await prisma.session.count({ where: { userId: user.id } })).toBe(1);
   });
 });

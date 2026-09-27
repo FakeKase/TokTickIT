@@ -22,7 +22,7 @@ import {
 import {
   clearSessionCookie,
   createSession,
-  deleteSession,
+  deleteSessionByToken,
   deleteUserSessions,
   resolveSession,
   setSessionCookie,
@@ -167,16 +167,24 @@ export function createApp(prisma = createPrismaClient()) {
   // for the caller to do differently, and a 401 here would tell an anonymous
   // visitor whether the cookie they hold is live.
   app.post("/api/auth/logout", async (req, res) => {
+    const token = req.cookies?.[SESSION_COOKIE];
+
     try {
-      const auth = await resolveSession(prisma, req.cookies?.[SESSION_COOKIE]);
-      if (auth) await deleteSession(prisma, auth.sessionId);
+      // Deleted by token hash rather than by resolving the session first.
+      // resolveSession answers null for a deactivated user, so going through it
+      // would leave that user's row in place - and hand them a working session
+      // again the moment an Administrator reactivated them inside the 8-hour
+      // window. Logging out destroys the token you presented, whatever the
+      // account behind it is doing.
+      if (token) await deleteSessionByToken(prisma, token);
     } catch {
-      // A 204 here would tell the caller they are signed out while the session
-      // row is still live and usable by anyone holding the token. Report the
-      // failure; the cookie is deliberately left alone, because clearing it
-      // would hide a session the user can no longer reach but an attacker can.
+      // A 204 here would tell the caller they are signed out while the row is
+      // still live and usable by anyone holding the token. The cookie is
+      // deliberately left alone too: clearing it would hide a session the user
+      // can no longer reach but an attacker still can.
       return res.status(500).json({ error: "Unable to sign out" });
     }
+
     clearSessionCookie(res);
     res.status(204).end();
   });
@@ -782,6 +790,27 @@ export function createApp(prisma = createPrismaClient()) {
       res.status(500).json({ error: "Unable to remove the Attachment" });
     }
   });
+
+  // Last, deliberately: Express picks the error handler by arity, and it only
+  // sees what the routes above did not catch. Without it, an async handler that
+  // rejects - a dropped database connection inside requireAuth, a bcrypt
+  // failure in change-password - reaches Express's own handler, which renders
+  // the stack trace and absolute file paths as HTML whenever NODE_ENV is not
+  // production. AC-44 and BR-17 both forbid exactly that.
+  app.use(
+    (
+      error: unknown,
+      _req: express.Request,
+      res: express.Response,
+      _next: express.NextFunction,
+    ) => {
+      // The detail belongs in the server log, where the operator can read it,
+      // and nowhere near the response.
+      console.error("Unhandled error:", error);
+      if (res.headersSent) return;
+      res.status(500).json({ error: "Something went wrong. Please try again." });
+    },
+  );
 
   return app;
 }

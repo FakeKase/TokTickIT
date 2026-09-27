@@ -111,7 +111,7 @@ backend, and the tests that prove it call the API directly rather than clicking 
 | BR-10 | Logout deletes the session row. Presenting the same cookie afterwards is treated as unauthenticated. |
 | BR-11 | An expired session is treated as unauthenticated, and the expired row is removed when encountered. |
 | BR-12 | A session belonging to a user who has since been deactivated is rejected on its next request, so deactivation takes effect without waiting for expiry. |
-| BR-13 | A new password must be 8 to 72 characters, must differ from the current password, and must match its confirmation field. |
+| BR-13 | A new password must be at least 8 characters and at most 72 **bytes** when UTF-8 encoded, must differ from the current password, and must match its confirmation field. The ceiling is bcrypt's input limit, and it is counted in bytes because bcrypt truncates in bytes: 72 Thai characters are 216 bytes, so a character-counted limit would admit an input whose tail bcrypt silently ignores, letting two different passwords unlock one account. |
 | BR-14 | While a user holds an initial password, only current-user retrieval, change-password, and logout are permitted; every other endpoint returns 403 with a `PASSWORD_CHANGE_REQUIRED` code. |
 | BR-15 | A user holds exactly one role: Requester, IT Staff, or Administrator. |
 | BR-16 | Only an Administrator may create a user, change a role, change an activation state, or issue a new initial password. |

@@ -31,7 +31,7 @@ is under test.
 | UNIT-01 | Unit | BR-07 | Password hash and verify helper | A hash never equals the plaintext; verify accepts the right password and rejects a wrong one; two hashes of the same password differ (salted) | `server/tests/lab-03/password.unit.test.ts` | Pass |
 | UNIT-02 | Unit | BR-09, BR-11 | Session token and expiry helper | Token is 32 random bytes, never repeats across 1000 draws; expiry is exactly 8 hours ahead; an expired row is reported expired | `server/tests/lab-03/session.unit.test.ts` | Pass |
 | UNIT-03 | Unit | BR-22, BR-23 | Status transition matrix helper | Every cell of §5.2 permitted; every other pair rejected; Resolved/Closed rejected without an owner | `server/tests/lab-03/status-transitions.unit.test.ts` | Planned |
-| UNIT-04 | Unit | BR-13, BR-37 | Password validation | Password 8–72 at both bounds, new ≠ current, confirmation mismatch reported on the confirmation field | `server/tests/lab-03/password.unit.test.ts` | Pass |
+| UNIT-04 | Unit | BR-13, BR-37 | Password validation | At least 8 characters and at most 72 UTF-8 bytes, both bounds inclusive, with Thai and emoji inputs that `.length` would wave through; new ≠ current; confirmation mismatch reported on the confirmation field | `server/tests/lab-03/password.unit.test.ts` | Pass |
 | UNIT-06 | Unit | BR-37 | User field validation | Name 2–80, email ≤120 and syntactically valid | `server/tests/lab-03/user-validation.unit.test.ts` | Planned (Issue #45) |
 | UNIT-05 | Unit | BR-30, BR-31, AC-26 | Queue query parser | Defaults `updatedAt` desc, page 1, size 10; out-of-range and non-numeric values clamped, not rejected; unknown sort key falls back to the default | `server/tests/lab-03/staff-queue.unit.test.ts` | Planned |
 
@@ -229,7 +229,7 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 | 38 — User model and migration | `cd server && npm test` | 10 files, 117 tests passed |
 | 38 — User model and migration | `cd client && npm test` | 12 files, 111 tests passed |
 | 38 — User model and migration | `npm run e2e` | 29 specs passed |
-| 39 — Authentication API | `cd server && npm test` | 15 files, 162 tests passed |
+| 39 — Authentication API | `cd server && npm test` | 15 files, 164 tests passed |
 | 39 — Authentication API | `cd client && npm test` | 12 files, 111 tests passed |
 | 39 — Authentication API | `npm run e2e` | 29 specs passed |
 

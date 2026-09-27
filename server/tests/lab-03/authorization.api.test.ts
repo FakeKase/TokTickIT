@@ -220,6 +220,33 @@ describe("API-44 unexpected failures stay safe", () => {
   });
 });
 
+describe("API-44 a bad request is not a server fault", () => {
+  it("answers malformed JSON with 400, not 500", async () => {
+    // express.json() throws a SyntaxError carrying status 400. An error handler
+    // that flattens everything to 500 turns a stray brace into what looks like
+    // an outage.
+    const response = await request(realApp)
+      .post("/api/auth/login")
+      .set("Content-Type", "application/json")
+      .send("{bad");
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: "The request could not be read" });
+    // Still safe: no parser internals, no position, no stack.
+    expect(String(response.text)).not.toMatch(/JSON|position|SyntaxError/i);
+  });
+
+  it("answers an oversized body with 413", async () => {
+    const response = await request(realApp)
+      .post("/api/auth/login")
+      .set("Content-Type", "application/json")
+      .send(JSON.stringify({ email: "a@b.test", password: "x".repeat(200_000) }));
+
+    expect(response.status).toBe(413);
+    expect(response.body).toEqual({ error: "Request body is too large" });
+  });
+});
+
 describe("requireRole (§5.1)", () => {
   it("admits every listed role and refuses the rest with 403, not 404", async () => {
     for (const who of ["staff", "admin"]) {

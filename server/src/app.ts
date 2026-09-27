@@ -804,10 +804,32 @@ export function createApp(prisma = createPrismaClient()) {
       res: express.Response,
       _next: express.NextFunction,
     ) => {
+      // Already streaming: hand it back to Express, whose default handler
+      // destroys the socket. Returning quietly instead would leave a response
+      // that failed mid-body hanging open until the client gave up.
+      if (res.headersSent) return _next(error);
+
+      // Not every error reaching here is a server fault. express.json() rejects
+      // malformed JSON with status 400 and an oversized body with 413, and
+      // reporting those as 500 sends somebody hunting a server outage over a
+      // stray brace. The status is honoured; the message stays generic either
+      // way, so nothing about the parser's internals is echoed back.
+      const status = Number(
+        (error as { status?: unknown; statusCode?: unknown })?.status ??
+          (error as { statusCode?: unknown })?.statusCode,
+      );
+      if (Number.isInteger(status) && status >= 400 && status < 500) {
+        return res.status(status).json({
+          error:
+            status === 413
+              ? "Request body is too large"
+              : "The request could not be read",
+        });
+      }
+
       // The detail belongs in the server log, where the operator can read it,
       // and nowhere near the response.
       console.error("Unhandled error:", error);
-      if (res.headersSent) return;
       res.status(500).json({ error: "Something went wrong. Please try again." });
     },
   );

@@ -229,7 +229,7 @@ Administrator only (BR-16).
 ```
 
 - **`201`**: the created user, with `mustChangePassword: true` (AC-37).
-- **`400`**: name outside 2–80 characters, invalid or over-long email, unrecognised role, or an initial password outside 8–72 characters (BR-13, BR-37).
+- **`400`**: name outside 2–80 characters, invalid or over-long email, unrecognised role, or an initial password shorter than 8 characters or longer than 72 UTF-8 bytes (BR-13, BR-37).
 - **`403`**: non-Administrator.
 - **`409`**: the email address is already held — `{ "error": "That email address is already in use" }` (BR-34).
 
@@ -252,7 +252,7 @@ Deactivating a user also deletes their sessions, so access ends immediately rath
 **Request body**: `{ "initialPassword": "..." }`
 
 - **`200`**: `{ "user": { ..., "mustChangePassword": true } }`. All of that user's sessions are deleted (BR-36, AC-41).
-- **`400`**: password outside 8–72 characters.
+- **`400`**: password shorter than 8 characters or longer than 72 UTF-8 bytes (BR-13).
 - **`403`**: non-Administrator.
 - **`404`**: no such user.
 

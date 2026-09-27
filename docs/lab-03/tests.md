@@ -56,7 +56,7 @@ is under test.
 | API-11 | API | AC-14, BR-16 | Requester calls staff and admin endpoints | `403` on the queue, staff detail, and every `/api/users` route; no data in the body | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | API-12 | API | AC-17, BR-18 | Another Requester's Ticket, Attachment, and download | `404`, byte-identical to a nonexistent id | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | API-13 | API | AC-10, BR-12 | Session of a deactivated user | The next request after deactivation is `401` | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| API-14 | API | AC-15, BR-40 | Migration regression | Tickets and Attachments seeded before the migration are still listed, still owned by the same person, and still downloadable afterwards | `server/tests/lab-03/authorization.api.test.ts` | Planned |
+| API-14 | API | AC-15, BR-40 | Migration regression | Tickets and Attachments seeded before the migration are still listed, still owned by the same person, and still downloadable afterwards. The migration itself is proved separately by `npm run db:migration-check`, which applies it to a throwaway database holding Lab 2 data; this row proves the API still serves what survived | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | API-15 | API | AC-21, BR-05 | Requester attempts a status change | `403`; status unchanged | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | API-16 | API | AC-18, BR-27 | Post a Public Comment | `201`; author and timestamp come from the server even when the body supplies others; visible to IT Staff | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
 | API-17 | API | AC-19, BR-25 | Empty and whitespace-only bodies, and one over 2000 characters | `400`; nothing stored | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
@@ -203,6 +203,7 @@ It is completed in Issue #47 and its result recorded here.
 ## 5. Test Commands
 
 ```bash
+cd server && npm run db:migration-check   # proves Lab 2 data survives the Lab 3 migration
 cd server && npm test    # unit + API tests (server/tests/lab-03/*, plus lab-01 and lab-02)
 cd client && npm test    # UI component tests (client/tests/lab-03/*)
 npm run e2e              # responsive/visual and end-to-end specs (starts the API and client itself)
@@ -221,7 +222,11 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 
 | Issue | Suite | Result |
 | --- | --- | --- |
-| 37 — Sprint 3 contract | `npm run typecheck` | Pending |
+| 37 — Sprint 3 contract | `npm run typecheck` | Passed |
+| 38 — User model and migration | `cd server && npm run db:migration-check` | 11 checks passed |
+| 38 — User model and migration | `cd server && npm test` | 10 files, 117 tests passed |
+| 38 — User model and migration | `cd client && npm test` | 12 files, 111 tests passed |
+| 38 — User model and migration | `npm run e2e` | 29 specs passed |
 
 ## 7. Known Limitations or Deferred Tests
 

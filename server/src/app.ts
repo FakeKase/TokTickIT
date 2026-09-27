@@ -96,14 +96,15 @@ export function createApp(prisma = createPrismaClient()) {
     res.json(categories);
   });
 
-  // Active Development Requesters for the Lab 2 selector screen
-  // (api-spec.md §1). BR-04: inactive Requesters are never returned, so the
-  // selector cannot offer one. BR-03/BR-29: this is testing scaffolding, not
-  // an identity provider — it deliberately exposes no credentials of any kind.
+  // Active Requesters for the Lab 2 selector screen (Lab 2 api-spec.md §1).
+  // Now reads the User table, which also holds IT Staff and Administrators, so
+  // the role filter is what keeps the contract unchanged. Still exposes no
+  // credential of any kind: Lab 3 removes this endpoint outright once the
+  // authenticated client lands (Issue #41).
   app.get("/api/requesters", async (_req, res) => {
     try {
-      const requesters = await prisma.requester.findMany({
-        where: { isActive: true },
+      const requesters = await prisma.user.findMany({
+        where: { isActive: true, role: "REQUESTER" },
         orderBy: { name: "asc" },
         select: { id: true, name: true, email: true },
       });
@@ -141,13 +142,17 @@ export function createApp(prisma = createPrismaClient()) {
 
     // Reference checks are 404s, not 400s (api-spec.md §4): the shape was
     // valid, the row simply is not there.
-    const requester = await prisma.requester.findUnique({
+    const requester = await prisma.user.findUnique({
       where: { id: input.requesterId },
     });
-    if (!requester?.isActive) {
+    // One message for all three cases - unknown id, inactive Requester, or a
+    // real account that is IT Staff or an Administrator. The old wording said
+    // "no longer active", which is simply false for a staff id and would send
+    // anyone debugging it to look at the wrong column.
+    if (!requester?.isActive || requester.role !== "REQUESTER") {
       return res
         .status(404)
-        .json({ error: "Selected Requester is no longer active" });
+        .json({ error: "Selected Requester is not available" });
     }
 
     const [category, relatedSystem] = await Promise.all([
@@ -178,6 +183,10 @@ export function createApp(prisma = createPrismaClient()) {
             summary: input.summary,
             description: input.description,
             requestedPriority: input.requestedPriority,
+            // BR-21: IT Priority starts as a copy of what the Requester asked
+            // for. It is a separate column from here on - only IT Staff move it,
+            // and requestedPriority never changes again.
+            itPriority: input.requestedPriority,
             // currentStatus is deliberately not settable from the body (BR-02);
             // the schema default supplies NEW.
           },

@@ -106,6 +106,42 @@ cd server
 npx prisma generate
 ```
 
+## Seeded accounts
+
+Every seeded account uses the same password:
+
+```
+ChangeMe123!
+```
+
+This is a local development fixture, not a secret. It exists only in a database seeded from
+`server/prisma/seed.ts`, it is documented here precisely so nobody mistakes it for a credential,
+and no real password belongs in this repository (BR-39).
+
+| Email | Role | State |
+| :-- | :-- | :-- |
+| `peter.parker@toktickit.test` | Requester | Active |
+| `ned.leeds@toktickit.test` | Requester | Active |
+| `michelle.jones@toktickit.test` | Requester | Active |
+| `roronoa.zoro@toktickit.test` | Requester | Active |
+| `nora.bennett@toktickit.test` | Requester | Active, **must change password at first login** |
+| `david.kim@toktickit.test` | Requester | Inactive — cannot sign in (BR-01) |
+| `sarah.chen@toktickit.test` | IT Staff | Active |
+| `marcus.reed@toktickit.test` | IT Staff | Active |
+| `aiko.tanaka@toktickit.test` | IT Staff | Active |
+| `daniel.okafor@toktickit.test` | IT Staff | Active, **must change password at first login** |
+| `viktor.hale@toktickit.test` | IT Staff | Inactive |
+| `alex.morgan@toktickit.test` | Administrator | Active |
+
+Requesters carried over from Lab 2 keep the addresses they had, so Tickets created before the
+migration still belong to the same people. Re-running the seed never rewrites a password that has
+since been changed.
+
+The table above holds whether or not your database has been through the Lab 3 migration. The
+migration marks every account it carries over as holding an initial password; seeding then puts
+the roster back into the state shown here, so only the two accounts marked above are gated. A
+database that ran Lab 2 and one created this morning behave identically once seeded.
+
 ## Running the app
 
 Two terminals are needed.
@@ -138,8 +174,8 @@ API tests query the real database rather than mocking it.
 
 ```bash
 # One-time setup, from server/
-npx prisma migrate deploy   # creates the Lab 1 + Lab 2 tables
-npm run db:seed             # categories, related systems, requesters
+npx prisma migrate deploy   # creates the Lab 1 + Lab 2 + Lab 3 tables
+npm run db:seed             # categories, related systems, users, tickets, comments
 
 # Run the suites
 cd server && npm test       # Supertest API + unit tests
@@ -182,7 +218,8 @@ traceability to acceptance criteria.
 | `npm test` | Run the Supertest suite |
 | `npm run typecheck` | Type-check without emitting |
 | `npm run db:check` | Verify PostgreSQL connectivity |
-| `npm run db:seed` | Seed categories, related systems and requesters (idempotent) |
+| `npm run db:seed` | Seed categories, related systems, users, tickets and comments (idempotent) |
+| `npm run db:migration-check` | Rebuild the Lab 2 schema on a throwaway database, apply the Lab 3 migration, and assert no Ticket, Attachment or owner was lost |
 | `npm run prisma:generate` | Regenerate the Prisma client |
 
 ### `client/`

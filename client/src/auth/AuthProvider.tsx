@@ -43,15 +43,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = useCallback(async () => {
-    try {
-      await logoutRequest()
-    } finally {
-      // Cleared even if the request failed. The alternative is a shell that
-      // still shows a name and a nav the person can no longer use, which reads
-      // as "logout is broken" rather than "the network is".
-      setUser(null)
-      setStatus('anonymous')
-    }
+    // Swallowed, not rethrown. Logout is idempotent server-side, the session
+    // cookie is cleared either way, and the route guards put the person on
+    // Login regardless — so there is nothing a caller could usefully do with
+    // the error, and every call site was dropping it into an unhandled
+    // rejection instead.
+    await logoutRequest().catch(() => {})
+
+    // Cleared even when the request failed. The alternative is a shell that
+    // still shows a name and a nav the person can no longer use, which reads
+    // as "logout is broken" rather than "the network is".
+    setUser(null)
+    setStatus('anonymous')
   }, [])
 
   const value = useMemo(

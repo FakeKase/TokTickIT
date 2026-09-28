@@ -5,7 +5,7 @@ import { ApiError } from '../api'
 import { Button } from '../components/Button'
 import { Field } from '../components/Field'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { landingPathFor } from '../auth/landing'
+import { canRoleOpen, landingPathFor } from '../auth/landing'
 import { useAuth } from '../auth/useAuth'
 import './AuthPage.css'
 
@@ -39,15 +39,27 @@ export function LoginPage() {
     )
   }
 
+  /**
+   * Where this person goes next.
+   *
+   * Used by both the redirect below and the submit handler, and it has to be:
+   * signing in re-renders this component with a user, so the redirect fires on
+   * that render and wins whatever the handler decided afterwards. Two copies of
+   * this rule meant the remembered destination was computed, then immediately
+   * overridden by the role's home page.
+   */
+  function destinationFor(signedIn: NonNullable<typeof user>) {
+    if (signedIn.mustChangePassword) return '/change-password'
+
+    const from = (location.state as { from?: string } | null)?.from
+    // Only followed when this role can actually open it — see canRoleOpen.
+    return from && canRoleOpen(signedIn.role, from) ? from : landingPathFor(signedIn.role)
+  }
+
   // Already signed in — arriving here by typing the URL or pressing Back after
   // a login should not offer a second one.
   if (status === 'authenticated' && user) {
-    return (
-      <Navigate
-        to={user.mustChangePassword ? '/change-password' : landingPathFor(user.role)}
-        replace
-      />
-    )
+    return <Navigate to={destinationFor(user)} replace />
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -64,13 +76,7 @@ export function LoginPage() {
     setSubmitting(true)
     try {
       const signedIn = await signIn(email, password)
-      const from = (location.state as { from?: string } | null)?.from
-      navigate(
-        signedIn.mustChangePassword
-          ? '/change-password'
-          : (from ?? landingPathFor(signedIn.role)),
-        { replace: true },
-      )
+      navigate(destinationFor(signedIn), { replace: true })
     } catch (error) {
       // The password field is cleared, the email is not: retyping an address
       // you got right is busywork, and the password is the part worth

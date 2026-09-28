@@ -6,6 +6,21 @@ import { renderApp } from '../helpers/renderApp'
 
 // UI-01 to UI-04 (AC-01, AC-06, AC-07, AC-44), ui-spec.md §1.1.
 
+const TICKET_DETAIL = {
+  id: 42,
+  ticketNumber: 'TKT-2026-000042',
+  requester: { id: 1, name: 'Peter Parker' },
+  category: { id: 10, name: 'Hardware' },
+  relatedSystem: { id: 20, name: 'Corporate Laptop' },
+  summary: 'Laptop will not start',
+  description: 'Nothing happens when the power button is pressed.',
+  requestedPriority: 'MEDIUM',
+  currentStatus: 'NEW',
+  createdAt: '2026-09-01T09:00:00.000Z',
+  updatedAt: '2026-09-01T09:00:00.000Z',
+  attachments: [],
+}
+
 let signedIn: ReturnType<typeof authUser> | null = null
 
 /** Answers /api/auth/login with `respond`, and everything else emptily. */
@@ -25,6 +40,9 @@ function mockApi(respond: (body: { email: string; password: string }) => Respons
       calls.push(body)
       return Promise.resolve(respond(body))
     }
+    // The resume test lands on a Ticket Detail route, which throws on an
+    // answer it cannot read — leaving an unhandled error behind a passing test.
+    if (/\/api\/tickets\/\d+/.test(url)) return Promise.resolve(Response.json(TICKET_DETAIL))
     return Promise.resolve(Response.json([]))
   }) as typeof fetch)
 
@@ -98,6 +116,38 @@ describe('UI-01 Login (AC-01)', () => {
     expect(await screen.findByText('Enter your email address')).toBeInTheDocument()
     expect(screen.getByText('Enter your password')).toBeInTheDocument()
     expect(calls).toHaveLength(0)
+  })
+})
+
+describe('the remembered destination (review of PR #52)', () => {
+  it('resumes a path the new user can open', async () => {
+    // Driven through the real redirect rather than by seeding router state:
+    // RequireAuth is what records where the visitor was going, so this proves
+    // the two halves agree.
+    mockApi(() => Response.json({ user: authUser({ role: 'REQUESTER' }) }))
+    window.history.pushState({}, '', '/tickets/42')
+    await renderApp()
+    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+
+    await fillAndSubmit('peter.parker@toktickit.test', 'ChangeMe123!')
+
+    await waitFor(() => expect(window.location.pathname).toBe('/tickets/42'))
+  })
+
+  it('ignores one the new user cannot, and sends them home instead', async () => {
+    // The remembered path belongs to whoever used this browser last. A
+    // Requester's session expiring on their own Ticket, then a colleague
+    // signing in on the same machine, must not drop the colleague onto a
+    // stranger's Ticket — the API refuses them, but a 404 is a poor way to
+    // find out.
+    mockApi(() => Response.json({ user: authUser({ role: 'IT_STAFF' }) }))
+    window.history.pushState({}, '', '/tickets/42')
+    await renderApp()
+    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+
+    await fillAndSubmit('sarah.chen@toktickit.test', 'ChangeMe123!')
+
+    await waitFor(() => expect(window.location.pathname).toBe('/staff/tickets'))
   })
 })
 

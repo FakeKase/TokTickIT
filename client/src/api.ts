@@ -27,17 +27,6 @@ export interface Category {
   description: string
 }
 
-/**
- * A Development Requester as returned by `GET /api/requesters` (api-spec.md §1).
- * Lab 2 testing scaffolding only — this is not an authenticated identity
- * (BR-03/BR-29), which is why it carries no credential or role information.
- */
-export interface Requester {
-  id: number
-  name: string
-  email: string
-}
-
 export async function fetchHealth(): Promise<HealthResponse> {
   const response = await apiFetch(`/api/health`)
 
@@ -135,7 +124,6 @@ async function readError(response: Response, fallback: string): Promise<ApiError
   }
 }
 
-
 /** One of the three Lab 3 roles (specification.md §5.1). */
 export type Role = 'REQUESTER' | 'IT_STAFF' | 'ADMINISTRATOR'
 
@@ -209,17 +197,6 @@ export async function changePassword(input: {
   }
 
   return ((await response.json()) as { user: AuthenticatedUser }).user
-}
-
-/** Active Development Requesters for the selector screen (BR-04). */
-export async function fetchRequesters(): Promise<Requester[]> {
-  const response = await apiFetch(`/api/requesters`)
-
-  if (!response.ok) {
-    throw new Error(`TokTickIT API responded with ${response.status}`)
-  }
-
-  return (await response.json()) as Requester[]
 }
 
 /** Active Related Systems for the classification row (api-spec.md §3). */
@@ -380,13 +357,13 @@ export async function fetchTicket(
   return (await response.json()) as TicketDetail
 }
 
-/** The download URL for an active Attachment (api-spec.md §9).
+/**
+ * The download URL for an active Attachment (api-spec.md §9).
  *
- *  Built here rather than in a component so the requesterId seam stays in one
- *  place — a plain <a href> would otherwise bypass it. */
-/** A URL for an `<a href>`, not for fetch: the browser attaches the session
- *  cookie itself on a same-site navigation, which is why this is the one place
- *  that does not go through `apiFetch`. */
+ * A URL for an `<a href>`, not for `fetch`: the browser attaches the session
+ * cookie itself on a same-site navigation, which is why this is the one place
+ * that does not go through `apiFetch`.
+ */
 export function attachmentDownloadUrl(attachmentId: number, requesterId: number): string {
   return `${API_URL}/api/attachments/${attachmentId}/download?requesterId=${requesterId}`
 }

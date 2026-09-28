@@ -233,7 +233,7 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 | 39 — Authentication API | `cd client && npm test` | 12 files, 111 tests passed |
 | 39 — Authentication API | `npm run e2e` | 29 specs passed |
 | 40 — Login, password change, app shell | `cd server && npm test` | 15 files, 164 tests passed |
-| 40 — Login, password change, app shell | `cd client && npm test` | 13 files, 117 tests passed |
+| 40 — Login, password change, app shell | `cd client && npm test` | 13 files, 120 tests passed |
 | 40 — Login, password change, app shell | `npm run e2e` | 27 specs passed |
 
 ## 7. Known Limitations or Deferred Tests
@@ -243,6 +243,6 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 - Password hashing cost is not benchmarked; cost 10 is taken as the documented default rather than tuned.
 - Rate limiting and account lockout after repeated failed logins are not implemented, and therefore not tested: the handout excludes account unlocking and advanced identity management. This is a known gap, recorded here rather than left to be discovered.
 - The dark appearance is asserted at the `data-theme` level, as in Lab 2, not by computed contrast ratio.
-- **A session that expires while somebody is using the app does not send them back to Login.** The API answers 401 and the screen shows its failure state, which is safe but reads as "the server is broken" rather than "you were signed out". The fix belongs with Issue #41, where the Lab 2 endpoints become authenticated and there is a single place to notice a 401 and route on it.
+- **A session that expires while somebody is using the app does not send them back to Login,** except on Change Password, where a 401 carrying no field errors is now recognised as "the session is gone" and does exactly that (review of PR #52). Everywhere else the API answers 401 and the screen shows its failure state, which is safe but reads as "the server is broken". The general fix belongs with Issue #41, where the Lab 2 endpoints become authenticated and there is a single place to notice a 401 and route on it.
 - **Lab 2's e2e coverage of the Development Requester selector was removed with the selector itself** (Issue #40). Seven specs and the Part 6 evidence block drove a screen that no longer exists. Their screenshots stay under `artifacts/lab-02/screenshots/` as evidence for a lab already submitted; Login's own evidence is captured by Lab 3's suite in Issue #46. The client suite likewise lost `RequesterContext.test.tsx` and `RequesterSelector.test.tsx`, 15 tests covering the deleted context.
 - **BR-06's "stored lower-cased" is not yet enforced anywhere.** Login lower-cases what it is given before looking a user up, and every row written so far is lower-case, so nothing is broken today. But no constraint or write path prevents a future endpoint storing `Alex.Morgan@…`, and the moment one does, that user cannot log in — the lookup would normalise while the stored value would not. Issue #45 owns the write paths (`POST`/`PATCH /api/users`) and must normalise there; a `CHECK (email = lower(email))` would make it impossible to get wrong, at the cost of turning a mistyped address into a constraint violation the API has to translate.

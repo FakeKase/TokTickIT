@@ -161,6 +161,24 @@ describe('UI-06 validation (AC-11, BR-13)', () => {
   })
 })
 
+describe('an expired session during the change (review of PR #52)', () => {
+  it('sends the user to Login instead of blaming their password', async () => {
+    // The server answers a wrong current password with a 401 that carries
+    // `fields`. A 401 *without* them means the session is gone — so the only
+    // 401 reaching this path is the one the password had nothing to do with.
+    mockApi(() => Response.json({ error: 'Authentication required' }, { status: 401 }))
+    window.history.pushState({}, '', '/change-password')
+    await renderApp()
+
+    await fill('ChangeMe123!', 'Replacement1!', 'Replacement1!')
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+    expect(
+      screen.queryByText('That is not your current password'),
+    ).not.toBeInTheDocument()
+  })
+})
+
 describe('UI-07 success (AC-12)', () => {
   it('re-reads the session and continues into the application', async () => {
     const calls = mockApi(() => {

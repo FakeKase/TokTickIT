@@ -69,8 +69,11 @@ export function ChangePasswordPage() {
     setSubmitting(true)
     try {
       const updated = await changePassword({ currentPassword, newPassword, confirmPassword })
-      // The server rotated the session and cleared the flag; re-read it so the
-      // shell and the route guards see the new state rather than the old one.
+      // Re-read rather than trusting the response body, even though it carries
+      // the updated user. The server rotated the session as part of this call,
+      // so `me` is also the confirmation that the cookie the browser now holds
+      // is the working one — if the rotation went wrong, this is where it
+      // surfaces, instead of on whatever the user clicked next.
       await refresh()
       navigate(landingPathFor(updated.role), { replace: true })
     } catch (error) {
@@ -80,7 +83,14 @@ export function ChangePasswordPage() {
         // password the user probably typed correctly (ui-spec.md §1.2).
         setFieldErrors(error.fields)
       } else if (error instanceof ApiError && error.status === 401) {
-        setFieldErrors({ currentPassword: 'That is not your current password' })
+        // A wrong current password comes back as a 401 *with* fields, and is
+        // handled above. A 401 without them means the session itself is gone —
+        // expired, or revoked elsewhere. Blaming the password the user just
+        // typed correctly would be a lie, and leaving them on this form gives
+        // them nothing that can succeed.
+        await signOut()
+        navigate('/login', { replace: true })
+        return
       } else {
         setFormError('Unable to change your password right now. Please try again.')
       }

@@ -28,34 +28,36 @@ is under test.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| UNIT-01 | Unit | BR-07 | Password hash and verify helper | A hash never equals the plaintext; verify accepts the right password and rejects a wrong one; two hashes of the same password differ (salted) | `server/tests/lab-03/password.unit.test.ts` | Planned |
-| UNIT-02 | Unit | BR-09, BR-11 | Session token and expiry helper | Token is 32 random bytes, never repeats across 1000 draws; expiry is exactly 8 hours ahead; an expired row is reported expired | `server/tests/lab-03/session.unit.test.ts` | Planned |
+| UNIT-01 | Unit | BR-07 | Password hash and verify helper | A hash never equals the plaintext; verify accepts the right password and rejects a wrong one; two hashes of the same password differ (salted) | `server/tests/lab-03/password.unit.test.ts` | Pass |
+| UNIT-02 | Unit | BR-09, BR-11 | Session token and expiry helper | Token is 32 random bytes, never repeats across 1000 draws; expiry is exactly 8 hours ahead; an expired row is reported expired | `server/tests/lab-03/session.unit.test.ts` | Pass |
 | UNIT-03 | Unit | BR-22, BR-23 | Status transition matrix helper | Every cell of §5.2 permitted; every other pair rejected; Resolved/Closed rejected without an owner | `server/tests/lab-03/status-transitions.unit.test.ts` | Planned |
-| UNIT-04 | Unit | BR-13, BR-37 | User and password validation | Name 2–80, email ≤120 and syntactically valid, password 8–72, new ≠ current, confirmation must match | `server/tests/lab-03/user-validation.unit.test.ts` | Planned |
+| UNIT-04 | Unit | BR-13, BR-37 | Password validation | At least 8 characters and at most 72 UTF-8 bytes, both bounds inclusive, with Thai and emoji inputs that `.length` would wave through; new ≠ current; confirmation mismatch reported on the confirmation field | `server/tests/lab-03/password.unit.test.ts` | Pass |
+| UNIT-06 | Unit | BR-37 | User field validation | Name 2–80, email ≤120 and syntactically valid | `server/tests/lab-03/user-validation.unit.test.ts` | Planned (Issue #45) |
 | UNIT-05 | Unit | BR-30, BR-31, AC-26 | Queue query parser | Defaults `updatedAt` desc, page 1, size 10; out-of-range and non-numeric values clamped, not rejected; unknown sort key falls back to the default | `server/tests/lab-03/staff-queue.unit.test.ts` | Planned |
 
 ### API — authentication
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| API-01 | API | AC-01 | Valid login | Authenticated response; safe user data; session cookie set `HttpOnly`; no `passwordHash` in the body | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-02 | API | AC-06, BR-08 | Wrong password vs unknown email | Both `401` with byte-identical bodies; no session created | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-03 | API | AC-05, BR-01 | Inactive account with the correct password | `401`, same body as API-02; no session created | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-04 | API | AC-08, BR-10 | Logout then reuse the cookie | Logout `204`; the session row is gone; the same cookie then returns `401` | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-05 | API | AC-09, BR-11 | Expired session | A session backdated past its expiry is treated as unauthenticated and the row is removed | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-06 | API | AC-11, BR-13 | Change-password validation | Too short, mismatched confirmation, and same-as-current each `400`; the flag stays set | `server/tests/lab-03/auth.api.test.ts` | Planned |
-| API-07 | API | AC-12 | Change password successfully | `200`, `mustChangePassword` false; the old password then fails and the new one works | `server/tests/lab-03/auth.api.test.ts` | Planned |
+| API-01 | API | AC-01 | Valid login | Authenticated response; safe user data; session cookie set `HttpOnly`; no `passwordHash` in the body | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-46 | API | BR-39, AC-01 | Seeded credentials match the README | Every account in the README's table signs in (or is refused, for the inactive one) with the documented password, and the first-login flag matches what the table claims | `server/tests/lab-03/seed-credentials.api.test.ts` | Pass |
+| API-02 | API | AC-06, BR-08 | Wrong password vs unknown email | Both `401` with byte-identical bodies; no session created | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-03 | API | AC-05, BR-01 | Inactive account with the correct password | `401`, same body as API-02; no session created | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-04 | API | AC-08, BR-10 | Logout then reuse the cookie | Logout `204`; the session row is gone; the same cookie then returns `401` | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-05 | API | AC-09, BR-11 | Expired session | A session backdated past its expiry is treated as unauthenticated and the row is removed | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-06 | API | AC-11, BR-13 | Change-password validation | Too short, mismatched confirmation, and same-as-current each `400`; the flag stays set | `server/tests/lab-03/auth.api.test.ts` | Pass |
+| API-07 | API | AC-12 | Change password successfully | `200`, `mustChangePassword` false; the old password then fails and the new one works | `server/tests/lab-03/auth.api.test.ts` | Pass |
 
 ### API — authorization, comments and notes
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | API-08 | API | AC-04, BR-29 | Requester requests Internal Notes | Forbidden; no note data returned; the same call as IT Staff returns the notes, proving they exist | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-09 | API | AC-02, BR-14 | Password-change gate | With `mustChangePassword` set, every endpoint except me/change-password/logout returns `403 PASSWORD_CHANGE_REQUIRED` | `server/tests/lab-03/authorization.api.test.ts` | Planned |
+| API-09 | API | AC-02, BR-14 | Password-change gate | With `mustChangePassword` set, every endpoint except me/change-password/logout returns `403 PASSWORD_CHANGE_REQUIRED` | `server/tests/lab-03/authorization.api.test.ts` | Planned (Issue #41 — the middleware itself is covered now; the gate needs the converted endpoints) |
 | API-10 | API | AC-03, BR-03 | Spoofed `requesterId` | Supplying another user's id in the body or query changes nothing; the session's identity is used | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | API-11 | API | AC-14, BR-16 | Requester calls staff and admin endpoints | `403` on the queue, staff detail, and every `/api/users` route; no data in the body | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | API-12 | API | AC-17, BR-18 | Another Requester's Ticket, Attachment, and download | `404`, byte-identical to a nonexistent id | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| API-13 | API | AC-10, BR-12 | Session of a deactivated user | The next request after deactivation is `401` | `server/tests/lab-03/authorization.api.test.ts` | Planned |
+| API-13 | API | AC-10, BR-12 | Session of a deactivated user | The next request after deactivation is `401` | `server/tests/lab-03/authorization.api.test.ts` | Pass |
 | API-14 | API | AC-15, BR-40 | Migration regression | Tickets and Attachments seeded before the migration are still listed, still owned by the same person, and still downloadable afterwards. The migration itself is proved separately by `npm run db:migration-check`, which applies it to a throwaway database holding Lab 2 data; this row proves the API still serves what survived | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | API-15 | API | AC-21, BR-05 | Requester attempts a status change | `403`; status unchanged | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 | API-16 | API | AC-18, BR-27 | Post a Public Comment | `201`; author and timestamp come from the server even when the body supplies others; visible to IT Staff | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
@@ -96,7 +98,7 @@ is under test.
 | API-41 | API | AC-40, BR-33 | Last active Administrator deactivated or demoted | `409` for both; with a second Administrator present, both succeed | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-42 | API | AC-41, BR-36 | Set a new initial password | `200`; the old password fails; the new one works and demands a change; existing sessions are gone | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
 | API-43 | API | BR-35 | No delete endpoint | `DELETE /api/users/:id` returns `404`/`405`, never removes a row | `server/tests/lab-03/users-admin.api.test.ts` | Planned |
-| API-44 | API | AC-44, BR-17 | Safe errors across the surface | No response body contains a stack trace, SQL fragment, hash, or internal identifier | `server/tests/lab-03/authorization.api.test.ts` | Planned |
+| API-44 | API | AC-44, BR-17 | Safe errors across the surface | No response body contains a stack trace, SQL fragment, hash, or internal identifier | `server/tests/lab-03/authorization.api.test.ts` | Partial — the unhandled-rejection path is covered; the rest lands with each Issue's endpoints |
 | API-45 | API | AC-45, BR-18 | Staff attachment access | IT Staff read and download an Attachment on a Ticket they do not own (`200`); upload and removal are `403`; a removed Attachment is still `404` for staff | `server/tests/lab-03/authorization.api.test.ts` | Planned |
 
 ### UI component
@@ -227,6 +229,9 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 | 38 — User model and migration | `cd server && npm test` | 10 files, 117 tests passed |
 | 38 — User model and migration | `cd client && npm test` | 12 files, 111 tests passed |
 | 38 — User model and migration | `npm run e2e` | 29 specs passed |
+| 39 — Authentication API | `cd server && npm test` | 15 files, 164 tests passed |
+| 39 — Authentication API | `cd client && npm test` | 12 files, 111 tests passed |
+| 39 — Authentication API | `npm run e2e` | 29 specs passed |
 
 ## 7. Known Limitations or Deferred Tests
 
@@ -234,5 +239,5 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 - No automated cross-browser matrix; Playwright runs on Chromium only.
 - Password hashing cost is not benchmarked; cost 10 is taken as the documented default rather than tuned.
 - Rate limiting and account lockout after repeated failed logins are not implemented, and therefore not tested: the handout excludes account unlocking and advanced identity management. This is a known gap, recorded here rather than left to be discovered.
-- Session fixation across a password change is out of scope: the current session survives a change by design (`api-spec.md` §4), and rotating it is deferred with the rest of session hardening.
 - The dark appearance is asserted at the `data-theme` level, as in Lab 2, not by computed contrast ratio.
+- **BR-06's "stored lower-cased" is not yet enforced anywhere.** Login lower-cases what it is given before looking a user up, and every row written so far is lower-case, so nothing is broken today. But no constraint or write path prevents a future endpoint storing `Alex.Morgan@…`, and the moment one does, that user cannot log in — the lookup would normalise while the stored value would not. Issue #45 owns the write paths (`POST`/`PATCH /api/users`) and must normalise there; a `CHECK (email = lower(email))` would make it impossible to get wrong, at the cost of turning a mistyped address into a constraint violation the API has to translate.

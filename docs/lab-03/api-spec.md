@@ -70,9 +70,9 @@ incompatible with credentialed requests, which is the intended safety net.
 { "currentPassword": "...", "newPassword": "...", "confirmPassword": "..." }
 ```
 
-- **`200`**: `{ "user": { ..., "mustChangePassword": false } }`. The current session stays valid; other sessions are unaffected.
-- **`400`**: new password outside 8–72 characters, not matching its confirmation, or identical to the current one (BR-13) — `{ "error": "Validation failed", "fields": { "newPassword": "..." } }`
-- **`401`**: not authenticated, or `currentPassword` is wrong.
+- **`200`**: `{ "user": { ..., "mustChangePassword": false } }`, and a **new** session cookie. Every session the user held — including the one that made this call — is deleted first, so the response's cookie is the only live one afterwards.
+- **`400`**: new password under 8 characters or over 72 UTF-8 bytes, not matching its confirmation, or identical to the current one (BR-13) — `{ "error": "Validation failed", "fields": { "newPassword": "..." } }`
+- **`401`**: not authenticated, or `currentPassword` is wrong — `{ "error": "Current password is incorrect", "fields": { "currentPassword": "..." } }`. The status says the credential failed; the `fields` map lets the UI put the message under the right control.
 
 ---
 
@@ -229,7 +229,7 @@ Administrator only (BR-16).
 ```
 
 - **`201`**: the created user, with `mustChangePassword: true` (AC-37).
-- **`400`**: name outside 2–80 characters, invalid or over-long email, unrecognised role, or an initial password outside 8–72 characters (BR-13, BR-37).
+- **`400`**: name outside 2–80 characters, invalid or over-long email, unrecognised role, or an initial password shorter than 8 characters or longer than 72 UTF-8 bytes (BR-13, BR-37).
 - **`403`**: non-Administrator.
 - **`409`**: the email address is already held — `{ "error": "That email address is already in use" }` (BR-34).
 
@@ -252,7 +252,7 @@ Deactivating a user also deletes their sessions, so access ends immediately rath
 **Request body**: `{ "initialPassword": "..." }`
 
 - **`200`**: `{ "user": { ..., "mustChangePassword": true } }`. All of that user's sessions are deleted (BR-36, AC-41).
-- **`400`**: password outside 8–72 characters.
+- **`400`**: password shorter than 8 characters or longer than 72 UTF-8 bytes (BR-13).
 - **`403`**: non-Administrator.
 - **`404`**: no such user.
 

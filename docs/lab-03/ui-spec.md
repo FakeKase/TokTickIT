@@ -38,7 +38,7 @@ available, because trapping someone on a screen with no exit is worse than letti
 | :-- | :-- |
 | Explanatory line | "Your account was created with a temporary password. Choose a new one to continue." |
 | Fields | Current password, New password, Confirm new password, all `autocomplete="new-password"` where applicable |
-| Rules, shown before submission | 8–72 characters; must differ from the current password |
+| Rules, shown before submission | At least 8 characters, at most 72 bytes, and different from the current password. The ceiling is shown as "about 72 letters, fewer in scripts like Thai" rather than as a byte count, which means nothing to the person typing |
 | Validation | Per field; the confirmation mismatch attaches to the confirmation field, not to the new-password field |
 | Success | Redirect to the role's landing screen, with a success message in the shell |
 
@@ -170,7 +170,7 @@ trap and `Esc` to dismiss:
 | Email | Required, valid, ≤120 | Editable; duplicate rejected with a field-level message on the email field, not a banner |
 | Role | Required, one of three, radio group rather than a select — three options do not need a dropdown | Editable |
 | Active | Checkbox, default on | Editable; disabled with a reason when editing yourself or the last active Administrator |
-| Initial password | Required, 8–72 | Not shown; replaced by a `Set new initial password` secondary action with its own confirmation |
+| Initial password | Required, at least 8 characters and at most 72 bytes (BR-13) | Not shown; replaced by a `Set new initial password` secondary action with its own confirmation |
 
 **Guard-rail feedback** — the two safety rules (BR-32, BR-33) are shown as disabled controls *with
 a visible reason beside them*, never as a silent absence, and are enforced by the backend

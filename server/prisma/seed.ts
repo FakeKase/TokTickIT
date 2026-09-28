@@ -71,6 +71,13 @@ async function main() {
     { name: 'Roronoa Zoro', email: 'roronoa.zoro@toktickit.test', role: 'REQUESTER', isActive: true },
     { name: 'David Kim', email: 'david.kim@toktickit.test', role: 'REQUESTER', isActive: false },
 
+    // Owns nothing, on purpose. My Tickets has to distinguish Empty ("you have
+    // no Tickets") from No-Results ("nothing matches these filters") - BR-28 -
+    // and the Empty state cannot be demonstrated, screenshotted or tested
+    // without an account that genuinely has no Tickets. Every other active
+    // Requester below is given some.
+    { name: 'Grace Lim', email: 'grace.lim@toktickit.test', role: 'REQUESTER', isActive: true },
+
     { name: 'Sarah Chen', email: 'sarah.chen@toktickit.test', role: 'IT_STAFF', isActive: true },
     { name: 'Marcus Reed', email: 'marcus.reed@toktickit.test', role: 'IT_STAFF', isActive: true },
     { name: 'Aiko Tanaka', email: 'aiko.tanaka@toktickit.test', role: 'IT_STAFF', isActive: true },

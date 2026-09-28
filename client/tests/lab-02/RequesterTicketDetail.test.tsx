@@ -1,8 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import App from '../../src/App'
-import { REQUESTER_STORAGE_KEY } from '../../src/requester/requesterContext'
+import { renderApp } from '../helpers/renderApp'
+import { authRoutes, authUser } from '../helpers/auth'
 
 // UI-12 (AC-17): the Ticket Detail header renders read-only, with none of the
 // controls handout §4.2 puts out of scope.
@@ -27,6 +27,8 @@ const TICKET = {
 function mockApi(detail: () => Promise<Response>) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
     const url = String(input)
+    const auth = authRoutes(signedIn)(url)
+    if (auth) return auth
     if (/\/api\/tickets\/\d+\?/.test(url)) return detail()
     if (url.includes('/api/tickets')) {
       return Promise.resolve(
@@ -43,14 +45,16 @@ function mockApi(detail: () => Promise<Response>) {
 
 function renderDetail(path = '/tickets/42') {
   window.history.pushState({}, '', path)
-  return render(<App />)
+  return renderApp()
 }
+
+let signedIn: ReturnType<typeof authUser> | null = authUser()
 
 describe('Requester Ticket Detail', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     window.localStorage.clear()
-    window.localStorage.setItem(REQUESTER_STORAGE_KEY, JSON.stringify(REQUESTER))
+    signedIn = authUser({ id: REQUESTER.id, name: REQUESTER.name, email: REQUESTER.email })
   })
 
   afterEach(() => {
@@ -61,7 +65,7 @@ describe('Requester Ticket Detail', () => {
   it('UI-12 (AC-17): renders every header field with no editable control', async () => {
     mockApi(() => Promise.resolve(Response.json(TICKET)))
 
-    renderDetail()
+    await renderDetail()
 
     expect(await screen.findByText('TKT-2026-000042')).toBeInTheDocument()
     expect(screen.getByText('Projector will not power on')).toBeInTheDocument()
@@ -82,7 +86,7 @@ describe('Requester Ticket Detail', () => {
   it('shows both badges with their text label', async () => {
     mockApi(() => Promise.resolve(Response.json(TICKET)))
 
-    renderDetail()
+    await renderDetail()
 
     // ui-spec.md §7: colour is never the only signal.
     expect(await screen.findByText('High')).toBeInTheDocument()
@@ -92,7 +96,7 @@ describe('Requester Ticket Detail', () => {
   it('preserves the line breaks the Requester typed', async () => {
     mockApi(() => Promise.resolve(Response.json(TICKET)))
 
-    renderDetail()
+    await renderDetail()
 
     const description = await screen.findByText(/lecture theatre projector/)
     expect(description).toHaveClass('ttk-detail__description')
@@ -102,7 +106,7 @@ describe('Requester Ticket Detail', () => {
   it('handout §4.2: shows no Comments, Notes, Actions Taken or status control', async () => {
     mockApi(() => Promise.resolve(Response.json(TICKET)))
 
-    renderDetail()
+    await renderDetail()
     await screen.findByText('TKT-2026-000042')
 
     for (const forbidden of [/public comment/i, /internal note/i, /actions taken/i]) {
@@ -117,7 +121,7 @@ describe('Requester Ticket Detail', () => {
       Promise.resolve(Response.json({ error: 'Ticket not found' }, { status: 404 })),
     )
 
-    renderDetail()
+    await renderDetail()
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/Ticket not found/i)
@@ -137,7 +141,7 @@ describe('Requester Ticket Detail', () => {
       ),
     )
 
-    renderDetail()
+    await renderDetail()
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/Ticket not found/i)
@@ -153,7 +157,7 @@ describe('Requester Ticket Detail', () => {
       ),
     )
 
-    renderDetail()
+    await renderDetail()
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/Unable to load the Ticket/i)
@@ -163,7 +167,7 @@ describe('Requester Ticket Detail', () => {
   it('offers a retry for a genuine failure, but not for a 404', async () => {
     mockApi(() => Promise.reject(new TypeError('Failed to fetch')))
 
-    renderDetail()
+    await renderDetail()
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/Unable to load the Ticket/i)
@@ -174,7 +178,7 @@ describe('Requester Ticket Detail', () => {
   it('treats a non-numeric id as not found without calling the API', async () => {
     const fetchSpy = mockApi(() => Promise.resolve(Response.json(TICKET)))
 
-    renderDetail('/tickets/not-a-number')
+    await renderDetail('/tickets/not-a-number')
 
     expect(await screen.findByText(/Ticket not found/i)).toBeInTheDocument()
     expect(
@@ -186,7 +190,7 @@ describe('Requester Ticket Detail', () => {
     const user = userEvent.setup()
     mockApi(() => Promise.resolve(Response.json(TICKET)))
 
-    renderDetail()
+    await renderDetail()
     await screen.findByText('TKT-2026-000042')
 
     await user.click(screen.getByRole('link', { name: /Back to My Tickets/i }))
@@ -194,12 +198,16 @@ describe('Requester Ticket Detail', () => {
     expect(window.location.pathname).toBe('/tickets')
   })
 
-  it('AC-02: redirects to the Selector when no Requester is selected', async () => {
-    window.localStorage.clear()
+  it('AC-02: sends a visitor with no session to Login', async () => {
+    // Lab 2 sent them to the Requester selector. There is no selector now:
+    // identity comes from a session the server issued, so the only "not
+    // selected" state left is "not signed in".
+    signedIn = null
     mockApi(() => Promise.resolve(Response.json(TICKET)))
 
-    renderDetail()
+    await renderDetail()
 
-    expect(window.location.pathname).toBe('/select-requester')
+    expect(await screen.findByRole('heading', { name: /Sign in/i })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/login')
   })
 })

@@ -1,8 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import App from '../../src/App'
-import { REQUESTER_STORAGE_KEY } from '../../src/requester/requesterContext'
+import { renderApp } from '../helpers/renderApp'
+import { authRoutes, authUser } from '../helpers/auth'
 
 // UI-04, UI-10, UI-11 (ui-spec.md §6.3). Rendered through <App /> at /tickets
 // so the route guard, shell and screen are exercised together.
@@ -61,6 +61,8 @@ const requestedQueries: string[] = []
 function mockApi(listFor: (url: URL) => unknown) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
     const raw = String(input)
+    const auth = authRoutes(signedIn)(raw)
+    if (auth) return auth
     if (raw.includes('/api/categories')) return Promise.resolve(Response.json(CATEGORIES))
     if (raw.includes('/api/requesters')) {
       return Promise.resolve(Response.json([REQUESTER, OTHER]))
@@ -76,15 +78,17 @@ function mockApi(listFor: (url: URL) => unknown) {
 
 function renderList() {
   window.history.pushState({}, '', '/tickets')
-  return render(<App />)
+  return renderApp()
 }
+
+let signedIn: ReturnType<typeof authUser> | null = authUser()
 
 describe('My Tickets', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     requestedQueries.length = 0
     window.localStorage.clear()
-    window.localStorage.setItem(REQUESTER_STORAGE_KEY, JSON.stringify(REQUESTER))
+    signedIn = authUser({ id: REQUESTER.id, name: REQUESTER.name, email: REQUESTER.email })
   })
 
   afterEach(() => {
@@ -92,22 +96,23 @@ describe('My Tickets', () => {
     window.history.pushState({}, '', '/')
   })
 
-  it('UI-04 (AC-02): redirects to the Selector when no Requester is selected', async () => {
-    window.localStorage.clear()
+  it('UI-04 (AC-02): sends a visitor with no session to Login, not to My Tickets', async () => {
+    // Lab 2 sent them to the Requester selector. There is no selector now, and
+    // no client-held identity to be missing: the only way to have one is a
+    // session the server issued.
+    signedIn = null
     mockApi(() => listResponse([]))
 
-    renderList()
+    await renderList()
 
-    expect(
-      await screen.findByRole('combobox', { name: /Development Requester/i }),
-    ).toBeInTheDocument()
-    expect(window.location.pathname).toBe('/select-requester')
+    expect(await screen.findByRole('heading', { name: /Sign in/i })).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/login')
   })
 
   it('AC-11: lists the Tickets the API returned, scoped by requesterId', async () => {
     mockApi(() => listResponse([ticket(1), ticket(2)]))
 
-    renderList()
+    await renderList()
 
     expect(await screen.findByText('TKT-2026-000001')).toBeInTheDocument()
     expect(screen.getByText('TKT-2026-000002')).toBeInTheDocument()
@@ -118,7 +123,7 @@ describe('My Tickets', () => {
   it('UI-10 (AC-14): shows the Empty state, with no filter toolbar', async () => {
     mockApi(() => listResponse([], { filtered: false }))
 
-    renderList()
+    await renderList()
 
     expect(await screen.findByText(/haven't created any tickets yet/i)).toBeInTheDocument()
     // A filter toolbar here would imply data exists somewhere to filter.
@@ -129,7 +134,7 @@ describe('My Tickets', () => {
   it('UI-10 (AC-13): shows the No-Results state, distinct from Empty', async () => {
     mockApi(() => listResponse([], { filtered: true }))
 
-    renderList()
+    await renderList()
 
     expect(await screen.findByText(/No tickets match your filters/i)).toBeInTheDocument()
     expect(screen.queryByText(/haven't created any tickets yet/i)).not.toBeInTheDocument()
@@ -146,7 +151,7 @@ describe('My Tickets', () => {
         : listResponse([ticket(1), ticket(2)]),
     )
 
-    renderList()
+    await renderList()
     await screen.findByText('TKT-2026-000001')
 
     await user.type(screen.getByLabelText(/^Search/), 'VPN')
@@ -160,7 +165,7 @@ describe('My Tickets', () => {
     const user = userEvent.setup()
     mockApi(() => listResponse([ticket(1)]))
 
-    renderList()
+    await renderList()
     await screen.findByText('TKT-2026-000001')
 
     await user.selectOptions(screen.getByLabelText(/^Category/), '11')
@@ -182,7 +187,7 @@ describe('My Tickets', () => {
         : listResponse([ticket(1)]),
     )
 
-    renderList()
+    await renderList()
     await screen.findByText('TKT-2026-000001')
 
     await user.type(screen.getByLabelText(/^Search/), 'nothing')
@@ -206,7 +211,7 @@ describe('My Tickets', () => {
       })
     })
 
-    renderList()
+    await renderList()
     await screen.findByText('TKT-2026-000001')
     expect(screen.getByText(/Showing 1–1 of 2/)).toBeInTheDocument()
 
@@ -219,7 +224,7 @@ describe('My Tickets', () => {
   it('disables Previous on the first page and Next on the last', async () => {
     mockApi(() => listResponse([ticket(1)], { page: 1, totalItems: 2, totalPages: 2 }))
 
-    renderList()
+    await renderList()
     await screen.findByText('TKT-2026-000001')
 
     expect(screen.getByRole('button', { name: /^Previous$/ })).toBeDisabled()
@@ -230,7 +235,7 @@ describe('My Tickets', () => {
     const user = userEvent.setup()
     mockApi(() => listResponse([ticket(1)]))
 
-    renderList()
+    await renderList()
     await screen.findByText('TKT-2026-000001')
 
     await user.click(screen.getByRole('button', { name: /Requested Priority/i }))
@@ -257,7 +262,7 @@ describe('My Tickets', () => {
     const user = userEvent.setup()
     mockApi(() => listResponse([ticket(1)]))
 
-    renderList()
+    await renderList()
     await screen.findByText('TKT-2026-000001')
 
     // Under 768px the table — and every sort button in its header — is
@@ -285,7 +290,7 @@ describe('My Tickets', () => {
   it('renders both priority and status badges with their text label', async () => {
     mockApi(() => listResponse([ticket(1, { requestedPriority: 'HIGH' })]))
 
-    renderList()
+    await renderList()
     await screen.findByText('TKT-2026-000001')
 
     // Scoped to the table: the mobile card list renders the same rows, and
@@ -297,9 +302,14 @@ describe('My Tickets', () => {
   })
 
   it('shows a retryable failure state when the list cannot load', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Failed to fetch'))
+    // Only the ticket list fails. Rejecting every request would take the
+    // session check down with it and land on Login, which is a different test.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
+      const auth = authRoutes(signedIn)(String(input))
+      return auth ?? Promise.reject(new Error('Failed to fetch'))
+    }) as typeof fetch)
 
-    renderList()
+    await renderList()
 
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent(/Unable to load your Tickets/i)
@@ -315,7 +325,7 @@ describe('My Tickets', () => {
         : listResponse([ticket(1)]),
     )
 
-    renderList()
+    await renderList()
     await screen.findByText('TKT-2026-000001')
 
     await user.type(screen.getByLabelText(/^Search/), 'stale term')
@@ -325,9 +335,9 @@ describe('My Tickets', () => {
     })
 
     // Simulate the selector storing a different Requester and remounting.
-    window.localStorage.setItem(REQUESTER_STORAGE_KEY, JSON.stringify(OTHER))
+    signedIn = authUser({ id: OTHER.id, name: OTHER.name, email: OTHER.email })
     window.history.pushState({}, '', '/tickets')
-    render(<App />)
+    await renderApp()
 
     expect(await screen.findByText("Ned's ticket")).toBeInTheDocument()
     const last = requestedQueries[requestedQueries.length - 1]

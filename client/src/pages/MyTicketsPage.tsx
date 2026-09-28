@@ -15,7 +15,7 @@ import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { Field } from '../components/Field'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { useSelectedRequester } from '../requester/useSelectedRequester'
+import { useAuth } from '../auth/useAuth'
 import './MyTicketsPage.css'
 
 type Filters = {
@@ -64,7 +64,10 @@ function statusLabel(status: string) {
  * pagination, and BR-28's two distinct zero-result states.
  */
 export function MyTicketsPage() {
-  const { requester } = useSelectedRequester()
+  // Lab 2 read this from the selector; Lab 3 reads it from the session. The
+  // requesterId still travels on the wire until Issue #41 removes it from the
+  // API contract - at which point this line goes too.
+  const { user: requester } = useAuth()
   const navigate = useNavigate()
 
   const [categories, setCategories] = useState<Category[]>([])

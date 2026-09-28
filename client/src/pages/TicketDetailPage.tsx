@@ -8,7 +8,7 @@ import { AttachmentSection } from '../components/AttachmentSection'
 import { Card } from '../components/Card'
 import { ErrorState } from '../components/ErrorState'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { useSelectedRequester } from '../requester/useSelectedRequester'
+import { useAuth } from '../auth/useAuth'
 import './TicketDetailPage.css'
 
 const PRIORITY_TONE: Record<RequestedPriority, BadgeTone> = {
@@ -67,7 +67,10 @@ function ReadOnlyField({
  */
 export function TicketDetailPage() {
   const { id } = useParams()
-  const { requester } = useSelectedRequester()
+  // Lab 2 read this from the selector; Lab 3 reads it from the session. The
+  // requesterId still travels on the wire until Issue #41 removes it from the
+  // API contract - at which point this line goes too.
+  const { user: requester } = useAuth()
 
   const [ticket, setTicket] = useState<TicketDetail | null>(null)
   const [loading, setLoading] = useState(true)

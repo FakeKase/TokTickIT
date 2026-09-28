@@ -146,8 +146,8 @@ test.describe('ui-spec §10: field states are distinguishable', () => {
     await selectRequester(page, requester)
 
     await page.goto('/tickets/new')
-    // Role-scoped: the header's "Change Requester" link also carries an
-    // aria-label containing "Requester".
+    // Role-scoped and exact: "Requester" appears in the header too, as the
+    // read-only field's own label, and a loose match would find both.
     const readOnly = page.getByRole('textbox', { name: 'Requester', exact: true })
     const editable = page.getByRole('textbox', { name: /^Summary/ })
 

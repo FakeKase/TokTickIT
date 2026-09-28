@@ -1,7 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import App from '../../src/App'
+import { renderApp } from '../helpers/renderApp'
+import { authRoutes, authUser } from '../helpers/auth'
 import {
   THEME_STORAGE_KEY,
   THEME_TRANSITION_CLASS,
@@ -25,13 +26,18 @@ function stubMatchMedia(impl: () => MediaQueryList) {
   Object.defineProperty(window, 'matchMedia', { configurable: true, value: impl })
 }
 
+const signedIn = authUser()
+
 describe('Theme toggle', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     window.localStorage.clear()
     delete document.documentElement.dataset.theme
     document.documentElement.classList.remove(THEME_TRANSITION_CLASS)
-    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json([])))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
+      const auth = authRoutes(signedIn)(String(input))
+      return auth ?? Promise.resolve(Response.json([]))
+    }) as typeof fetch)
   })
 
   afterEach(() => {
@@ -41,8 +47,8 @@ describe('Theme toggle', () => {
     delete window.matchMedia
   })
 
-  it('renders in the header and defaults to light with no stored preference', () => {
-    render(<App />)
+  it('renders in the header and defaults to light with no stored preference', async () => {
+    await renderApp()
 
     expect(screen.getByRole('button', { name: /Switch to dark theme/i })).toBeInTheDocument()
     expect(themeAttr()).toBe('light')
@@ -50,7 +56,7 @@ describe('Theme toggle', () => {
 
   it('switches to dark and back, updating its own accessible name', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    await renderApp()
 
     await user.click(screen.getByRole('button', { name: /Switch to dark theme/i }))
     expect(themeAttr()).toBe('dark')
@@ -68,14 +74,14 @@ describe('Theme toggle', () => {
 
   it('persists the choice across a reload', async () => {
     const user = userEvent.setup()
-    const first = render(<App />)
+    const first = await renderApp()
 
     await user.click(screen.getByRole('button', { name: /Switch to dark theme/i }))
     expect(window.localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark')
 
     first.unmount()
     delete document.documentElement.dataset.theme
-    render(<App />)
+    await renderApp()
 
     expect(themeAttr()).toBe('dark')
     expect(screen.getByRole('button', { name: /Switch to light theme/i })).toBeInTheDocument()
@@ -84,7 +90,7 @@ describe('Theme toggle', () => {
   it('follows the OS preference only until an explicit choice is stored', async () => {
     stubMatchMedia(() => ({ matches: true }) as MediaQueryList)
 
-    const first = render(<App />)
+    const first = await renderApp()
     expect(themeAttr()).toBe('dark')
 
     // An explicit light choice must win over a dark OS setting.
@@ -94,7 +100,7 @@ describe('Theme toggle', () => {
 
     first.unmount()
     delete document.documentElement.dataset.theme
-    render(<App />)
+    await renderApp()
 
     expect(themeAttr()).toBe('light')
   })
@@ -102,10 +108,12 @@ describe('Theme toggle', () => {
   // These two use fireEvent rather than userEvent: userEvent's own inter-event
   // delay deadlocks against fake timers, and what is under test here is the
   // transition window's timing, not the fidelity of the click itself.
-  it('arms the colour transition for the switch only, then disarms it', () => {
+  it('arms the colour transition for the switch only, then disarms it', async () => {
+    // Rendered before the timers are faked: the session check resolves on a
+    // real microtask, and waiting for it under fake timers would hang.
+    await renderApp()
     vi.useFakeTimers()
     try {
-      render(<App />)
 
       // Not armed on mount — otherwise first paint would animate too.
       expect(document.documentElement).not.toHaveClass(THEME_TRANSITION_CLASS)
@@ -123,10 +131,12 @@ describe('Theme toggle', () => {
     }
   })
 
-  it('restarts the transition window when switched again mid-animation', () => {
+  it('restarts the transition window when switched again mid-animation', async () => {
+    // Rendered before the timers are faked: the session check resolves on a
+    // real microtask, and waiting for it under fake timers would hang.
+    await renderApp()
     vi.useFakeTimers()
     try {
-      render(<App />)
 
       fireEvent.click(screen.getByRole('button', { name: /Switch to dark theme/i }))
       act(() => {
@@ -151,12 +161,12 @@ describe('Theme toggle', () => {
     }
   })
 
-  it('falls back to light when the OS preference cannot be read', () => {
+  it('falls back to light when the OS preference cannot be read', async () => {
     stubMatchMedia(() => {
       throw new Error('matchMedia unavailable')
     })
 
-    render(<App />)
+    await renderApp()
 
     expect(themeAttr()).toBe('light')
   })

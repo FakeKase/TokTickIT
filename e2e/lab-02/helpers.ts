@@ -22,18 +22,68 @@ export interface SeedRequester {
 }
 
 /** The first active seeded Requester, used as the demo identity throughout. */
-export async function firstRequester(request: APIRequestContext): Promise<SeedRequester> {
+/**
+ * Whether an account can actually reach the application, rather than only
+ * authenticate.
+ *
+ * The seed deliberately leaves two accounts holding an initial password so the
+ * mandatory first-login change is demonstrable. Both are active Requesters, so
+ * `GET /api/requesters` lists them and any spec that picks a Requester by
+ * position can land on one - signing in perfectly well and then being held on
+ * Change Password, which looks like a broken guard rather than a fixture
+ * problem.
+ *
+ * Probed with the test-scoped `request` context, which has its own cookie jar,
+ * so this never disturbs the session the page is using.
+ */
+async function canReachTheApp(
+  request: APIRequestContext,
+  requester: SeedRequester,
+): Promise<boolean> {
+  const response = await request.post(`${API}/api/auth/login`, {
+    data: { email: requester.email, password: DEV_PASSWORD },
+  })
+  if (!response.ok()) return false
+  const { user } = (await response.json()) as { user: { mustChangePassword: boolean } }
+  return !user.mustChangePassword
+}
+
+/**
+ * The seeded Requester that owns nothing, reserved for the Empty state.
+ *
+ * Kept out of the general-purpose pickers below. `GET /api/requesters` is
+ * ordered by name, and "Grace Lim" sorts first - so without this the very
+ * account the Empty state needs is the one `firstRequester` hands out, and the
+ * first spec to create a Ticket for it destroys the only fixture that can
+ * demonstrate BR-28.
+ */
+const EMPTY_STATE_REQUESTER = 'grace.lim@toktickit.test'
+
+/** The seeded Requesters a spec can drive, in list order. */
+async function usableRequesters(request: APIRequestContext): Promise<SeedRequester[]> {
   const response = await request.get(`${API}/api/requesters`)
   expect(response.ok(), 'GET /api/requesters must succeed — is the database seeded?').toBe(true)
   const requesters = (await response.json()) as SeedRequester[]
-  expect(requesters.length, 'seed must provide at least one active Requester').toBeGreaterThan(0)
-  return requesters[0]
+
+  const usable: SeedRequester[] = []
+  for (const requester of requesters) {
+    if (requester.email === EMPTY_STATE_REQUESTER) continue
+    if (await canReachTheApp(request, requester)) usable.push(requester)
+  }
+  expect(
+    usable.length,
+    'seed must provide active Requesters who are not held on Change Password',
+  ).toBeGreaterThan(0)
+  return usable
+}
+
+export async function firstRequester(request: APIRequestContext): Promise<SeedRequester> {
+  return (await usableRequesters(request))[0]
 }
 
 /** A second Requester, for anything needing two distinct identities. */
 export async function secondRequester(request: APIRequestContext): Promise<SeedRequester> {
-  const response = await request.get(`${API}/api/requesters`)
-  const requesters = (await response.json()) as SeedRequester[]
+  const requesters = await usableRequesters(request)
   expect(requesters.length).toBeGreaterThan(1)
   return requesters[1]
 }
@@ -48,10 +98,16 @@ export async function secondRequester(request: APIRequestContext): Promise<SeedR
 export async function requesterWithoutTickets(
   request: APIRequestContext,
 ): Promise<SeedRequester> {
+  // Includes the reserved account, which is the whole point of it.
   const response = await request.get(`${API}/api/requesters`)
   const requesters = (await response.json()) as SeedRequester[]
+  const reservedFirst = [
+    ...requesters.filter((r) => r.email === EMPTY_STATE_REQUESTER),
+    ...requesters.filter((r) => r.email !== EMPTY_STATE_REQUESTER),
+  ]
 
-  for (const requester of requesters) {
+  for (const requester of reservedFirst) {
+    if (!(await canReachTheApp(request, requester))) continue
     const list = await request.get(`${API}/api/tickets?requesterId=${requester.id}&pageSize=1`)
     const { pagination } = (await list.json()) as { pagination: { totalItems: number } }
     if (pagination.totalItems === 0) return requester
@@ -133,38 +189,53 @@ export async function attachFile(
   return response.json()
 }
 
+/** The password every seeded account shares (README, BR-39). */
+export const DEV_PASSWORD = 'ChangeMe123!'
+
 /**
- * Puts the app in the "Requester already selected" state.
+ * Puts the browser in the "already signed in" state.
  *
- * Writes the same localStorage key the app uses rather than clicking through
- * the selector, so a failure in these specs points at the screen under test
- * rather than at the selection flow.
+ * Lab 2 wrote a localStorage key here, because identity was a client-side
+ * choice. It is a session cookie now, so the shortcut is a real login through
+ * the API: the session it produces is indistinguishable from one obtained by
+ * typing in the form, and a failure in these specs still points at the screen
+ * under test rather than at the login flow.
  */
 export async function selectRequester(page: Page, requester: SeedRequester) {
-  await page.addInitScript((value) => {
-    window.localStorage.setItem('toktickit.selectedRequester', value)
-  }, JSON.stringify(requester))
+  const response = await page.request.post(`${API}/api/auth/login`, {
+    data: { email: requester.email, password: DEV_PASSWORD },
+  })
+  expect(
+    response.ok(),
+    `could not sign in as ${requester.email} - is the database seeded?`,
+  ).toBe(true)
 }
 
 /**
- * Signs in the way a person does: through the Development Requester Selection
- * screen (AC-02).
+ * Signs in the way a person does: through the Login screen (AC-01).
  *
- * The localStorage shortcut above is right for the visual specs, where the
- * selector is not what is under test — but an end-to-end flow that skips the
- * selector never proves the selector works, so E2E-01 uses this instead.
+ * The API shortcut above is right for the visual specs, where login is not
+ * what is under test — but a flow that skips the form never proves the form
+ * works, so E2E-01 uses this instead.
  */
-export async function signInThroughSelector(page: Page, requester: SeedRequester) {
-  // Landing on a guarded route must send us to the selector (AC-02).
+export async function signInThroughLogin(page: Page, requester: SeedRequester) {
+  // Landing on a guarded route must send us to Login (AC-13).
   await page.goto('/tickets')
-  await expect(page).toHaveURL(/\/select-requester$/)
+  await expect(page).toHaveURL(/\/login$/)
 
-  await page.getByLabel('Development Requester').selectOption(String(requester.id))
-  await page.getByRole('button', { name: 'Continue' }).click()
+  await page.getByLabel('Email address').fill(requester.email)
+  await page.getByLabel(/^Password/).fill(DEV_PASSWORD)
+  await page.getByRole('button', { name: 'Sign in' }).click()
 
   // Resumes the route the guard interrupted.
   await expect(page).toHaveURL(/\/tickets$/)
   await expect(page.getByText(requester.name).first()).toBeVisible()
+}
+
+/** Ends the session, for a spec that needs to become somebody else. */
+export async function signOut(page: Page) {
+  await page.getByRole('button', { name: 'Log out' }).click()
+  await expect(page).toHaveURL(/\/login$/)
 }
 
 /**

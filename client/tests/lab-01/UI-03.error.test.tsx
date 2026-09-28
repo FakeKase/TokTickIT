@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import App from '../../src/App'
+import { MemoryRouter } from 'react-router-dom'
+import { CheckSystemPage } from '../../src/pages/CheckSystemPage'
 
+// Rendered as the page rather than through <App />: Lab 3 put every screen
+// behind a session, and these tests are about the Check System screen itself.
 // UI-03: when the API cannot be reached the user must be told, rather than the
 // page silently doing nothing. Both failure modes are covered: the request
 // never lands (network error) and it lands but fails (5xx).
@@ -19,7 +22,11 @@ describe('UI-03 API failure', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Failed to fetch'))
     const user = userEvent.setup()
 
-    render(<App />)
+    render(
+      <MemoryRouter>
+        <CheckSystemPage />
+      </MemoryRouter>,
+    )
     await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -34,7 +41,11 @@ describe('UI-03 API failure', () => {
     )
     const user = userEvent.setup()
 
-    render(<App />)
+    render(
+      <MemoryRouter>
+        <CheckSystemPage />
+      </MemoryRouter>,
+    )
     await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -54,7 +65,11 @@ describe('UI-03 API failure', () => {
     )
     const user = userEvent.setup()
 
-    render(<App />)
+    render(
+      <MemoryRouter>
+        <CheckSystemPage />
+      </MemoryRouter>,
+    )
     await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     expect(await screen.findByText(/Online/i)).toBeInTheDocument()

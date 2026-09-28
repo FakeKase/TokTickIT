@@ -124,6 +124,7 @@ and no real password belongs in this repository (BR-39).
 | `ned.leeds@toktickit.test` | Requester | Active |
 | `michelle.jones@toktickit.test` | Requester | Active |
 | `roronoa.zoro@toktickit.test` | Requester | Active |
+| `grace.lim@toktickit.test` | Requester | Active, owns no Tickets — the My Tickets Empty state (BR-28) |
 | `nora.bennett@toktickit.test` | Requester | Active, **must change password at first login** |
 | `david.kim@toktickit.test` | Requester | Inactive — cannot sign in (BR-01) |
 | `sarah.chen@toktickit.test` | IT Staff | Active |

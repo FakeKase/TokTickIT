@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Button } from './Button'
 
 export interface ErrorStateProps {
@@ -5,6 +6,10 @@ export interface ErrorStateProps {
   message: string
   onRetry?: () => void
   retryLabel?: string
+  /** A way onward when retrying is not the answer — a Forbidden state, where
+   *  the same request will fail the same way however many times it is sent. */
+  actionTo?: string
+  actionLabel?: string
   className?: string
 }
 
@@ -17,6 +22,8 @@ export function ErrorState({
   message,
   onRetry,
   retryLabel = 'Retry',
+  actionTo,
+  actionLabel = 'Go back',
   className,
 }: ErrorStateProps) {
   const classes = ['ttk-error-state', className ?? ''].filter(Boolean).join(' ')
@@ -29,6 +36,11 @@ export function ErrorState({
         <Button variant="secondary" onClick={onRetry}>
           {retryLabel}
         </Button>
+      )}
+      {actionTo && (
+        <Link className="ttk-btn ttk-btn--secondary" to={actionTo}>
+          {actionLabel}
+        </Link>
       )}
     </div>
   )

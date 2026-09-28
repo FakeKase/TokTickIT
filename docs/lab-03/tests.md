@@ -105,15 +105,15 @@ is under test.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| UI-01 | UI | AC-01, FR-01 | Login submits and stores identity | Valid submission calls the API once and routes to the role's landing screen | `client/tests/lab-03/Login.test.tsx` | Planned |
-| UI-02 | UI | AC-06, BR-08 | Login failure message | A `401` renders one generic alert; nothing indicates which field or account state was wrong | `client/tests/lab-03/Login.test.tsx` | Planned |
-| UI-03 | UI | AC-07 | Login busy state | The submit control is disabled and labelled while the request is in flight; a second click sends nothing | `client/tests/lab-03/Login.test.tsx` | Planned |
-| UI-04 | UI | AC-44 | Login API failure | An unreachable API renders a safe failure with no internal detail | `client/tests/lab-03/Login.test.tsx` | Planned |
-| UI-05 | UI | AC-02 | Password-change gate in the router | A user with `mustChangePassword` is redirected from every route to Change Password | `client/tests/lab-03/ChangePassword.test.tsx` | Planned |
-| UI-06 | UI | AC-11 | Password-change validation | Short password, mismatched confirmation, and same-as-current each show a field-level message and send nothing | `client/tests/lab-03/ChangePassword.test.tsx` | Planned |
-| UI-07 | UI | AC-12 | Password-change success | Success routes into the application and the gate no longer fires | `client/tests/lab-03/ChangePassword.test.tsx` | Planned |
-| UI-08 | UI | AC-13, FR-05 | Role-specific navigation | Requester, IT Staff, and Administrator each see only their permitted destinations; the name and role badge render; Logout is present | `client/tests/lab-03/AppShellAuth.test.tsx` | Planned |
-| UI-09 | UI | AC-08 | Logout from the shell | Logout calls the API and returns to Login; a protected route afterwards shows Login | `client/tests/lab-03/AppShellAuth.test.tsx` | Planned |
+| UI-01 | UI | AC-01, FR-01 | Login submits and stores identity | Valid submission calls the API once and routes to the role's landing screen | `client/tests/lab-03/Login.test.tsx` | Pass |
+| UI-02 | UI | AC-06, BR-08 | Login failure message | A `401` renders one generic alert; nothing indicates which field or account state was wrong | `client/tests/lab-03/Login.test.tsx` | Pass |
+| UI-03 | UI | AC-07 | Login busy state | The submit control is disabled and labelled while the request is in flight; a second click sends nothing | `client/tests/lab-03/Login.test.tsx` | Pass |
+| UI-04 | UI | AC-44 | Login API failure | An unreachable API renders a safe failure with no internal detail | `client/tests/lab-03/Login.test.tsx` | Pass |
+| UI-05 | UI | AC-02 | Password-change gate in the router | A user with `mustChangePassword` is redirected from every route to Change Password | `client/tests/lab-03/ChangePassword.test.tsx` | Pass |
+| UI-06 | UI | AC-11 | Password-change validation | Short password, mismatched confirmation, and same-as-current each show a field-level message and send nothing | `client/tests/lab-03/ChangePassword.test.tsx` | Pass |
+| UI-07 | UI | AC-12 | Password-change success | Success routes into the application and the gate no longer fires | `client/tests/lab-03/ChangePassword.test.tsx` | Pass |
+| UI-08 | UI | AC-13, FR-05 | Role-specific navigation | Requester, IT Staff, and Administrator each see only their permitted destinations; the name and role badge render; Logout is present | `client/tests/lab-03/AppShellAuth.test.tsx` | Pass |
+| UI-09 | UI | AC-08 | Logout from the shell | Logout calls the API and returns to Login; a protected route afterwards shows Login | `client/tests/lab-03/AppShellAuth.test.tsx` | Pass |
 | UI-10 | UI | AC-22, FR-13 | Queue renders rows | Ticket Number, Summary, both priority badges, status badge, owner or "Unassigned" | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
 | UI-11 | UI | AC-23 | Queue empty vs no-results | Different copy and different actions for the two states | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
 | UI-12 | UI | AC-24, AC-26 | Queue filters and paging | Changing a filter refetches with the right query; page controls move the page and clamp at the bounds | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
@@ -232,6 +232,9 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 | 39 — Authentication API | `cd server && npm test` | 15 files, 164 tests passed |
 | 39 — Authentication API | `cd client && npm test` | 12 files, 111 tests passed |
 | 39 — Authentication API | `npm run e2e` | 29 specs passed |
+| 40 — Login, password change, app shell | `cd server && npm test` | 15 files, 164 tests passed |
+| 40 — Login, password change, app shell | `cd client && npm test` | 13 files, 117 tests passed |
+| 40 — Login, password change, app shell | `npm run e2e` | 27 specs passed |
 
 ## 7. Known Limitations or Deferred Tests
 
@@ -240,4 +243,6 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 - Password hashing cost is not benchmarked; cost 10 is taken as the documented default rather than tuned.
 - Rate limiting and account lockout after repeated failed logins are not implemented, and therefore not tested: the handout excludes account unlocking and advanced identity management. This is a known gap, recorded here rather than left to be discovered.
 - The dark appearance is asserted at the `data-theme` level, as in Lab 2, not by computed contrast ratio.
+- **A session that expires while somebody is using the app does not send them back to Login.** The API answers 401 and the screen shows its failure state, which is safe but reads as "the server is broken" rather than "you were signed out". The fix belongs with Issue #41, where the Lab 2 endpoints become authenticated and there is a single place to notice a 401 and route on it.
+- **Lab 2's e2e coverage of the Development Requester selector was removed with the selector itself** (Issue #40). Seven specs and the Part 6 evidence block drove a screen that no longer exists. Their screenshots stay under `artifacts/lab-02/screenshots/` as evidence for a lab already submitted; Login's own evidence is captured by Lab 3's suite in Issue #46. The client suite likewise lost `RequesterContext.test.tsx` and `RequesterSelector.test.tsx`, 15 tests covering the deleted context.
 - **BR-06's "stored lower-cased" is not yet enforced anywhere.** Login lower-cases what it is given before looking a user up, and every row written so far is lower-case, so nothing is broken today. But no constraint or write path prevents a future endpoint storing `Alex.Morgan@…`, and the moment one does, that user cannot log in — the lookup would normalise while the stored value would not. Issue #45 owns the write paths (`POST`/`PATCH /api/users`) and must normalise there; a `CHECK (email = lower(email))` would make it impossible to get wrong, at the cost of turning a mistyped address into a constraint violation the API has to translate.

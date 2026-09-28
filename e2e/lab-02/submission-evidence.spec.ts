@@ -8,6 +8,9 @@ import {
   firstRequester,
   secondRequester,
   selectRequester,
+  signInThroughLogin,
+  signOut,
+  DEV_PASSWORD,
   shot,
 } from './helpers'
 
@@ -25,93 +28,11 @@ import {
 
 const DESCRIPTION = `Reported during the ${FIXTURE_MARKER}, with enough body text for the Detail screen to render realistically.`
 
-test.describe('Part 6 — Development Requester Selection', () => {
-  test('screen, dropdown, selected-user display and Change Requester action', async ({
-    page,
-    request,
-  }) => {
-    await page.setViewportSize(VIEWPORTS.desktop)
-    const requester = await firstRequester(request)
-
-    // --- The Selection screen itself ------------------------------------
-    await page.goto('/tickets')
-    await expect(page).toHaveURL(/\/select-requester$/)
-    await expect(
-      page.getByText(/Select a Development Requester to test requester-specific/i),
-    ).toBeVisible()
-    await expect(page.getByText(/not a login screen/i)).toBeVisible()
-    await page.screenshot({ path: shot('dev-requester-selection', 'screen'), fullPage: true })
-
-    // --- The Requester options, loaded and selectable --------------------
-    // A native <select> popup is painted by the browser's own UI layer rather
-    // than by the page, so page.screenshot() cannot photograph it expanded on
-    // any browser. Focusing it only draws a focus ring, which is why the
-    // earlier capture was 0.017% different from 'screen' above and showed the
-    // "Choose a Requester…" placeholder rather than any Requester at all.
-    // The option list is proven by assertion; the capture carries the part a
-    // screenshot honestly can — a real Requester chosen and displayed.
-    const dropdown = page.getByLabel('Development Requester')
-    const options = await dropdown.locator('option').allInnerTexts()
-    // BR-04: only active Requesters are offered. The inactive seed row must
-    // not appear among them.
-    expect(options.length).toBeGreaterThan(1)
-    expect(options.join('|')).not.toContain('David Kim')
-    await dropdown.selectOption(String(requester.id))
-    await expect(dropdown).toHaveValue(String(requester.id))
-    // The chosen Requester's name must be on screen, so the file cannot drift
-    // from what its name claims.
-    await expect(dropdown.locator('option:checked')).toContainText(requester.name)
-    await page.screenshot({
-      path: shot('dev-requester-selection', 'requester-options-loaded'),
-      fullPage: true,
-    })
-
-    // --- Continue, and the selected user showing in the shell ------------
-    await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page).toHaveURL(/\/tickets$/)
-    const header = page.locator('.ttk-shell__requester')
-    await expect(header).toContainText(requester.name)
-    await page.screenshot({
-      path: shot('dev-requester-selection', 'selected-user-display'),
-      fullPage: true,
-    })
-
-    // --- The Change Requester action, actually taken ---------------------
-    // Captured after the click, on the screen it returns to, so the file
-    // shows the action's effect rather than the button sitting unused.
-    await page.getByRole('link', { name: /Change Requester/i }).click()
-    await expect(page).toHaveURL(/\/select-requester$/)
-    await expect(page.getByLabel('Development Requester')).toBeVisible()
-    await page.screenshot({
-      path: shot('dev-requester-selection', 'change-requester-action'),
-      fullPage: true,
-    })
-  })
-
-  test('loading and failure states', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.desktop)
-
-    // --- Loading: hold the response open long enough to capture ----------
-    await page.route('**/api/requesters', async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      await route.continue()
-    })
-    await page.goto('/select-requester')
-    await expect(page.getByText(/Loading Development Requesters/i)).toBeVisible()
-    await page.screenshot({ path: shot('dev-requester-selection', 'loading'), fullPage: true })
-    await page.unroute('**/api/requesters')
-
-    // --- Failure: AC-24, a safe message and a Retry ----------------------
-    await page.route('**/api/requesters', (route) => route.abort('failed'))
-    await page.goto('/select-requester')
-    const alert = page.getByRole('alert')
-    await expect(alert).toContainText(/Unable to load Development Requesters/i)
-    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
-    // The safe message must not leak the underlying failure.
-    await expect(alert).not.toContainText(/fetch|network|ECONN/i)
-    await page.screenshot({ path: shot('dev-requester-selection', 'failure'), fullPage: true })
-  })
-})
+// The "Part 6 — Development Requester Selection" block that stood here covered
+// the selector screen, which Lab 3 replaced with real authentication (Issue
+// #40). Its screenshots remain under artifacts/lab-02/screenshots/ as evidence
+// for a lab that has already been submitted; the tests could not outlive the
+// screen they drove. Login's own evidence is captured by Lab 3's suite.
 
 test.describe('Part 6 — Create Ticket submitting state', () => {
   test('submit is busy and disabled while the request is in flight (AC-06)', async ({
@@ -170,10 +91,11 @@ test.describe('Part 7 — My Tickets', () => {
     await page.screenshot({ path: shot('my-tickets', 'requester-a-list'), fullPage: true })
 
     // --- Switch to B, and A's Ticket is gone -----------------------------
-    await page.getByRole('link', { name: /Change Requester/i }).click()
-    await page.getByLabel('Development Requester').selectOption(String(b.id))
-    await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page.locator('.ttk-shell__requester')).toContainText(b.name)
+    // There is no "Change Requester" any more: being somebody else means
+    // signing in as them.
+    await signOut(page)
+    await signInThroughLogin(page, b)
+    await expect(page.locator('.ttk-shell__identity')).toContainText(b.name)
 
     await page.getByLabel(/^Search/).fill(ownedByA.ticketNumber)
     await page.getByRole('button', { name: 'Apply' }).click()

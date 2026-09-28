@@ -2,6 +2,20 @@
 // still runs when client/.env has not been created.
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
 
+/**
+ * Every call goes through here so that `credentials: 'include'` cannot be
+ * forgotten on a new endpoint.
+ *
+ * Without it the browser sends no cookie to a different origin — the API is on
+ * :3001 and the client on :5173 — and every authenticated request would be
+ * answered 401 while looking perfectly correct in the network tab. It is also
+ * why the server sets an explicit CORS origin: a wildcard is refused once
+ * credentials are in play.
+ */
+function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${API_URL}${path}`, { ...init, credentials: 'include' })
+}
+
 export interface HealthResponse {
   status: string
   service: string
@@ -25,7 +39,7 @@ export interface Requester {
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
-  const response = await fetch(`${API_URL}/api/health`)
+  const response = await apiFetch(`/api/health`)
 
   if (!response.ok) {
     throw new Error(`TokTickIT API responded with ${response.status}`)
@@ -35,7 +49,7 @@ export async function fetchHealth(): Promise<HealthResponse> {
 }
 
 export async function fetchCategories(): Promise<Category[]> {
-  const response = await fetch(`${API_URL}/api/categories`)
+  const response = await apiFetch(`/api/categories`)
 
   if (!response.ok) {
     throw new Error(`TokTickIT API responded with ${response.status}`)
@@ -121,9 +135,85 @@ async function readError(response: Response, fallback: string): Promise<ApiError
   }
 }
 
+
+/** One of the three Lab 3 roles (specification.md §5.1). */
+export type Role = 'REQUESTER' | 'IT_STAFF' | 'ADMINISTRATOR'
+
+/** The authenticated user, as every auth endpoint returns them. Deliberately
+ *  the same shape everywhere, so no screen has to special-case where it came
+ *  from. Never carries a password hash — see api-spec.md "Conventions". */
+export interface AuthenticatedUser {
+  id: number
+  name: string
+  email: string
+  role: Role
+  isActive: boolean
+  mustChangePassword: boolean
+  createdAt: string
+}
+
+/** api-spec.md §1. Throws ApiError(401) for a wrong password, an unknown
+ *  address, and an inactive account alike — the caller cannot tell them apart,
+ *  which is the point (BR-08). */
+export async function login(email: string, password: string): Promise<AuthenticatedUser> {
+  const response = await apiFetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to sign in')
+  }
+
+  return ((await response.json()) as { user: AuthenticatedUser }).user
+}
+
+/** api-spec.md §2. Idempotent server-side, so a failure here is a network
+ *  problem, never "you were not signed in". */
+export async function logout(): Promise<void> {
+  const response = await apiFetch('/api/auth/logout', { method: 'POST' })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to sign out')
+  }
+}
+
+/** api-spec.md §3. The only way this code can learn who is signed in: the
+ *  session cookie is httpOnly and unreadable from JavaScript by design. */
+export async function fetchCurrentUser(): Promise<AuthenticatedUser> {
+  const response = await apiFetch('/api/auth/me')
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to read the current session')
+  }
+
+  return ((await response.json()) as { user: AuthenticatedUser }).user
+}
+
+/** api-spec.md §4. On success the server rotates the session, so the cookie
+ *  this browser holds afterwards is a different one (BR-41). */
+export async function changePassword(input: {
+  currentPassword: string
+  newPassword: string
+  confirmPassword: string
+}): Promise<AuthenticatedUser> {
+  const response = await apiFetch('/api/auth/change-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to change the password')
+  }
+
+  return ((await response.json()) as { user: AuthenticatedUser }).user
+}
+
 /** Active Development Requesters for the selector screen (BR-04). */
 export async function fetchRequesters(): Promise<Requester[]> {
-  const response = await fetch(`${API_URL}/api/requesters`)
+  const response = await apiFetch(`/api/requesters`)
 
   if (!response.ok) {
     throw new Error(`TokTickIT API responded with ${response.status}`)
@@ -134,7 +224,7 @@ export async function fetchRequesters(): Promise<Requester[]> {
 
 /** Active Related Systems for the classification row (api-spec.md §3). */
 export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
-  const response = await fetch(`${API_URL}/api/related-systems`)
+  const response = await apiFetch(`/api/related-systems`)
 
   if (!response.ok) {
     throw new Error(`TokTickIT API responded with ${response.status}`)
@@ -145,7 +235,7 @@ export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
 
 /** Creates one Ticket for the selected Requester (api-spec.md §4). */
 export async function createTicket(input: CreateTicketInput): Promise<Ticket> {
-  const response = await fetch(`${API_URL}/api/tickets`, {
+  const response = await apiFetch(`/api/tickets`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -173,7 +263,7 @@ export async function uploadAttachment(
   body.append('requesterId', String(requesterId))
   body.append('file', file)
 
-  const response = await fetch(`${API_URL}/api/tickets/${ticketId}/attachments`, {
+  const response = await apiFetch(`/api/tickets/${ticketId}/attachments`, {
     method: 'POST',
     body,
   })
@@ -234,7 +324,7 @@ export async function fetchTickets(
     if (value !== undefined && value !== '') query.set(key, String(value))
   }
 
-  const response = await fetch(`${API_URL}/api/tickets?${query.toString()}`)
+  const response = await apiFetch(`/api/tickets?${query.toString()}`)
 
   if (!response.ok) {
     throw await readError(response, 'Unable to load your Tickets')
@@ -279,8 +369,8 @@ export async function fetchTicket(
   ticketId: number,
   requesterId: number,
 ): Promise<TicketDetail> {
-  const response = await fetch(
-    `${API_URL}/api/tickets/${ticketId}?requesterId=${requesterId}`,
+  const response = await apiFetch(
+    `/api/tickets/${ticketId}?requesterId=${requesterId}`,
   )
 
   if (!response.ok) {
@@ -294,6 +384,9 @@ export async function fetchTicket(
  *
  *  Built here rather than in a component so the requesterId seam stays in one
  *  place — a plain <a href> would otherwise bypass it. */
+/** A URL for an `<a href>`, not for fetch: the browser attaches the session
+ *  cookie itself on a same-site navigation, which is why this is the one place
+ *  that does not go through `apiFetch`. */
 export function attachmentDownloadUrl(attachmentId: number, requesterId: number): string {
   return `${API_URL}/api/attachments/${attachmentId}/download?requesterId=${requesterId}`
 }
@@ -304,7 +397,7 @@ export async function removeAttachment(
   requesterId: number,
   reason: string,
 ): Promise<TicketAttachment> {
-  const response = await fetch(`${API_URL}/api/attachments/${attachmentId}`, {
+  const response = await apiFetch(`/api/attachments/${attachmentId}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ requesterId, reason }),

@@ -13,7 +13,7 @@ import { Card } from '../components/Card'
 import { ErrorState } from '../components/ErrorState'
 import { Field } from '../components/Field'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { useSelectedRequester } from '../requester/useSelectedRequester'
+import { useAuth } from '../auth/useAuth'
 import {
   DESCRIPTION_MAX,
   MAX_ACTIVE_ATTACHMENTS,
@@ -51,7 +51,10 @@ const PRIORITIES: { value: RequestedPriority; label: string }[] = [
  * failure per BR-18.
  */
 export function CreateTicketPage() {
-  const { requester } = useSelectedRequester()
+  // Lab 2 read this from the selector; Lab 3 reads it from the session. The
+  // requesterId still travels on the wire until Issue #41 removes it from the
+  // API contract - at which point this line goes too.
+  const { user: requester } = useAuth()
   const navigate = useNavigate()
 
   const [refData, setRefData] = useState<RefData>({ status: 'loading' })

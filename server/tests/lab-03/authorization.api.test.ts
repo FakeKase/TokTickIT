@@ -1,3 +1,6 @@
+import { unlink } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 import cookieParser from "cookie-parser";
 import request from "supertest";
@@ -26,6 +29,28 @@ import { requireSessionCookie, signInAs } from "../helpers/session.js";
 
 const prisma = createPrismaClient();
 const realApp = createApp();
+
+const UPLOADS_DIR = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "uploads",
+);
+
+/** Removes the rows a fixture Ticket owns, and the files behind them.
+ *  Deleting only the rows leaves the uploads directory growing by three files
+ *  on every run, which attachments.api.test.ts learned the hard way. */
+async function discardTicket(ticketId: number) {
+  const stored = await prisma.attachment.findMany({
+    where: { ticketId },
+    select: { storedFilename: true },
+  });
+  await prisma.attachment.deleteMany({ where: { ticketId } });
+  await prisma.ticket.deleteMany({ where: { id: ticketId } });
+  for (const { storedFilename } of stored) {
+    await unlink(path.join(UPLOADS_DIR, storedFilename)).catch(() => {});
+  }
+}
 
 const TAG = "authorization.api.test";
 const email = (who: string) => `${who}.${TAG}@toktickit.test`;
@@ -311,8 +336,7 @@ describe("the converted Lab 2 endpoints", () => {
       // one exists, you just cannot have it".
       expect(JSON.stringify(metadata.body)).toBe(JSON.stringify(nonexistent.body));
     } finally {
-      await prisma.attachment.deleteMany({ where: { ticketId } });
-      await prisma.ticket.deleteMany({ where: { id: ticketId } });
+      await discardTicket(ticketId);
     }
   });
 
@@ -342,8 +366,7 @@ describe("the converted Lab 2 endpoints", () => {
       expect(numbers(spoofed.body)).not.toContain(theirs.ticketId);
     } finally {
       for (const { ticketId } of [mine, theirs]) {
-        await prisma.attachment.deleteMany({ where: { ticketId } });
-        await prisma.ticket.deleteMany({ where: { id: ticketId } });
+        await discardTicket(ticketId);
       }
     }
   });
@@ -369,16 +392,22 @@ describe("the converted Lab 2 endpoints", () => {
     }
   });
 
-  it("API-14 (AC-15, BR-40): a migrated Requester still reaches their Lab 2 data", async () => {
-    // db:migration-check proves the migration itself, on a throwaway database.
-    // This proves the other half: that the API still serves what survived it,
-    // for an account the migration carried over rather than the seed created.
-    const migrated = await prisma.user.findUniqueOrThrow({
+  it("API-14 (AC-15, BR-40): an account carried through the migration reaches its data", async () => {
+    // What this can and cannot prove, stated plainly. db:migration-check owns
+    // the migration itself: it applies the SQL to a throwaway database holding
+    // Lab 2 rows and fingerprints ownership either side. This covers the other
+    // half - that the authenticated API still serves an account the migration
+    // carried over rather than one the seed created fresh.
+    //
+    // It cannot distinguish a migrated row from a seeded one at the API level,
+    // because the seed upserts these same accounts on every run and rewrites
+    // their flags. The account identity is what survives the rename, and that
+    // is what is asserted here.
+    const carriedOver = await prisma.user.findUniqueOrThrow({
       where: { email: "peter.parker@toktickit.test" },
     });
     const existing = await prisma.ticket.findFirst({
-      where: { requesterId: migrated.id },
-      include: { attachments: { where: { isRemoved: false } } },
+      where: { requesterId: carriedOver.id },
       orderBy: { id: "asc" },
     });
     expect(
@@ -388,7 +417,11 @@ describe("the converted Lab 2 endpoints", () => {
 
     // The seeded password from the README, not the fixture one: this account
     // comes from the seed and the migration, not from this file.
-    const cookie = await signInAs(realApp, migrated.email, "ChangeMe123!");
+    const cookie = await signInAs(realApp, carriedOver.email, "ChangeMe123!");
+
+    const listed = await request(realApp).get("/api/tickets").set("Cookie", cookie);
+    expect(listed.status).toBe(200);
+    expect(listed.body.data.map((row: { id: number }) => row.id)).toContain(existing!.id);
 
     const detail = await request(realApp)
       .get(`/api/tickets/${existing!.id}`)
@@ -396,16 +429,31 @@ describe("the converted Lab 2 endpoints", () => {
     expect(detail.status).toBe(200);
     expect(detail.body.ticketNumber).toBe(existing!.ticketNumber);
 
-    const listed = await request(realApp).get("/api/tickets").set("Cookie", cookie);
-    expect(listed.status).toBe(200);
-    expect(listed.body.data.map((row: { id: number }) => row.id)).toContain(existing!.id);
+    // The Attachment is uploaded here rather than looked for. The seed creates
+    // none, so a conditional download check never ran on a seeded database and
+    // the test passed without exercising the path it claimed to.
+    const uploaded = await request(realApp)
+      .post(`/api/tickets/${existing!.id}/attachments`)
+      .set("Cookie", cookie)
+      .attach("file", Buffer.from("89504e470d0a1a0a", "hex"), {
+        filename: "carried-over.png",
+        contentType: "image/png",
+      });
+    expect(uploaded.status).toBe(201);
 
-    // And an Attachment on it is still downloadable, if it has one.
-    if (existing!.attachments.length > 0) {
+    try {
       const download = await request(realApp)
-        .get(`/api/attachments/${existing!.attachments[0].id}/download`)
+        .get(`/api/attachments/${uploaded.body.id}/download`)
         .set("Cookie", cookie);
       expect(download.status).toBe(200);
+    } finally {
+      // The Ticket itself is seeded and stays; only what this test added goes.
+      const stored = await prisma.attachment.findUniqueOrThrow({
+        where: { id: uploaded.body.id },
+        select: { storedFilename: true },
+      });
+      await prisma.attachment.delete({ where: { id: uploaded.body.id } });
+      await unlink(path.join(UPLOADS_DIR, stored.storedFilename)).catch(() => {});
     }
   });
 });

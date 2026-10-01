@@ -92,6 +92,11 @@ describe('UI-08 role-specific navigation (AC-13, FR-05)', () => {
   })
 })
 
+// The other half of this rule — that a 401 from the auth endpoints themselves
+// must NOT be read as an expired session — is pinned by ChangePassword.test.tsx
+// "shows a wrong current password against the field the server blamed". A test
+// on Login cannot pin it: the user is already anonymous there, so clearing the
+// session changes nothing and the assertion holds either way.
 describe('a session that goes away mid-use (review of PR #53)', () => {
   it('sends the user to Login instead of leaving them on a failure state', async () => {
     // The screen loads normally, then the session expires or an Administrator
@@ -125,35 +130,6 @@ describe('a session that goes away mid-use (review of PR #53)', () => {
 
     await waitFor(() => expect(window.location.pathname).toBe('/login'))
     expect(await screen.findByRole('heading', { name: /Sign in/i })).toBeInTheDocument()
-  })
-
-  it('does not mistake a failed login for an expired session', async () => {
-    // A 401 from the auth endpoints is ordinary: a wrong password, or nobody
-    // signed in yet. Neither may clear state the caller is already handling.
-    signedIn = null
-    vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
-      const url = String(input)
-      if (url.includes('/api/auth/login')) {
-        return Promise.resolve(
-          Response.json({ error: 'Invalid email or password' }, { status: 401 }),
-        )
-      }
-      const auth = authRoutes(signedIn)(url)
-      return auth ?? Promise.resolve(Response.json([]))
-    }) as typeof fetch)
-
-    window.history.pushState({}, '', '/login')
-    await renderApp()
-
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText(/Email address/i), 'peter.parker@toktickit.test')
-    await user.type(screen.getByLabelText(/^Password/i), 'wrong')
-    await user.click(screen.getByRole('button', { name: /Sign in/i }))
-
-    // Still on Login, showing the login error rather than having been "signed
-    // out" of a session that never existed.
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password.')
-    expect(window.location.pathname).toBe('/login')
   })
 })
 

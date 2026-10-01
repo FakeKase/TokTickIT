@@ -499,8 +499,10 @@ export function createApp(prisma = createPrismaClient()) {
     }
   });
 
-  // api-spec.md §7. multer runs first so the multipart body is parsed, then
-  // every rejection path discards the file it wrote.
+  // api-spec.md §7. The auth chain runs first, so an anonymous or wrong-role
+  // caller is turned away before multer writes anything; multer then parses the
+  // multipart body, and every rejection path after it discards the file it
+  // wrote.
   app.post(
     "/api/tickets/:id/attachments",
     ...asRequester,

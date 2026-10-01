@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { fetchCurrentUser, login as loginRequest, logout as logoutRequest } from '../api'
+import {
+  fetchCurrentUser,
+  login as loginRequest,
+  logout as logoutRequest,
+  setUnauthorizedHandler,
+} from '../api'
 import type { AuthenticatedUser } from '../api'
 import { AuthContext } from './authContext'
 import type { AuthStatus } from './authContext'
@@ -34,6 +39,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void load()
   }, [load])
+
+  /**
+   * Any 401 from a protected endpoint means the session this client believed in
+   * is gone - expired, or revoked by an Administrator deactivating the account.
+   * Clearing it here is enough: the route guards do the rest, and the person
+   * lands on Login instead of staring at a screen full of failure states.
+   */
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setUser(null)
+      setStatus('anonymous')
+    })
+    return () => setUnauthorizedHandler(null)
+  }, [])
 
   const signIn = useCallback(async (email: string, password: string) => {
     const signedIn = await loginRequest(email, password)

@@ -92,6 +92,71 @@ describe('UI-08 role-specific navigation (AC-13, FR-05)', () => {
   })
 })
 
+describe('a session that goes away mid-use (review of PR #53)', () => {
+  it('sends the user to Login instead of leaving them on a failure state', async () => {
+    // The screen loads normally, then the session expires or an Administrator
+    // deactivates the account, and the next call answers 401.
+    let sessionAlive = true
+    vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
+      const url = String(input)
+      const auth = authRoutes(signedIn)(url)
+      if (auth) return auth
+      if (url.includes('/api/tickets')) {
+        return Promise.resolve(
+          sessionAlive
+            ? Response.json({
+                data: [],
+                filtered: false,
+                pagination: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0 },
+              })
+            : Response.json({ error: 'Authentication required' }, { status: 401 }),
+        )
+      }
+      return Promise.resolve(Response.json([]))
+    }) as typeof fetch)
+
+    window.history.pushState({}, '', '/tickets')
+    await renderApp()
+    expect(await screen.findByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
+
+    sessionAlive = false
+    await userEvent.setup().click(screen.getByRole('link', { name: 'Create Ticket' }))
+    await userEvent.setup().click(screen.getByRole('link', { name: 'My Tickets' }))
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+    expect(await screen.findByRole('heading', { name: /Sign in/i })).toBeInTheDocument()
+  })
+
+  it('does not mistake a failed login for an expired session', async () => {
+    // A 401 from the auth endpoints is ordinary: a wrong password, or nobody
+    // signed in yet. Neither may clear state the caller is already handling.
+    signedIn = null
+    vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/api/auth/login')) {
+        return Promise.resolve(
+          Response.json({ error: 'Invalid email or password' }, { status: 401 }),
+        )
+      }
+      const auth = authRoutes(signedIn)(url)
+      return auth ?? Promise.resolve(Response.json([]))
+    }) as typeof fetch)
+
+    window.history.pushState({}, '', '/login')
+    await renderApp()
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/Email address/i), 'peter.parker@toktickit.test')
+    await user.type(screen.getByLabelText(/^Password/i), 'wrong')
+    await user.click(screen.getByRole('button', { name: /Sign in/i }))
+
+    // Still on Login, showing the login error rather than having been "signed
+    // out" of a session that never existed.
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password.')
+    expect(window.location.pathname).toBe('/login')
+  })
+})
+
 describe('UI-09 logout (AC-08)', () => {
   it('ends the session, returns to Login, and leaves protected routes closed', async () => {
     mockApi()

@@ -12,8 +12,32 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
  * why the server sets an explicit CORS origin: a wildcard is refused once
  * credentials are in play.
  */
-function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(`${API_URL}${path}`, { ...init, credentials: 'include' })
+let onUnauthorized: (() => void) | null = null
+
+/**
+ * Registers what happens when the API says the session is gone.
+ *
+ * AuthProvider owns the handler; this module only needs somewhere to report to.
+ * Without it, a session that expires mid-use leaves every screen showing its
+ * own failure state - safe, but it reads as "the server is broken" rather than
+ * "you were signed out", and nothing moves the person to Login.
+ */
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler
+}
+
+async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const response = await fetch(`${API_URL}${path}`, { ...init, credentials: 'include' })
+
+  // The auth endpoints are excluded on purpose: a 401 from `login` is a wrong
+  // password and a 401 from `me` is an ordinary anonymous visitor. Neither is a
+  // session that went away, and treating them as one would clear state the
+  // caller is already handling.
+  if (response.status === 401 && !path.startsWith('/api/auth/')) {
+    onUnauthorized?.()
+  }
+
+  return response
 }
 
 export interface HealthResponse {

@@ -276,7 +276,8 @@ describe("API-23 filters (AC-30, BR-10)", () => {
   });
 
   it("ignores an unparseable filter rather than failing the request", async () => {
-    // api-spec.md §5: requesterId is the only strict parameter.
+    // api-spec.md §5: no query parameter here is strict — ownership is the
+    // session's, and everything else is a display preference.
     const response = await list({ categoryId: "not-a-number", pageSize: 50 });
 
     expect(response.status).toBe(200);

@@ -1,9 +1,13 @@
 // BR-09..BR-12: the My Tickets query contract (api-spec.md §5).
 //
-// Posture, taken from the spec: `requesterId` is the only strict parameter —
-// everything else is a display preference, so a value that cannot be honoured
-// falls back to its default rather than failing the request. A reader whose
-// bookmarked URL has gone stale should still see their tickets.
+// Posture, taken from the spec: every parameter here is a display preference,
+// so a value that cannot be honoured falls back to its default rather than
+// failing the request. A reader whose bookmarked URL has gone stale should
+// still see their tickets.
+//
+// There is no strict parameter left to contrast that with: ownership used to
+// arrive as `requesterId` and was validated hard, and since Issue #41 it comes
+// from the session and never passes through here at all.
 
 export const DEFAULT_PAGE_SIZE = 10;
 export const MAX_PAGE_SIZE = 50;

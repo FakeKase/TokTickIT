@@ -78,7 +78,6 @@ export interface Attachment {
 }
 
 export interface CreateTicketInput {
-  requesterId: number
   categoryId: number
   relatedSystemId: number
   requestedPriority: RequestedPriority
@@ -231,13 +230,8 @@ export async function createTicket(input: CreateTicketInput): Promise<Ticket> {
  * No Content-Type header is set on purpose: the browser has to add the
  * multipart boundary itself, and setting it manually breaks the upload.
  */
-export async function uploadAttachment(
-  ticketId: number,
-  requesterId: number,
-  file: File,
-): Promise<Attachment> {
+export async function uploadAttachment(ticketId: number, file: File): Promise<Attachment> {
   const body = new FormData()
-  body.append('requesterId', String(requesterId))
   body.append('file', file)
 
   const response = await apiFetch(`/api/tickets/${ticketId}/attachments`, {
@@ -293,15 +287,15 @@ export interface TicketListParams {
  * same request the user would get from a clean load.
  */
 export async function fetchTickets(
-  requesterId: number,
   params: TicketListParams = {},
 ): Promise<TicketListResponse> {
-  const query = new URLSearchParams({ requesterId: String(requesterId) })
+  const query = new URLSearchParams()
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== '') query.set(key, String(value))
   }
 
-  const response = await apiFetch(`/api/tickets?${query.toString()}`)
+  const search = query.toString()
+  const response = await apiFetch(search ? `/api/tickets?${search}` : '/api/tickets')
 
   if (!response.ok) {
     throw await readError(response, 'Unable to load your Tickets')
@@ -342,13 +336,8 @@ export interface TicketDetail {
  * A Ticket owned by someone else answers 404, identically to one that does
  * not exist (BR-08) — so callers must not treat "not found" as "no access".
  */
-export async function fetchTicket(
-  ticketId: number,
-  requesterId: number,
-): Promise<TicketDetail> {
-  const response = await apiFetch(
-    `/api/tickets/${ticketId}?requesterId=${requesterId}`,
-  )
+export async function fetchTicket(ticketId: number): Promise<TicketDetail> {
+  const response = await apiFetch(`/api/tickets/${ticketId}`)
 
   if (!response.ok) {
     throw await readError(response, 'Unable to load the Ticket')
@@ -364,20 +353,19 @@ export async function fetchTicket(
  * cookie itself on a same-site navigation, which is why this is the one place
  * that does not go through `apiFetch`.
  */
-export function attachmentDownloadUrl(attachmentId: number, requesterId: number): string {
-  return `${API_URL}/api/attachments/${attachmentId}/download?requesterId=${requesterId}`
+export function attachmentDownloadUrl(attachmentId: number): string {
+  return `${API_URL}/api/attachments/${attachmentId}/download`
 }
 
 /** Soft-removes an owned Attachment (api-spec.md §10, BR-23/BR-25). */
 export async function removeAttachment(
   attachmentId: number,
-  requesterId: number,
   reason: string,
 ): Promise<TicketAttachment> {
   const response = await apiFetch(`/api/attachments/${attachmentId}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ requesterId, reason }),
+    body: JSON.stringify({ reason }),
   })
 
   if (!response.ok) {

@@ -89,6 +89,7 @@ Contract as in `docs/lab-02/api-spec.md` §4–§10, with these changes:
 - **Requester or staff (two):** `GET /api/attachments/:id` and `GET /api/attachments/:id/download` serve the owning Requester for their own Ticket, and IT Staff or an Administrator for **any** Ticket (§5.1 of `specification.md`, AC-45). The role decides which rule applies: a Requester who is not the owner still gets `404`, while staff get `200`. A removed Attachment is still `404` for everyone (Lab 2 BR-26) — the staff path widens *whose* Attachments are readable, not *which*.
 - `POST /api/tickets` responses gain `itPriority` (initialised from `requestedPriority`), `ownerId` (`null`), and `requesterResolvedAt` (`null`).
 - `GET /api/requesters` is **removed**. Nothing outside Administrator user management lists people any more.
+- `GET /api/categories` and `GET /api/related-systems` stay **unauthenticated**, as in Lab 2. They are a fixed taxonomy with no owner and no role rule, nothing about them is specific to a person, and every screen that reads them is behind a session anyway. Worth stating rather than leaving as an accident of inheritance: the rule being applied is "protect what is owned or role-restricted", and these are neither.
 
 ## 6. `GET|POST /api/tickets/:id/comments`
 

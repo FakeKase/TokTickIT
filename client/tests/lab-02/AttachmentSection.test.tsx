@@ -72,7 +72,7 @@ function mockApi({ detail, upload, remove }: Handlers) {
             ),
           )
     }
-    if (/\/api\/tickets\/\d+\?/.test(url)) return Promise.resolve(Response.json(detail))
+    if (/\/api\/tickets\/\d+$/.test(url)) return Promise.resolve(Response.json(detail))
     return Promise.resolve(Response.json([]))
   }) as typeof fetch)
 }
@@ -102,12 +102,14 @@ describe('Ticket Detail attachments', () => {
     window.history.pushState({}, '', '/')
   })
 
-  it('lists active attachments with a Download link carrying the requesterId', async () => {
+  it('lists active attachments with a plain Download link', async () => {
     await renderPanel({ detail: ticketWith([attachment(1)]) })
 
     const download = screen.getByRole('link', { name: /Download/i })
     expect(download).toHaveAttribute('href', expect.stringContaining('/api/attachments/1/download'))
-    expect(download).toHaveAttribute('href', expect.stringContaining('requesterId=1'))
+    // No identity in the URL any more: the browser sends the session cookie on
+    // a same-site navigation, and the server reads ownership from it (BR-03).
+    expect(download).toHaveAttribute('href', expect.not.stringContaining('requesterId'))
   })
 
   it('UI-13 (AC-18): a new attachment appears without a reload', async () => {

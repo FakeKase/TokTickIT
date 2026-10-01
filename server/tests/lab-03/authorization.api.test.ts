@@ -76,6 +76,7 @@ beforeAll(async () => {
   await prisma.user.createMany({
     data: [
       fixtureUser({ name: `Requester ${TAG}`, email: email("requester") }),
+      fixtureUser({ name: `Second ${TAG}`, email: email("second") }),
       fixtureUser({
         name: `Staff ${TAG}`,
         email: email("staff"),
@@ -187,6 +188,109 @@ describe("requirePasswordChanged (BR-14, AC-02)", () => {
 
 // Part of API-44 (AC-44, BR-17). The rest of the surface is covered as each
 // Issue converts its endpoints; this is the case that was live and leaking.
+// API-09 to API-15: the rules that only became testable once the Lab 2
+// endpoints moved onto the session (Issue #41).
+describe("the converted Lab 2 endpoints", () => {
+  const REQUESTER_ROUTES = [
+    { method: "get" as const, path: "/api/tickets" },
+    { method: "post" as const, path: "/api/tickets" },
+  ];
+
+  it("API-09 (AC-02, BR-14): a gated user reaches none of them", async () => {
+    const cookie = await cookieFor("gated");
+
+    for (const route of REQUESTER_ROUTES) {
+      const response = await request(realApp)[route.method](route.path).set("Cookie", cookie);
+
+      expect(response.status, `${route.method} ${route.path}`).toBe(403);
+      expect(response.body.code).toBe("PASSWORD_CHANGE_REQUIRED");
+    }
+
+    // ...while the three a gated user needs stay open.
+    expect((await request(realApp).get("/api/auth/me").set("Cookie", cookie)).status).toBe(200);
+  });
+
+  it("API-11 (AC-14): a Requester is refused the staff and admin namespaces", async () => {
+    // Those endpoints arrive in Issues #43 and #45. What is assertable now is
+    // that the role guard itself refuses, which the probe router covers above;
+    // this case guards the opposite direction - staff refused a Requester route.
+    const staff = await cookieFor("staff");
+
+    const response = await request(realApp).get("/api/tickets").set("Cookie", staff);
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({
+      error: "You do not have permission to perform this action",
+    });
+  });
+
+  it("API-12 (AC-17, BR-18): another Requester's Ticket is indistinguishable from none", async () => {
+    const owner = await prisma.user.findUniqueOrThrow({
+      where: { email: email("requester") },
+    });
+    const category = await prisma.category.findFirstOrThrow();
+    const relatedSystem = await prisma.relatedSystem.findFirstOrThrow();
+
+    const created = await request(realApp)
+      .post("/api/tickets")
+      .set("Cookie", await cookieFor("requester"))
+      .send({
+        categoryId: category.id,
+        relatedSystemId: relatedSystem.id,
+        requestedPriority: "LOW",
+        summary: `Owned by ${owner.name} ${TAG}`,
+        description: "Created so a second Requester can fail to read it.",
+      });
+    expect(created.status).toBe(201);
+
+    const intruder = await cookieFor("second");
+    const theirs = await request(realApp)
+      .get(`/api/tickets/${created.body.id}`)
+      .set("Cookie", intruder);
+    const nonexistent = await request(realApp)
+      .get("/api/tickets/999999999")
+      .set("Cookie", intruder);
+
+    expect(theirs.status).toBe(404);
+    // Byte-identical: a different body would say "this one exists".
+    expect(JSON.stringify(theirs.body)).toBe(JSON.stringify(nonexistent.body));
+
+    await prisma.ticket.delete({ where: { id: created.body.id } });
+  });
+
+  it("API-10 (AC-03, AC-16, BR-03): a supplied requesterId changes nothing", async () => {
+    const owner = await cookieFor("requester");
+    const other = await prisma.user.findUniqueOrThrow({
+      where: { email: email("second") },
+    });
+
+    const listed = await request(realApp)
+      .get(`/api/tickets?requesterId=${other.id}`)
+      .set("Cookie", owner);
+    const honest = await request(realApp).get("/api/tickets").set("Cookie", owner);
+
+    expect(listed.status).toBe(200);
+    expect(listed.body).toEqual(honest.body);
+  });
+
+  it("API-13 (AC-10, BR-12): deactivation ends access on the next request", async () => {
+    const cookie = await cookieFor("second");
+    expect((await request(realApp).get("/api/tickets").set("Cookie", cookie)).status).toBe(200);
+
+    await prisma.user.update({
+      where: { email: email("second") },
+      data: { isActive: false },
+    });
+
+    expect((await request(realApp).get("/api/tickets").set("Cookie", cookie)).status).toBe(401);
+
+    await prisma.user.update({
+      where: { email: email("second") },
+      data: { isActive: true },
+    });
+  });
+});
+
 describe("API-44 unexpected failures stay safe", () => {
   it("answers a database failure with JSON, not a stack trace", async () => {
     const failing = createPrismaClient();

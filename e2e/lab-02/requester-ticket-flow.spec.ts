@@ -144,14 +144,14 @@ test.describe('E2E-02 (AC-03): one Requester cannot reach another’s Ticket', (
 
     // Owner's Ticket, created out of band so this spec tests access, not
     // creation.
-    const ticket = await createTicket(request, owner.id, {
+    const ticket = await createTicket(request, owner, {
       summary: `Owned by ${owner.name} ${Date.now()}`,
     })
 
     // The other Requester gets a Ticket of their own. Without one they land in
     // the Empty state, which hides the toolbar by design (BR-28) — and
     // "B sees their own but not A's" is a stronger claim than "B sees nothing".
-    const theirs = await createTicket(request, other.id, {
+    const theirs = await createTicket(request, other, {
       summary: `Owned by ${other.name} ${Date.now()}`,
     })
 
@@ -181,7 +181,7 @@ test.describe('E2E-02 (AC-03): one Requester cannot reach another’s Ticket', (
   }) => {
     await page.setViewportSize(VIEWPORTS.desktop)
     const owner = await firstRequester(request)
-    const ticket = await createTicket(request, owner.id, {
+    const ticket = await createTicket(request, owner, {
       summary: `Reachable by owner ${Date.now()}`,
     })
 
@@ -197,13 +197,13 @@ test.describe('E2E-02 (AC-03): one Requester cannot reach another’s Ticket', (
     await page.setViewportSize(VIEWPORTS.desktop)
     const owner = await firstRequester(request)
     const other = await secondRequester(request)
-    const ticket = await createTicket(request, owner.id, {
+    const ticket = await createTicket(request, owner, {
       summary: `Switch check ${Date.now()}`,
     })
 
     // Both need a Ticket: the switch target would otherwise land in the Empty
     // state, where the toolbar is deliberately absent.
-    await createTicket(request, other.id, { summary: `Theirs ${Date.now()}` })
+    await createTicket(request, other, { summary: `Theirs ${Date.now()}` })
 
     await signInThroughLogin(page, owner)
     await page.getByLabel(/^Search/).fill(ticket.ticketNumber)

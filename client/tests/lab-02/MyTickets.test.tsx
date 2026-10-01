@@ -109,7 +109,7 @@ describe('My Tickets', () => {
     expect(window.location.pathname).toBe('/login')
   })
 
-  it('AC-11: lists the Tickets the API returned, scoped by requesterId', async () => {
+  it('AC-11: lists the Tickets the API returned for the signed-in Requester', async () => {
     mockApi(() => listResponse([ticket(1), ticket(2)]))
 
     await renderList()
@@ -117,7 +117,8 @@ describe('My Tickets', () => {
     expect(await screen.findByText('TKT-2026-000001')).toBeInTheDocument()
     expect(screen.getByText('TKT-2026-000002')).toBeInTheDocument()
     // Ownership is the server's job; the client must at least ask correctly.
-    expect(requestedQueries[0]).toContain('requesterId=1')
+    // The request carries no identity at all — that is the point of BR-03.
+    expect(requestedQueries[0]).not.toContain('requesterId')
   })
 
   it('UI-10 (AC-14): shows the Empty state, with no filter toolbar', async () => {
@@ -317,10 +318,12 @@ describe('My Tickets', () => {
     expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument()
   })
 
-  it('AC-12: switching Requester reloads for the new one and drops the old filters', async () => {
+  it('AC-12: a different signed-in Requester reloads, and drops the old filters', async () => {
     const user = userEvent.setup()
-    mockApi((url) =>
-      url.searchParams.get('requesterId') === '2'
+    // Keyed off who is signed in rather than off a query parameter: the
+    // request no longer carries one, which is what BR-03 changed.
+    mockApi(() =>
+      signedIn?.id === OTHER.id
         ? listResponse([ticket(9, { summary: "Ned's ticket" })])
         : listResponse([ticket(1)]),
     )
@@ -334,14 +337,13 @@ describe('My Tickets', () => {
       expect(requestedQueries.some((q) => q.includes('search=stale'))).toBe(true)
     })
 
-    // Simulate the selector storing a different Requester and remounting.
+    // Somebody else signs in on this browser and the screen remounts.
     signedIn = authUser({ id: OTHER.id, name: OTHER.name, email: OTHER.email })
     window.history.pushState({}, '', '/tickets')
     await renderApp()
 
     expect(await screen.findByText("Ned's ticket")).toBeInTheDocument()
     const last = requestedQueries[requestedQueries.length - 1]
-    expect(last).toContain('requesterId=2')
     expect(last).not.toContain('search=stale')
   })
 })

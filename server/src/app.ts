@@ -12,6 +12,8 @@ import { createPrismaClient } from "./prisma.js";
 import {
   type AuthenticatedRequest,
   requireAuth,
+  requirePasswordChanged,
+  requireRole,
   toIdentity,
 } from "./middleware/auth.js";
 import {
@@ -247,30 +249,25 @@ export function createApp(prisma = createPrismaClient()) {
     },
   );
 
+  /**
+   * Authenticated, past the first-login gate, and a Requester (§5.1).
+   *
+   * Spread onto every route Lab 2 scoped with a client-supplied `requesterId`.
+   * The order matters and is the same everywhere: no session is 401 before
+   * anything else is considered, an outstanding password change is 403 with a
+   * code the client routes on, and only then does the role decide.
+   */
+  const asRequester = [
+    requireAuth(prisma),
+    requirePasswordChanged,
+    requireRole("REQUESTER"),
+  ];
+
   app.get("/api/categories", async (_req, res) => {
     const categories = await prisma.category.findMany({
       orderBy: { id: "asc" },
     });
     res.json(categories);
-  });
-
-  // Active Requesters for the Lab 2 selector screen (Lab 2 api-spec.md §1).
-  // Now reads the User table, which also holds IT Staff and Administrators, so
-  // the role filter is what keeps the contract unchanged. Still exposes no
-  // credential of any kind: Lab 3 removes this endpoint outright once the
-  // authenticated client lands (Issue #41).
-  app.get("/api/requesters", async (_req, res) => {
-    try {
-      const requesters = await prisma.user.findMany({
-        where: { isActive: true, role: "REQUESTER" },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true, email: true },
-      });
-      res.json(requesters);
-    } catch {
-      // Safe error only: the client never sees the underlying failure.
-      res.status(500).json({ error: "Unable to load Development Requesters" });
-    }
   });
 
   // Reference data for the Create Ticket classification row (api-spec.md §3).
@@ -288,7 +285,8 @@ export function createApp(prisma = createPrismaClient()) {
 
   // api-spec.md §4. Validation is re-run here even though the UI blocks the
   // same cases: BR-16 makes the backend the source of truth.
-  app.post("/api/tickets", async (req, res) => {
+  app.post("/api/tickets", ...asRequester, async (req: AuthenticatedRequest, res) => {
+    const requester = req.auth!.user;
     const parsed = validateTicketInput(req.body);
     if (!parsed.ok) {
       return res
@@ -298,21 +296,10 @@ export function createApp(prisma = createPrismaClient()) {
 
     const input = parsed.value;
 
-    // Reference checks are 404s, not 400s (api-spec.md §4): the shape was
-    // valid, the row simply is not there.
-    const requester = await prisma.user.findUnique({
-      where: { id: input.requesterId },
-    });
-    // One message for all three cases - unknown id, inactive Requester, or a
-    // real account that is IT Staff or an Administrator. The old wording said
-    // "no longer active", which is simply false for a staff id and would send
-    // anyone debugging it to look at the wrong column.
-    if (!requester?.isActive || requester.role !== "REQUESTER") {
-      return res
-        .status(404)
-        .json({ error: "Selected Requester is not available" });
-    }
-
+    // The Requester is no longer looked up, because there is nothing left to
+    // look up: requireAuth resolved an active user from the session and
+    // requireRole proved the role. The check this replaces existed only to
+    // validate an id the client chose, which is exactly what BR-03 removes.
     const [category, relatedSystem] = await Promise.all([
       prisma.category.findUnique({ where: { id: input.categoryId } }),
       prisma.relatedSystem.findUnique({ where: { id: input.relatedSystemId } }),
@@ -335,7 +322,8 @@ export function createApp(prisma = createPrismaClient()) {
         const created = await tx.ticket.create({
           data: {
             ticketNumber: placeholderTicketNumber(randomUUID()),
-            requesterId: input.requesterId,
+            // BR-03: from the session, never from the request.
+            requesterId: requester.id,
             categoryId: input.categoryId,
             relatedSystemId: input.relatedSystemId,
             summary: input.summary,
@@ -369,15 +357,8 @@ export function createApp(prisma = createPrismaClient()) {
 
   // api-spec.md §5. Ownership is a WHERE clause, never a post-filter: a
   // Ticket belonging to someone else is not fetched at all (BR-07/BR-08).
-  app.get("/api/tickets", async (req, res) => {
-    const requesterId = Number(
-      Array.isArray(req.query.requesterId)
-        ? req.query.requesterId[0]
-        : req.query.requesterId,
-    );
-    if (!Number.isInteger(requesterId) || requesterId <= 0) {
-      return res.status(400).json({ error: "A valid requesterId is required" });
-    }
+  app.get("/api/tickets", ...asRequester, async (req: AuthenticatedRequest, res) => {
+    const requesterId = req.auth!.user.id;
 
     const query = parseTicketQuery(req.query as Record<string, unknown>);
 
@@ -463,15 +444,8 @@ export function createApp(prisma = createPrismaClient()) {
 
   // api-spec.md §6. BR-08: a Ticket owned by someone else is indistinguishable
   // from one that does not exist, so id enumeration reveals nothing.
-  app.get("/api/tickets/:id", async (req, res) => {
-    const requesterId = Number(
-      Array.isArray(req.query.requesterId)
-        ? req.query.requesterId[0]
-        : req.query.requesterId,
-    );
-    if (!Number.isInteger(requesterId) || requesterId <= 0) {
-      return res.status(400).json({ error: "A valid requesterId is required" });
-    }
+  app.get("/api/tickets/:id", ...asRequester, async (req: AuthenticatedRequest, res) => {
+    const requesterId = req.auth!.user.id;
 
     const ticketId = Number(req.params.id);
     if (!Number.isInteger(ticketId) || ticketId <= 0) {
@@ -529,6 +503,7 @@ export function createApp(prisma = createPrismaClient()) {
   // every rejection path discards the file it wrote.
   app.post(
     "/api/tickets/:id/attachments",
+    ...asRequester,
     (req, res, next) => {
       upload.single("file")(req, res, (err: unknown) => {
         if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
@@ -548,11 +523,7 @@ export function createApp(prisma = createPrismaClient()) {
       });
     },
     async (req, res) => {
-      const requesterId = Number(req.body?.requesterId);
-      if (!Number.isInteger(requesterId) || requesterId <= 0) {
-        await discardUpload(req.file);
-        return res.status(400).json({ error: "requesterId is required" });
-      }
+      const requesterId = (req as AuthenticatedRequest).auth!.user.id;
 
       const ticketId = Number(req.params.id);
       const ticket = Number.isInteger(ticketId)
@@ -669,19 +640,13 @@ export function createApp(prisma = createPrismaClient()) {
     return payload;
   }
 
-  function requesterIdFrom(value: unknown): number | null {
-    const id = Number(Array.isArray(value) ? value[0] : value);
-    return Number.isInteger(id) && id > 0 ? id : null;
-  }
 
   // api-spec.md §8: one Attachment's metadata, active or removed.
-  app.get("/api/attachments/:id", async (req, res) => {
-    const requesterId = requesterIdFrom(req.query.requesterId);
-    if (requesterId === null) {
-      return res.status(400).json({ error: "A valid requesterId is required" });
-    }
-
-    const attachment = await findOwnedAttachment(req.params.id, requesterId);
+  app.get("/api/attachments/:id", ...asRequester, async (req: AuthenticatedRequest, res) => {
+    const attachment = await findOwnedAttachment(
+      req.params.id,
+      req.auth!.user.id,
+    );
     if (!attachment) {
       return res.status(404).json({ error: "Attachment not found" });
     }
@@ -690,13 +655,11 @@ export function createApp(prisma = createPrismaClient()) {
   });
 
   // api-spec.md §9: the file itself.
-  app.get("/api/attachments/:id/download", async (req, res) => {
-    const requesterId = requesterIdFrom(req.query.requesterId);
-    if (requesterId === null) {
-      return res.status(400).json({ error: "A valid requesterId is required" });
-    }
-
-    const attachment = await findOwnedAttachment(req.params.id, requesterId);
+  app.get("/api/attachments/:id/download", ...asRequester, async (req: AuthenticatedRequest, res) => {
+    const attachment = await findOwnedAttachment(
+      req.params.id,
+      req.auth!.user.id,
+    );
 
     // BR-26/AC-21: a removed Attachment answers exactly as a nonexistent one
     // does. Deliberately not 410 — a distinct status would confirm to anyone
@@ -722,11 +685,8 @@ export function createApp(prisma = createPrismaClient()) {
   });
 
   // api-spec.md §10: soft removal (BR-23/BR-24/BR-25).
-  app.delete("/api/attachments/:id", async (req, res) => {
-    const requesterId = requesterIdFrom(req.body?.requesterId);
-    if (requesterId === null) {
-      return res.status(400).json({ error: "A valid requesterId is required" });
-    }
+  app.delete("/api/attachments/:id", ...asRequester, async (req: AuthenticatedRequest, res) => {
+    const requesterId = req.auth!.user.id;
 
     const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
     // BR-25. Checked before the lookup so a bad reason cannot be used to probe

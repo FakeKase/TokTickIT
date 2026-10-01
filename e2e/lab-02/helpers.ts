@@ -23,100 +23,98 @@ export interface SeedRequester {
 
 /** The first active seeded Requester, used as the demo identity throughout. */
 /**
- * Whether an account can actually reach the application, rather than only
- * authenticate.
+ * The seeded Requesters these specs drive, by the addresses the README
+ * documents.
  *
- * The seed deliberately leaves two accounts holding an initial password so the
- * mandatory first-login change is demonstrable. Both are active Requesters, so
- * `GET /api/requesters` lists them and any spec that picks a Requester by
- * position can land on one - signing in perfectly well and then being held on
- * Change Password, which looks like a broken guard rather than a fixture
- * problem.
- *
- * Probed with the test-scoped `request` context, which has its own cookie jar,
- * so this never disturbs the session the page is using.
+ * Lab 2 asked the API for them, through an endpoint that existed to feed the
+ * selector. That endpoint is gone (api-spec.md §5) and listing people is an
+ * Administrator capability now, so the fixtures are named here instead - which
+ * is also more honest about what they are: a seed the suite depends on, not a
+ * discovery mechanism.
  */
-async function canReachTheApp(
+const SEEDED_REQUESTERS = [
+  { email: 'peter.parker@toktickit.test', name: 'Peter Parker' },
+  { email: 'ned.leeds@toktickit.test', name: 'Ned Leeds' },
+  { email: 'michelle.jones@toktickit.test', name: 'Michelle Jones' },
+  { email: 'roronoa.zoro@toktickit.test', name: 'Roronoa Zoro' },
+] as const
+
+/**
+ * Reserved for the Empty state, and deliberately not in the list above: the
+ * first spec to create a Ticket for a Requester destroys that Requester as an
+ * Empty-state fixture, so the one account BR-28 needs is kept out of the
+ * general pool.
+ */
+const EMPTY_STATE_REQUESTER = {
+  email: 'grace.lim@toktickit.test',
+  name: 'Grace Lim',
+} as const
+
+/** Signs in with the API context and returns the identity the session carries. */
+async function identify(
   request: APIRequestContext,
-  requester: SeedRequester,
-): Promise<boolean> {
+  account: { email: string; name: string },
+): Promise<SeedRequester> {
   const response = await request.post(`${API}/api/auth/login`, {
-    data: { email: requester.email, password: DEV_PASSWORD },
+    data: { email: account.email, password: DEV_PASSWORD },
   })
-  if (!response.ok()) return false
-  const { user } = (await response.json()) as { user: { mustChangePassword: boolean } }
-  return !user.mustChangePassword
-}
-
-/**
- * The seeded Requester that owns nothing, reserved for the Empty state.
- *
- * Kept out of the general-purpose pickers below. `GET /api/requesters` is
- * ordered by name, and "Grace Lim" sorts first - so without this the very
- * account the Empty state needs is the one `firstRequester` hands out, and the
- * first spec to create a Ticket for it destroys the only fixture that can
- * demonstrate BR-28.
- */
-const EMPTY_STATE_REQUESTER = 'grace.lim@toktickit.test'
-
-/** The seeded Requesters a spec can drive, in list order. */
-async function usableRequesters(request: APIRequestContext): Promise<SeedRequester[]> {
-  const response = await request.get(`${API}/api/requesters`)
-  expect(response.ok(), 'GET /api/requesters must succeed — is the database seeded?').toBe(true)
-  const requesters = (await response.json()) as SeedRequester[]
-
-  const usable: SeedRequester[] = []
-  for (const requester of requesters) {
-    if (requester.email === EMPTY_STATE_REQUESTER) continue
-    if (await canReachTheApp(request, requester)) usable.push(requester)
-  }
   expect(
-    usable.length,
-    'seed must provide active Requesters who are not held on Change Password',
-  ).toBeGreaterThan(0)
-  return usable
+    response.ok(),
+    `could not sign in as ${account.email} — is the database seeded?`,
+  ).toBe(true)
+  const { user } = (await response.json()) as { user: SeedRequester }
+  return user
 }
 
+/** The identity these specs use by default. */
 export async function firstRequester(request: APIRequestContext): Promise<SeedRequester> {
-  return (await usableRequesters(request))[0]
+  return identify(request, SEEDED_REQUESTERS[0])
 }
 
-/** A second Requester, for anything needing two distinct identities. */
+/** A second identity, for anything that needs two distinct Requesters. */
 export async function secondRequester(request: APIRequestContext): Promise<SeedRequester> {
-  const requesters = await usableRequesters(request)
-  expect(requesters.length).toBeGreaterThan(1)
-  return requesters[1]
+  return identify(request, SEEDED_REQUESTERS[1])
 }
 
 /**
- * An active Requester who currently owns nothing, for the Empty state.
+ * The Requester reserved for the Empty state (BR-28).
  *
- * Found by asking rather than by index: other specs create Tickets for the
- * Requesters they use, so a fixed position is only empty until something else
- * in the run touches it.
+ * Asserted rather than searched for. Lab 2 asked every Requester whether they
+ * owned anything, which needed an endpoint that listed people and a query
+ * parameter naming one; both are gone. Naming the account makes the dependency
+ * explicit, and failing loudly here is better than silently returning somebody
+ * who happens to be empty today.
  */
 export async function requesterWithoutTickets(
   request: APIRequestContext,
 ): Promise<SeedRequester> {
-  // Includes the reserved account, which is the whole point of it.
-  const response = await request.get(`${API}/api/requesters`)
-  const requesters = (await response.json()) as SeedRequester[]
-  const reservedFirst = [
-    ...requesters.filter((r) => r.email === EMPTY_STATE_REQUESTER),
-    ...requesters.filter((r) => r.email !== EMPTY_STATE_REQUESTER),
-  ]
+  const requester = await identify(request, EMPTY_STATE_REQUESTER)
 
-  for (const requester of reservedFirst) {
-    if (!(await canReachTheApp(request, requester))) continue
-    const list = await request.get(`${API}/api/tickets?requesterId=${requester.id}&pageSize=1`)
-    const { pagination } = (await list.json()) as { pagination: { totalItems: number } }
-    if (pagination.totalItems === 0) return requester
-  }
+  const list = await request.get(`${API}/api/tickets?pageSize=1`, {
+    headers: { Cookie: await sessionCookieFor(request, EMPTY_STATE_REQUESTER.email) },
+  })
+  const { pagination } = (await list.json()) as { pagination: { totalItems: number } }
+  expect(
+    pagination.totalItems,
+    `${EMPTY_STATE_REQUESTER.email} is reserved for the Empty state but owns Tickets — ` +
+      'run the e2e teardown, or reseed',
+  ).toBe(0)
 
-  throw new Error(
-    'every seeded Requester owns Tickets, so the Empty state cannot be shown — ' +
-      'seed another active Requester, or run the teardown first',
-  )
+  return requester
+}
+
+/** The raw Set-Cookie value for a seeded account, for a request made outside
+ *  the page's own context. */
+export async function sessionCookieFor(
+  request: APIRequestContext,
+  email: string,
+): Promise<string> {
+  const response = await request.post(`${API}/api/auth/login`, {
+    data: { email, password: DEV_PASSWORD },
+  })
+  expect(response.ok(), `could not sign in as ${email}`).toBe(true)
+  const header = response.headers()['set-cookie'] ?? ''
+  return header.split(';')[0]
 }
 
 /**
@@ -142,17 +140,21 @@ let summaryCursor = 0
 
 export async function createTicket(
   request: APIRequestContext,
-  requesterId: number,
+  requester: SeedRequester,
   overrides: Record<string, unknown> = {},
 ) {
+  // The API takes the Requester from the session now, so the fixture signs in
+  // as them rather than naming them (BR-03).
+  const cookie = await sessionCookieFor(request, requester.email)
+
   const [categories, systems] = await Promise.all([
     request.get(`${API}/api/categories`).then((r) => r.json()),
     request.get(`${API}/api/related-systems`).then((r) => r.json()),
   ])
 
   const response = await request.post(`${API}/api/tickets`, {
+    headers: { Cookie: cookie },
     data: {
-      requesterId,
       categoryId: categories[0].id,
       relatedSystemId: systems[0].id,
       requestedPriority: 'HIGH',
@@ -168,12 +170,12 @@ export async function createTicket(
 export async function attachFile(
   request: APIRequestContext,
   ticketId: number,
-  requesterId: number,
+  requester: SeedRequester,
   name = 'evidence.png',
 ) {
   const response = await request.post(`${API}/api/tickets/${ticketId}/attachments`, {
+    headers: { Cookie: await sessionCookieFor(request, requester.email) },
     multipart: {
-      requesterId: String(requesterId),
       file: {
         name,
         mimeType: 'image/png',

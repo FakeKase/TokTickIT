@@ -67,9 +67,9 @@ function ReadOnlyField({
  */
 export function TicketDetailPage() {
   const { id } = useParams()
-  // Lab 2 read this from the selector; Lab 3 reads it from the session. The
-  // requesterId still travels on the wire until Issue #41 removes it from the
-  // API contract - at which point this line goes too.
+  // Identity comes from the session and never leaves this component: no call
+  // below carries a Requester id, because the server takes it from the cookie
+  // (BR-03).
   const { user: requester } = useAuth()
 
   const [ticket, setTicket] = useState<TicketDetail | null>(null)
@@ -78,10 +78,10 @@ export function TicketDetailPage() {
   const [failed, setFailed] = useState(false)
 
   const ticketId = Number(id)
-  const requesterId = requester?.id
+  const signedInUserId = requester?.id
 
   const load = useCallback(async () => {
-    if (!requesterId) return
+    if (!signedInUserId) return
     setLoading(true)
     setNotFound(false)
     setFailed(false)
@@ -93,7 +93,7 @@ export function TicketDetailPage() {
     }
 
     try {
-      setTicket(await fetchTicket(ticketId, requesterId))
+      setTicket(await fetchTicket(ticketId))
     } catch (error) {
       // Branch on the status, not the message: the wording is presentation
       // and either side could reword it, whereas 404 is the contract.
@@ -109,7 +109,7 @@ export function TicketDetailPage() {
     } finally {
       setLoading(false)
     }
-  }, [ticketId, requesterId])
+  }, [ticketId, signedInUserId])
 
   useEffect(() => {
     void load()
@@ -180,7 +180,6 @@ export function TicketDetailPage() {
       {!loading && ticket && (
         <AttachmentSection
           ticketId={ticket.id}
-          requesterId={requester.id}
           attachments={ticket.attachments}
           onChange={(attachments) => setTicket({ ...ticket, attachments })}
         />

@@ -116,6 +116,10 @@ One endpoint family serves Public Comments and Internal Notes, filtered by role 
 - **`400`**: empty, whitespace-only, or longer than 2000 characters after trimming (BR-25).
 - **`403`**: a Requester posting `INTERNAL`.
 - **`404`**: a Requester posting on a Ticket they do not own.
+- There is deliberately **no 409 for a Resolved, Closed or Cancelled Ticket**, unlike §7. A
+  comment is a sentence about a Ticket and stays useful after it closes — "this came back" is
+  worth being able to say. The resolved signal is different: it asks IT Staff to act, and asking
+  them to resolve something already resolved is noise, not information.
 
 ## 7. `POST /api/tickets/:id/requester-resolved`
 

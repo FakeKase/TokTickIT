@@ -60,11 +60,11 @@ is under test.
 | API-13 | API | AC-10, BR-12 | Session of a deactivated user | The next request after deactivation is `401`, on a converted Lab 2 endpoint as well as the probe | `server/tests/lab-03/authorization.api.test.ts` | Pass |
 | API-14 | API | AC-15, BR-40 | Migration regression, API half | An account carried through the rename signs in with the documented password, lists its Ticket, opens it, and downloads an Attachment the test uploads itself. It does **not** distinguish a migrated row from a seeded one — the seed upserts these accounts on every run — so the migration itself is proved by `npm run db:migration-check`, on a throwaway database, and this row covers only that the authenticated API serves a carried-over account | `server/tests/lab-03/authorization.api.test.ts` | Pass |
 | API-15 | API | AC-21, BR-05 | Requester attempts a status change | `403`; status unchanged | `server/tests/lab-03/authorization.api.test.ts` | Planned |
-| API-16 | API | AC-18, BR-27 | Post a Public Comment | `201`; author and timestamp come from the server even when the body supplies others; visible to IT Staff | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-17 | API | AC-19, BR-25 | Empty and whitespace-only bodies, and one over 2000 characters | `400`; nothing stored | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-18 | API | AC-34, BR-04 | Visibility filtering | A Requester's comment list contains the public entries and no trace of the internal ones — not a redacted entry, not a count | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-19 | API | BR-04, BR-16 | Requester posts with `visibility: INTERNAL` | `403`; nothing stored | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
-| API-20 | API | AC-20, BR-24 | Problem appears resolved | `200`; `requesterResolvedAt` set; `currentStatus` unchanged; an accompanying Public Comment exists | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
+| API-16 | API | AC-18, BR-27 | Post a Public Comment | `201`; author and timestamp come from the server even when the body supplies others; visible to IT Staff | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-17 | API | AC-19, BR-25 | Empty and whitespace-only bodies, and one over 2000 characters | `400`; nothing stored | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-18 | API | AC-34, BR-04 | Visibility filtering | A Requester's comment list contains the public entries and no trace of the internal ones — not a redacted entry, not a count | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-19 | API | BR-04, BR-16 | Requester posts with `visibility: INTERNAL` | `403`; nothing stored | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-20 | API | AC-20, BR-24 | Problem appears resolved | `200`; `requesterResolvedAt` set; `currentStatus` unchanged; an accompanying Public Comment exists | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
 
 ### API — IT Staff queue and detail
 
@@ -121,7 +121,7 @@ is under test.
 | UI-14 | UI | AC-27, AC-28 | Ownership controls | Claim appears when unassigned; reassign lists only assignable users; both send the documented request | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
 | UI-15 | UI | AC-30, AC-31 | Priority and status controls | The status select offers only permitted transitions; a rejected transition shows the conflict message and reverts the control | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
 | UI-16 | UI | BR-04, ui-spec §5 | Two conversation streams | Public and internal composers are separate controls with distinct labels; posting through one never sends the other's visibility | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
-| UI-17 | UI | AC-34 | Requester Ticket Detail comments | Public comments render; no internal-note heading, composer, or entry exists in the tree | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
+| UI-17 | UI | AC-34, AC-18, AC-20 | Requester Ticket Detail thread and resolved signal | Each entry shows its author, role and time; posting trims and clears only on success; a failed post keeps the text; no edit or delete control exists; nothing mentions Internal Notes; the signal confirms first, survives a reload, and is absent on a finished Ticket | `client/tests/lab-03/RequesterComments.test.tsx` | Pass |
 | UI-18 | UI | AC-35, AC-36 | User list, search, role filter | Rows show Name, Email, Role, Status, Edit; search and filter refetch with the right query | `client/tests/lab-03/UserManagement.test.tsx` | Planned |
 | UI-19 | UI | AC-37 | Create-user dialog | Validates name, email, role, and initial password before sending; sends once | `client/tests/lab-03/UserManagement.test.tsx` | Planned |
 | UI-20 | UI | AC-38 | Duplicate email | A `409` attaches its message to the email field, not to a page-level banner | `client/tests/lab-03/UserManagement.test.tsx` | Planned |
@@ -238,6 +238,9 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 | 41 — Requester regression | `cd server && npm test` | 14 files, 165 tests passed |
 | 41 — Requester regression | `cd client && npm test` | 13 files, 121 tests passed |
 | 41 — Requester regression | `npm run e2e` | 27 specs passed |
+| 42 — Public Comments and resolved signal | `cd server && npm test` | 15 files, 182 tests passed |
+| 42 — Public Comments and resolved signal | `cd client && npm test` | 14 files, 134 tests passed |
+| 42 — Public Comments and resolved signal | `npm run e2e` | 27 specs passed |
 
 ## 7. Known Limitations or Deferred Tests
 
@@ -248,6 +251,7 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 - The dark appearance is asserted at the `data-theme` level, as in Lab 2, not by computed contrast ratio.
 - **`GET /api/requesters` and its test file are gone with the selector** (Issue #41). The endpoint existed to populate a screen that no longer exists, and listing people is an Administrator capability from Issue #45 onward. `requesters.api.test.ts` (6 tests) went with it, and the e2e helpers name the seeded Requesters directly rather than discovering them.
 - **Three Lab 2 create-ticket cases were replaced rather than deleted.** "Inactive requesterId", "non-Requester requesterId" and "unknown requesterId" tested a field the client can no longer send. Each moved to the layer that now answers it: an inactive account cannot obtain a session (API-03), a staff account is refused by role, and a supplied id is ignored (API-10, AC-03).
+- A Lab 2 client test asserted the Requester Ticket Detail screen showed no comments at all, which handout §4.2 put out of scope for that sprint. Issue #42 adds them, so the test now asserts the boundary that still holds: no Internal Notes, no Actions Taken, and no control that changes status.
 - A session that expires mid-use now sends the person to Login rather than leaving them on a failure state: `apiFetch` reports any 401 from a protected endpoint to `AuthProvider`, which clears the session and lets the route guards do the rest (Issue #41). The auth endpoints are excluded, because a 401 from `login` is a wrong password and a 401 from `me` is an ordinary anonymous visitor. The exclusion is pinned by `ChangePassword.test.tsx`'s wrong-current-password case, which is the only place it can be: on Login the user is already anonymous, so clearing the session there changes nothing and a test cannot tell the difference.
 - **Lab 2's e2e coverage of the Development Requester selector was removed with the selector itself** (Issue #40). Seven specs and the Part 6 evidence block drove a screen that no longer exists. Their screenshots stay under `artifacts/lab-02/screenshots/` as evidence for a lab already submitted; Login's own evidence is captured by Lab 3's suite in Issue #46. The client suite likewise lost `RequesterContext.test.tsx` and `RequesterSelector.test.tsx`, 15 tests covering the deleted context.
 - **BR-06's "stored lower-cased" is not yet enforced anywhere.** Login lower-cases what it is given before looking a user up, and every row written so far is lower-case, so nothing is broken today. But no constraint or write path prevents a future endpoint storing `Alex.Morgan@…`, and the moment one does, that user cannot log in — the lookup would normalise while the stored value would not. Issue #45 owns the write paths (`POST`/`PATCH /api/users`) and must normalise there; a `CHECK (email = lower(email))` would make it impossible to get wrong, at the cost of turning a mistyped address into a constraint violation the API has to translate.

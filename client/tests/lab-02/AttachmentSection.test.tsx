@@ -72,6 +72,10 @@ function mockApi({ detail, upload, remove }: Handlers) {
             ),
           )
     }
+    // Lab 3 added the thread; without this it falls through to the list
+    // branch below and the detail screen gets a paginated object where it
+    // expects an array.
+    if (/\/api\/tickets\/\d+\/comments$/.test(url)) return Promise.resolve(Response.json([]))
     if (/\/api\/tickets\/\d+$/.test(url)) return Promise.resolve(Response.json(detail))
     return Promise.resolve(Response.json([]))
   }) as typeof fetch)

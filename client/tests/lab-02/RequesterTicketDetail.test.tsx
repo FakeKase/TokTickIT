@@ -29,7 +29,7 @@ function mockApi(detail: () => Promise<Response>) {
     const url = String(input)
     const auth = authRoutes(signedIn)(url)
     if (auth) return auth
-    if (/\/api\/tickets\/\d+\?/.test(url)) return detail()
+    if (/\/api\/tickets\/\d+$/.test(url)) return detail()
     if (url.includes('/api/tickets')) {
       return Promise.resolve(
         Response.json({

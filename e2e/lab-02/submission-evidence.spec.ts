@@ -8,6 +8,7 @@ import {
   firstRequester,
   secondRequester,
   selectRequester,
+  sessionCookieFor,
   signInThroughLogin,
   signOut,
   DEV_PASSWORD,
@@ -75,10 +76,10 @@ test.describe('Part 7 — My Tickets', () => {
     const a = await firstRequester(request)
     const b = await secondRequester(request)
 
-    const ownedByA = await createTicket(request, a.id, {
+    const ownedByA = await createTicket(request, a, {
       summary: `Belongs to ${a.name} ${Date.now()}`,
     })
-    const ownedByB = await createTicket(request, b.id, {
+    const ownedByB = await createTicket(request, b, {
       summary: `Belongs to ${b.name} ${Date.now()}`,
     })
 
@@ -115,7 +116,7 @@ test.describe('Part 7 — My Tickets', () => {
     // Enough rows to page. Created up front so the list has depth to sort.
     const categories = await request.get(`${API}/api/categories`).then((r) => r.json())
     for (let i = 0; i < 12; i += 1) {
-      await createTicket(request, requester.id, {
+      await createTicket(request, requester, {
         summary: `Evidence ticket ${i + 1} — ${['VPN', 'printer', 'laptop'][i % 3]} issue`,
         categoryId: categories[i % categories.length].id,
         requestedPriority: (['LOW', 'MEDIUM', 'HIGH'] as const)[i % 3],
@@ -183,7 +184,7 @@ test.describe('Part 8 — Ticket Detail and attachments', () => {
   }) => {
     await page.setViewportSize(VIEWPORTS.desktop)
     const requester = await firstRequester(request)
-    const ticket = await createTicket(request, requester.id, {
+    const ticket = await createTicket(request, requester, {
       summary: `Attachment lifecycle ${Date.now()}`,
     })
     await selectRequester(page, requester)
@@ -243,8 +244,10 @@ test.describe('Part 8 — Ticket Detail and attachments', () => {
     // --- The removed file is no longer downloadable (AC-21, BR-26) -------
     // Asserted against the API, since the block is a server rule and the page
     // simply stops offering the link. Both halves are evidence.
-    const blockedUrl = `${API}/api/attachments/${attachmentId}/download?requesterId=${requester.id}`
-    const blocked = await request.get(blockedUrl)
+    const blockedUrl = `${API}/api/attachments/${attachmentId}/download`
+    const blocked = await request.get(blockedUrl, {
+      headers: { Cookie: await sessionCookieFor(request, requester.email) },
+    })
     expect(blocked.status()).toBe(404)
 
     // Navigated to directly, so the refusal is what the screenshot shows.
@@ -268,10 +271,10 @@ test.describe('Part 8 — Ticket Detail and attachments', () => {
     const owner = await firstRequester(request)
     const other = await secondRequester(request)
 
-    const ticket = await createTicket(request, owner.id, {
+    const ticket = await createTicket(request, owner, {
       summary: `Unauthorized-access evidence ${Date.now()}`,
     })
-    const attachment = await attachFile(request, ticket.id, owner.id, 'private-evidence.png')
+    const attachment = await attachFile(request, ticket.id, owner, 'private-evidence.png')
 
     // The other Requester, navigating directly to the URL.
     await selectRequester(page, other)
@@ -286,13 +289,17 @@ test.describe('Part 8 — Ticket Detail and attachments', () => {
 
     // AC-34: the same 404 for the Attachment's metadata, download and removal,
     // identical to a nonexistent id.
+    // As the other Requester: the identity is their session, not a parameter
+    // they chose (BR-03).
+    const asOther = { Cookie: await sessionCookieFor(request, other.email) }
     const [metadata, download, removal, nonexistent] = await Promise.all([
-      request.get(`${API}/api/attachments/${attachment.id}?requesterId=${other.id}`),
-      request.get(`${API}/api/attachments/${attachment.id}/download?requesterId=${other.id}`),
+      request.get(`${API}/api/attachments/${attachment.id}`, { headers: asOther }),
+      request.get(`${API}/api/attachments/${attachment.id}/download`, { headers: asOther }),
       request.delete(`${API}/api/attachments/${attachment.id}`, {
-        data: { requesterId: other.id, reason: 'not mine to remove' },
+        headers: asOther,
+        data: { reason: 'not mine to remove' },
       }),
-      request.get(`${API}/api/attachments/999999999?requesterId=${other.id}`),
+      request.get(`${API}/api/attachments/999999999`, { headers: asOther }),
     ])
     expect([metadata.status(), download.status(), removal.status()]).toEqual([404, 404, 404])
     expect(await metadata.json()).toEqual(await nonexistent.json())

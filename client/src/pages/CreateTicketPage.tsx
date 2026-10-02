@@ -51,9 +51,9 @@ const PRIORITIES: { value: RequestedPriority; label: string }[] = [
  * failure per BR-18.
  */
 export function CreateTicketPage() {
-  // Lab 2 read this from the selector; Lab 3 reads it from the session. The
-  // requesterId still travels on the wire until Issue #41 removes it from the
-  // API contract - at which point this line goes too.
+  // Identity comes from the session and never leaves this component: no call
+  // below carries a Requester id, because the server takes it from the cookie
+  // (BR-03).
   const { user: requester } = useAuth()
   const navigate = useNavigate()
 
@@ -122,7 +122,7 @@ export function CreateTicketPage() {
 
   async function uploadOne(ticketId: number, queued: QueuedFile) {
     try {
-      await uploadAttachment(ticketId, requester!.id, queued.file)
+      await uploadAttachment(ticketId, queued.file)
       setFiles((prev) =>
         prev.map((f) => (f.id === queued.id ? { ...f, uploaded: true, error: undefined } : f)),
       )
@@ -149,7 +149,6 @@ export function CreateTicketPage() {
 
     try {
       const ticket = await createTicket({
-        requesterId: requester!.id,
         categoryId: Number(values.categoryId),
         relatedSystemId: Number(values.relatedSystemId),
         requestedPriority: values.requestedPriority as RequestedPriority,

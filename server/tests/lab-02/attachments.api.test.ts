@@ -6,6 +6,7 @@ import request from "supertest";
 import { createApp } from "../../src/app.js";
 import { createPrismaClient } from "../../src/prisma.js";
 import { fixtureUser } from "../helpers/users.js";
+import { signInAs } from "../helpers/session.js";
 
 // API-10, API-11, API-12, API-13, API-28: POST /api/tickets/:id/attachments.
 // Uploads really are written to server/uploads here, so the "not stored"
@@ -30,6 +31,8 @@ const PNG = Buffer.from(
 
 let requesterId: number;
 let otherRequesterId: number;
+let ownerCookie: string;
+let otherCookie: string;
 let ticketId: number;
 let otherTicketId: number;
 let filesBefore: string[] = [];
@@ -39,11 +42,10 @@ async function uploadedFiles() {
   return all.filter((name) => !filesBefore.includes(name));
 }
 
-async function makeTicket(ownerId: number) {
+async function makeTicket(cookie: string) {
   const category = await prisma.category.findFirstOrThrow();
   const relatedSystem = await prisma.relatedSystem.findFirstOrThrow();
-  const response = await request(app).post("/api/tickets").send({
-    requesterId: ownerId,
+  const response = await request(app).post("/api/tickets").set("Cookie", cookie).send({
     categoryId: category.id,
     relatedSystemId: relatedSystem.id,
     requestedPriority: "LOW",
@@ -53,10 +55,10 @@ async function makeTicket(ownerId: number) {
   return response.body.id as number;
 }
 
-function upload(id: number, owner: number) {
-  return request(app)
-    .post(`/api/tickets/${id}/attachments`)
-    .field("requesterId", String(owner));
+/** An upload as whoever holds `cookie`. The owner comes from the session, so
+ *  there is no longer a field to carry it (BR-03). */
+function upload(id: number, cookie: string) {
+  return request(app).post(`/api/tickets/${id}/attachments`).set("Cookie", cookie);
 }
 
 beforeAll(async () => {
@@ -83,9 +85,11 @@ beforeAll(async () => {
   });
   requesterId = owner.id;
   otherRequesterId = other.id;
+  ownerCookie = await signInAs(app, owner.email);
+  otherCookie = await signInAs(app, other.email);
 
-  ticketId = await makeTicket(requesterId);
-  otherTicketId = await makeTicket(otherRequesterId);
+  ticketId = await makeTicket(ownerCookie);
+  otherTicketId = await makeTicket(otherCookie);
 });
 
 afterAll(async () => {
@@ -104,7 +108,7 @@ afterAll(async () => {
 
 describe("API-10 upload a valid attachment (BR-19)", () => {
   it("returns 201 and links the Attachment to the Ticket", async () => {
-    const response = await upload(ticketId, requesterId).attach("file", PNG, {
+    const response = await upload(ticketId, ownerCookie).attach("file", PNG, {
       filename: "screenshot.png",
       contentType: "image/png",
     });
@@ -121,7 +125,7 @@ describe("API-10 upload a valid attachment (BR-19)", () => {
   });
 
   it("keeps the on-disk name out of the response", async () => {
-    const response = await upload(ticketId, requesterId).attach("file", PNG, {
+    const response = await upload(ticketId, ownerCookie).attach("file", PNG, {
       filename: "second.png",
       contentType: "image/png",
     });
@@ -139,7 +143,7 @@ describe("API-10 upload a valid attachment (BR-19)", () => {
   });
 
   it("stores under a random name, not the name the client supplied", async () => {
-    const response = await upload(ticketId, requesterId).attach("file", PNG, {
+    const response = await upload(ticketId, ownerCookie).attach("file", PNG, {
       filename: "user-chosen.png",
       contentType: "image/png",
     });
@@ -152,7 +156,7 @@ describe("API-10 upload a valid attachment (BR-19)", () => {
   });
 
   it("BR-08: returns 404 for a Ticket owned by someone else", async () => {
-    const response = await upload(otherTicketId, requesterId).attach("file", PNG, {
+    const response = await upload(otherTicketId, ownerCookie).attach("file", PNG, {
       filename: "nope.png",
       contentType: "image/png",
     });
@@ -165,7 +169,7 @@ describe("API-10 upload a valid attachment (BR-19)", () => {
   });
 
   it("returns 404 for a Ticket that does not exist at all, identically", async () => {
-    const response = await upload(2_000_000_000, requesterId).attach("file", PNG, {
+    const response = await upload(2_000_000_000, ownerCookie).attach("file", PNG, {
       filename: "nope.png",
       contentType: "image/png",
     });
@@ -174,16 +178,21 @@ describe("API-10 upload a valid attachment (BR-19)", () => {
     expect(response.body.error).toBe("Ticket not found");
   });
 
-  it("requires a requesterId", async () => {
+  it("requires a session, and writes nothing to disk without one", async () => {
+    const before = await uploadedFiles();
+
     const response = await request(app)
       .post(`/api/tickets/${ticketId}/attachments`)
       .attach("file", PNG, { filename: "x.png", contentType: "image/png" });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(401);
+    // The guard runs before multer on purpose: an anonymous caller must be
+    // turned away before a file reaches the disk, not have it deleted after.
+    expect(await uploadedFiles()).toEqual(before);
   });
 
   it("requires a file", async () => {
-    const response = await upload(ticketId, requesterId);
+    const response = await upload(ticketId, ownerCookie);
 
     expect(response.status).toBe(400);
   });
@@ -194,7 +203,7 @@ describe("API-11 oversized upload (BR-20)", () => {
     const before = await prisma.attachment.count({ where: { ticketId } });
     const filesAtStart = (await uploadedFiles()).length;
 
-    const response = await upload(ticketId, requesterId).attach(
+    const response = await upload(ticketId, ownerCookie).attach(
       "file",
       Buffer.alloc(6 * 1024 * 1024, 1),
       { filename: "huge.png", contentType: "image/png" },
@@ -206,7 +215,7 @@ describe("API-11 oversized upload (BR-20)", () => {
   });
 
   it("accepts a file just under the limit", async () => {
-    const response = await upload(ticketId, requesterId).attach(
+    const response = await upload(ticketId, ownerCookie).attach(
       "file",
       Buffer.alloc(5 * 1024 * 1024 - 1024, 1),
       { filename: "big-enough.pdf", contentType: "application/pdf" },
@@ -221,7 +230,7 @@ describe("API-12 unsupported type (BR-19)", () => {
     const before = await prisma.attachment.count({ where: { ticketId } });
     const filesAtStart = (await uploadedFiles()).length;
 
-    const response = await upload(ticketId, requesterId).attach(
+    const response = await upload(ticketId, ownerCookie).attach(
       "file",
       Buffer.from("MZ"),
       { filename: "payload.exe", contentType: "application/x-msdownload" },
@@ -236,7 +245,7 @@ describe("API-12 unsupported type (BR-19)", () => {
   it("rejects a disallowed file renamed to a permitted extension", async () => {
     // BR-19 is explicit that the declared MIME type is what counts, so an
     // .exe wearing a .png name must still be refused.
-    const response = await upload(ticketId, requesterId).attach(
+    const response = await upload(ticketId, ownerCookie).attach(
       "file",
       Buffer.from("MZ"),
       { filename: "payload.png", contentType: "application/x-msdownload" },
@@ -246,7 +255,7 @@ describe("API-12 unsupported type (BR-19)", () => {
   });
 
   it("rejects a permitted MIME type whose extension disagrees", async () => {
-    const response = await upload(ticketId, requesterId).attach("file", PNG, {
+    const response = await upload(ticketId, ownerCookie).attach("file", PNG, {
       filename: "payload.exe",
       contentType: "image/png",
     });
@@ -257,17 +266,17 @@ describe("API-12 unsupported type (BR-19)", () => {
 
 describe("API-13 the 5-attachment cap (BR-21)", () => {
   it("returns 409 on the sixth active attachment", async () => {
-    const capTicket = await makeTicket(requesterId);
+    const capTicket = await makeTicket(ownerCookie);
 
     for (let i = 0; i < 5; i += 1) {
-      const ok = await upload(capTicket, requesterId).attach("file", PNG, {
+      const ok = await upload(capTicket, ownerCookie).attach("file", PNG, {
         filename: `file-${i}.png`,
         contentType: "image/png",
       });
       expect(ok.status).toBe(201);
     }
 
-    const sixth = await upload(capTicket, requesterId).attach("file", PNG, {
+    const sixth = await upload(capTicket, ownerCookie).attach("file", PNG, {
       filename: "sixth.png",
       contentType: "image/png",
     });
@@ -278,10 +287,10 @@ describe("API-13 the 5-attachment cap (BR-21)", () => {
   });
 
   it("counts only active Attachments, so removing one frees a slot", async () => {
-    const capTicket = await makeTicket(requesterId);
+    const capTicket = await makeTicket(ownerCookie);
 
     for (let i = 0; i < 5; i += 1) {
-      await upload(capTicket, requesterId).attach("file", PNG, {
+      await upload(capTicket, ownerCookie).attach("file", PNG, {
         filename: `file-${i}.png`,
         contentType: "image/png",
       });
@@ -295,7 +304,7 @@ describe("API-13 the 5-attachment cap (BR-21)", () => {
       data: { isRemoved: true, removedAt: new Date(), removedReason: "test" },
     });
 
-    const replacement = await upload(capTicket, requesterId).attach("file", PNG, {
+    const replacement = await upload(capTicket, ownerCookie).attach("file", PNG, {
       filename: "replacement.png",
       contentType: "image/png",
     });
@@ -306,9 +315,9 @@ describe("API-13 the 5-attachment cap (BR-21)", () => {
 
 describe("API-28 a failed upload leaves the Ticket intact (BR-22)", () => {
   it("keeps the Ticket valid and lets a retry succeed", async () => {
-    const retryTicket = await makeTicket(requesterId);
+    const retryTicket = await makeTicket(ownerCookie);
 
-    const failed = await upload(retryTicket, requesterId).attach(
+    const failed = await upload(retryTicket, ownerCookie).attach(
       "file",
       Buffer.from("MZ"),
       { filename: "bad.exe", contentType: "application/x-msdownload" },
@@ -323,7 +332,7 @@ describe("API-28 a failed upload leaves the Ticket intact (BR-22)", () => {
       await prisma.attachment.count({ where: { ticketId: retryTicket } }),
     ).toBe(0);
 
-    const retry = await upload(retryTicket, requesterId).attach("file", PNG, {
+    const retry = await upload(retryTicket, ownerCookie).attach("file", PNG, {
       filename: "good.png",
       contentType: "image/png",
     });
@@ -337,13 +346,13 @@ describe("API-28 a failed upload leaves the Ticket intact (BR-22)", () => {
 
 describe("API-13 the cap holds under concurrent uploads (BR-21)", () => {
   it("admits at most five when six upload at once", async () => {
-    const raceTicket = await makeTicket(requesterId);
+    const raceTicket = await makeTicket(ownerCookie);
 
     // Sequential uploads cannot expose a check-then-insert race: each one
     // commits before the next reads. These overlap deliberately.
     const results = await Promise.all(
       Array.from({ length: 6 }, (_, i) =>
-        upload(raceTicket, requesterId).attach("file", PNG, {
+        upload(raceTicket, ownerCookie).attach("file", PNG, {
           filename: `race-${i}.png`,
           contentType: "image/png",
         }),
@@ -370,8 +379,8 @@ describe("API-13 the cap holds under concurrent uploads (BR-21)", () => {
  * they have already partly consumed, so each case here starts clean.
  */
 async function makeAttachment(ticket?: number, filename = "doc.pdf") {
-  const target = ticket ?? (await makeTicket(requesterId));
-  const response = await upload(target, requesterId).attach(
+  const target = ticket ?? (await makeTicket(ownerCookie));
+  const response = await upload(target, ownerCookie).attach(
     "file",
     Buffer.from("%PDF-1.4 fixture"),
     { filename, contentType: "application/pdf" },
@@ -384,7 +393,7 @@ describe("API-14 GET /api/attachments/:id/download (AC-19)", () => {
     const id = await makeAttachment(undefined, "battery-report.pdf");
 
     const response = await request(app)
-      .get(`/api/attachments/${id}/download?requesterId=${requesterId}`);
+      .get(`/api/attachments/${id}/download`).set("Cookie", ownerCookie);
 
     expect(response.status).toBe(200);
     expect(response.headers["content-type"]).toContain("application/pdf");
@@ -399,7 +408,7 @@ describe("API-14 GET /api/attachments/:id/download (AC-19)", () => {
     const id = await makeAttachment(undefined, 'ev"il\nname.pdf');
 
     const response = await request(app)
-      .get(`/api/attachments/${id}/download?requesterId=${requesterId}`);
+      .get(`/api/attachments/${id}/download`).set("Cookie", ownerCookie);
 
     const header = response.headers["content-disposition"];
     expect(header).not.toContain('"il');
@@ -410,7 +419,7 @@ describe("API-14 GET /api/attachments/:id/download (AC-19)", () => {
     const id = await makeAttachment();
 
     const response = await request(app)
-      .get(`/api/attachments/${id}?requesterId=${requesterId}`);
+      .get(`/api/attachments/${id}`).set("Cookie", ownerCookie);
 
     expect(response.status).toBe(200);
     expect(response.body.storedFilename).toBeUndefined();
@@ -423,12 +432,14 @@ describe("API-15 removed Attachments are not downloadable (AC-21, BR-26)", () =>
     const id = await makeAttachment();
     await request(app)
       .delete(`/api/attachments/${id}`)
-      .send({ requesterId, reason: "Uploaded the wrong file" });
+      .set("Cookie", ownerCookie)
+      .send({ reason: "Uploaded the wrong file" });
 
     const removed = await request(app)
-      .get(`/api/attachments/${id}/download?requesterId=${requesterId}`);
+      .get(`/api/attachments/${id}/download`).set("Cookie", ownerCookie);
     const nonexistent = await request(app)
-      .get(`/api/attachments/2000000000/download?requesterId=${requesterId}`);
+      .get(`/api/attachments/2000000000/download`)
+      .set("Cookie", ownerCookie);
 
     // BR-26: a distinct status would confirm the file was once there.
     expect(removed.status).toBe(404);
@@ -440,10 +451,11 @@ describe("API-15 removed Attachments are not downloadable (AC-21, BR-26)", () =>
     const id = await makeAttachment();
     await request(app)
       .delete(`/api/attachments/${id}`)
-      .send({ requesterId, reason: "Superseded by a clearer scan" });
+      .set("Cookie", ownerCookie)
+      .send({ reason: "Superseded by a clearer scan" });
 
     const response = await request(app)
-      .get(`/api/attachments/${id}?requesterId=${requesterId}`);
+      .get(`/api/attachments/${id}`).set("Cookie", ownerCookie);
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
@@ -458,7 +470,8 @@ describe("API-15 removed Attachments are not downloadable (AC-21, BR-26)", () =>
     const id = await makeAttachment();
     await request(app)
       .delete(`/api/attachments/${id}`)
-      .send({ requesterId, reason: "Wrong screenshot" });
+      .set("Cookie", ownerCookie)
+      .send({ reason: "Wrong screenshot" });
 
     // Lab 2 keeps the bytes; only the row is marked.
     expect((await uploadedFiles()).length).toBe(before + 1);
@@ -471,7 +484,7 @@ describe("API-16 removal requires a reason (AC-22, BR-25)", () => {
 
     const response = await request(app)
       .delete(`/api/attachments/${id}`)
-      .send({ requesterId });
+      .set("Cookie", ownerCookie);
 
     expect(response.status).toBe(400);
     expect(response.body.fields.reason).toBeTruthy();
@@ -485,7 +498,8 @@ describe("API-16 removal requires a reason (AC-22, BR-25)", () => {
     for (const reason of ["ab", "   ", ""]) {
       const response = await request(app)
         .delete(`/api/attachments/${id}`)
-        .send({ requesterId, reason });
+        .set("Cookie", ownerCookie)
+        .send({ reason });
       expect(response.status).toBe(400);
     }
 
@@ -498,7 +512,8 @@ describe("API-16 removal requires a reason (AC-22, BR-25)", () => {
 
     const response = await request(app)
       .delete(`/api/attachments/${id}`)
-      .send({ requesterId, reason: "   Wrong file uploaded   " });
+      .set("Cookie", ownerCookie)
+      .send({ reason: "   Wrong file uploaded   " });
 
     expect(response.body.removedReason).toBe("Wrong file uploaded");
   });
@@ -510,7 +525,8 @@ describe("API-17 soft removal keeps the row (AC-20, BR-23)", () => {
 
     const response = await request(app)
       .delete(`/api/attachments/${id}`)
-      .send({ requesterId, reason: "Replaced with a clearer photo" });
+      .set("Cookie", ownerCookie)
+      .send({ reason: "Replaced with a clearer photo" });
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ id, isRemoved: true });
@@ -521,10 +537,12 @@ describe("API-17 soft removal keeps the row (AC-20, BR-23)", () => {
     const id = await makeAttachment();
     const first = await request(app)
       .delete(`/api/attachments/${id}`)
-      .send({ requesterId, reason: "First removal" });
+      .set("Cookie", ownerCookie)
+      .send({ reason: "First removal" });
     const second = await request(app)
       .delete(`/api/attachments/${id}`)
-      .send({ requesterId, reason: "Second attempt" });
+      .set("Cookie", ownerCookie)
+      .send({ reason: "Second attempt" });
 
     expect(first.status).toBe(200);
     // 409 rather than a 404: the owner already knows it exists, so this
@@ -536,11 +554,11 @@ describe("API-17 soft removal keeps the row (AC-20, BR-23)", () => {
   });
 
   it("frees a slot under the 5-attachment cap", async () => {
-    const capTicket = await makeTicket(requesterId);
+    const capTicket = await makeTicket(ownerCookie);
     const ids: number[] = [];
     for (let i = 0; i < 5; i += 1) ids.push(await makeAttachment(capTicket, `f${i}.pdf`));
 
-    const blocked = await upload(capTicket, requesterId).attach("file", PNG, {
+    const blocked = await upload(capTicket, ownerCookie).attach("file", PNG, {
       filename: "sixth.png",
       contentType: "image/png",
     });
@@ -548,9 +566,10 @@ describe("API-17 soft removal keeps the row (AC-20, BR-23)", () => {
 
     await request(app)
       .delete(`/api/attachments/${ids[0]}`)
-      .send({ requesterId, reason: "Making room" });
+      .set("Cookie", ownerCookie)
+      .send({ reason: "Making room" });
 
-    const allowed = await upload(capTicket, requesterId).attach("file", PNG, {
+    const allowed = await upload(capTicket, ownerCookie).attach("file", PNG, {
       filename: "replacement.png",
       contentType: "image/png",
     });
@@ -563,12 +582,13 @@ describe("API-27 cross-Requester access (AC-34, BR-08/BR-25)", () => {
     const id = await makeAttachment();
 
     const metadata = await request(app)
-      .get(`/api/attachments/${id}?requesterId=${otherRequesterId}`);
+      .get(`/api/attachments/${id}`).set("Cookie", otherCookie);
     const download = await request(app)
-      .get(`/api/attachments/${id}/download?requesterId=${otherRequesterId}`);
+      .get(`/api/attachments/${id}/download`).set("Cookie", otherCookie);
     const removal = await request(app)
       .delete(`/api/attachments/${id}`)
-      .send({ requesterId: otherRequesterId, reason: "Not mine to remove" });
+      .set("Cookie", otherCookie)
+      .send({ reason: "Not mine to remove" });
 
     expect([metadata.status, download.status, removal.status]).toEqual([404, 404, 404]);
   });
@@ -577,9 +597,10 @@ describe("API-27 cross-Requester access (AC-34, BR-08/BR-25)", () => {
     const id = await makeAttachment();
 
     const notOwned = await request(app)
-      .get(`/api/attachments/${id}?requesterId=${otherRequesterId}`);
+      .get(`/api/attachments/${id}`).set("Cookie", otherCookie);
     const nonexistent = await request(app)
-      .get(`/api/attachments/2000000000?requesterId=${otherRequesterId}`);
+      .get(`/api/attachments/2000000000`)
+      .set("Cookie", otherCookie);
 
     expect(notOwned.body).toEqual(nonexistent.body);
   });
@@ -589,22 +610,25 @@ describe("API-27 cross-Requester access (AC-34, BR-08/BR-25)", () => {
 
     await request(app)
       .delete(`/api/attachments/${id}`)
-      .send({ requesterId: otherRequesterId, reason: "Not mine to remove" });
+      .set("Cookie", otherCookie)
+      .send({ reason: "Not mine to remove" });
 
     const stored = await prisma.attachment.findUnique({ where: { id } });
     expect(stored?.isRemoved).toBe(false);
   });
 
-  it("requires a requesterId on every one of the three", async () => {
+  it("requires a session on every one of the three", async () => {
     const id = await makeAttachment();
 
     const metadata = await request(app).get(`/api/attachments/${id}`);
     const download = await request(app).get(`/api/attachments/${id}/download`);
     const removal = await request(app)
       .delete(`/api/attachments/${id}`)
-      .send({ reason: "No requester supplied" });
+      .send({ reason: "Nobody is signed in" });
 
-    expect([metadata.status, download.status, removal.status]).toEqual([400, 400, 400]);
+    // 401 rather than Lab 2's 400: the identity is missing from the request
+    // entirely, which is a different failure from a malformed one.
+    expect([metadata.status, download.status, removal.status]).toEqual([401, 401, 401]);
   });
 });
 
@@ -616,7 +640,10 @@ describe("API-17 removal is atomic under concurrency (BR-23)", () => {
     // commits before the second reads. These overlap deliberately.
     const responses = await Promise.all(
       ["First reason", "Second reason", "Third reason"].map((reason) =>
-        request(app).delete(`/api/attachments/${id}`).send({ requesterId, reason }),
+        request(app)
+          .delete(`/api/attachments/${id}`)
+          .set("Cookie", ownerCookie)
+          .send({ reason }),
       ),
     );
 

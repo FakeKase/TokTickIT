@@ -64,9 +64,9 @@ function statusLabel(status: string) {
  * pagination, and BR-28's two distinct zero-result states.
  */
 export function MyTicketsPage() {
-  // Lab 2 read this from the selector; Lab 3 reads it from the session. The
-  // requesterId still travels on the wire until Issue #41 removes it from the
-  // API contract - at which point this line goes too.
+  // Identity comes from the session and never leaves this component: no call
+  // below carries a Requester id, because the server takes it from the cookie
+  // (BR-03).
   const { user: requester } = useAuth()
   const navigate = useNavigate()
 
@@ -84,15 +84,15 @@ export function MyTicketsPage() {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
 
-  const requesterId = requester?.id
+  const signedInUserId = requester?.id
 
   const load = useCallback(async () => {
-    if (!requesterId) return
+    if (!signedInUserId) return
     setLoading(true)
     setFailed(false)
     try {
       setResponse(
-        await fetchTickets(requesterId, {
+        await fetchTickets({
           search: applied.search || undefined,
           categoryId: applied.categoryId ? Number(applied.categoryId) : undefined,
           requestedPriority: applied.requestedPriority || undefined,
@@ -107,7 +107,7 @@ export function MyTicketsPage() {
     } finally {
       setLoading(false)
     }
-  }, [requesterId, applied, sortBy, sortDir, page])
+  }, [signedInUserId, applied, sortBy, sortDir, page])
 
   useEffect(() => {
     void load()
@@ -119,7 +119,7 @@ export function MyTicketsPage() {
     setFilters(NO_FILTERS)
     setApplied(NO_FILTERS)
     setPage(1)
-  }, [requesterId])
+  }, [signedInUserId])
 
   useEffect(() => {
     fetchCategories()

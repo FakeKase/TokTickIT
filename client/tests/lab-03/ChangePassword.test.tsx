@@ -140,6 +140,10 @@ describe('UI-06 validation (AC-11, BR-13)', () => {
     expect(calls).toHaveLength(0)
   })
 
+  // Also the test that pins apiFetch's `/api/auth/` exclusion: the server
+  // answers a wrong current password with a 401, and if that were treated as an
+  // expired session the user would be signed out and sent to Login instead of
+  // being told which field was wrong. Removing the exclusion fails here.
   it('shows a wrong current password against the field the server blamed', async () => {
     mockApi(() =>
       Response.json(

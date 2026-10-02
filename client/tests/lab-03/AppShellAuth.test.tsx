@@ -92,6 +92,47 @@ describe('UI-08 role-specific navigation (AC-13, FR-05)', () => {
   })
 })
 
+// The other half of this rule — that a 401 from the auth endpoints themselves
+// must NOT be read as an expired session — is pinned by ChangePassword.test.tsx
+// "shows a wrong current password against the field the server blamed". A test
+// on Login cannot pin it: the user is already anonymous there, so clearing the
+// session changes nothing and the assertion holds either way.
+describe('a session that goes away mid-use (review of PR #53)', () => {
+  it('sends the user to Login instead of leaving them on a failure state', async () => {
+    // The screen loads normally, then the session expires or an Administrator
+    // deactivates the account, and the next call answers 401.
+    let sessionAlive = true
+    vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
+      const url = String(input)
+      const auth = authRoutes(signedIn)(url)
+      if (auth) return auth
+      if (url.includes('/api/tickets')) {
+        return Promise.resolve(
+          sessionAlive
+            ? Response.json({
+                data: [],
+                filtered: false,
+                pagination: { page: 1, pageSize: 10, totalItems: 0, totalPages: 0 },
+              })
+            : Response.json({ error: 'Authentication required' }, { status: 401 }),
+        )
+      }
+      return Promise.resolve(Response.json([]))
+    }) as typeof fetch)
+
+    window.history.pushState({}, '', '/tickets')
+    await renderApp()
+    expect(await screen.findByRole('navigation', { name: 'Primary' })).toBeInTheDocument()
+
+    sessionAlive = false
+    await userEvent.setup().click(screen.getByRole('link', { name: 'Create Ticket' }))
+    await userEvent.setup().click(screen.getByRole('link', { name: 'My Tickets' }))
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+    expect(await screen.findByRole('heading', { name: /Sign in/i })).toBeInTheDocument()
+  })
+})
+
 describe('UI-09 logout (AC-08)', () => {
   it('ends the session, returns to Login, and leaves protected routes closed', async () => {
     mockApi()

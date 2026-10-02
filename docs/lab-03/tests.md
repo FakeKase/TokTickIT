@@ -64,7 +64,7 @@ is under test.
 | API-17 | API | AC-19, BR-25 | Empty and whitespace-only bodies, and one over 2000 characters | `400`; nothing stored | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
 | API-18 | API | AC-34, BR-04 | Visibility filtering | A Requester's comment list contains the public entries and no trace of the internal ones — not a redacted entry, not a count | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
 | API-19 | API | BR-04, BR-16 | Requester posts with `visibility: INTERNAL` | `403`; nothing stored | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
-| API-20 | API | AC-20, BR-24 | Problem appears resolved | `200`; `requesterResolvedAt` set; `currentStatus` unchanged; an accompanying Public Comment exists | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-20 | API | AC-20, BR-24 | Problem appears resolved | `200`; `requesterResolvedAt` set; `currentStatus` unchanged; an accompanying Public Comment exists. A second signal is `409` and writes no duplicate, and a failure part-way leaves neither the timestamp nor the comment | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
 
 ### API — IT Staff queue and detail
 
@@ -238,7 +238,7 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 | 41 — Requester regression | `cd server && npm test` | 14 files, 165 tests passed |
 | 41 — Requester regression | `cd client && npm test` | 13 files, 121 tests passed |
 | 41 — Requester regression | `npm run e2e` | 27 specs passed |
-| 42 — Public Comments and resolved signal | `cd server && npm test` | 15 files, 182 tests passed |
+| 42 — Public Comments and resolved signal | `cd server && npm test` | 15 files, 185 tests passed |
 | 42 — Public Comments and resolved signal | `cd client && npm test` | 14 files, 134 tests passed |
 | 42 — Public Comments and resolved signal | `npm run e2e` | 27 specs passed |
 

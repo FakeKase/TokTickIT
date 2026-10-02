@@ -36,7 +36,7 @@ import {
 } from "./lib/ticket-number.js";
 import { validateTicketInput } from "./lib/ticket-validation.js";
 import { parseTicketQuery } from "./lib/ticket-query.js";
-import { COMMENT_MAX, validateComment } from "./lib/comment-validation.js";
+import { validateComment } from "./lib/comment-validation.js";
 import {
   ALLOWED_TYPES_LABEL,
   MAX_ACTIVE_ATTACHMENTS,
@@ -584,7 +584,11 @@ export function createApp(prisma = createPrismaClient()) {
             ticketId: ticket.id,
             ...(user.role === "REQUESTER" ? { visibility: "PUBLIC" as const } : {}),
           },
-          orderBy: { createdAt: "asc" },
+          // id as a same-direction tie-break: two comments written in the
+          // same millisecond would otherwise come back in either order, and a
+          // conversation that reorders itself between loads is worse than one
+          // that is a millisecond out.
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
           select: {
             id: true,
             ticketId: true,
@@ -607,6 +611,14 @@ export function createApp(prisma = createPrismaClient()) {
     ...asAnyUser,
     async (req: AuthenticatedRequest, res) => {
       const user = req.auth!.user;
+
+      // Ownership first, before the body is even looked at. The GET above
+      // refuses to tell a Requester whether somebody else's Ticket exists, and
+      // answering 400 or 403 here would answer a question 404 is meant to
+      // leave open.
+      const ticket = await resolveCommentTicket(user, req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
       const parsed = validateComment(req.body ?? {});
       if (!parsed.ok) {
         return res
@@ -619,9 +631,6 @@ export function createApp(prisma = createPrismaClient()) {
           error: "You do not have permission to perform this action",
         });
       }
-
-      const ticket = await resolveCommentTicket(user, req.params.id);
-      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
 
       try {
         const comment = await prisma.ticketComment.create({
@@ -672,24 +681,36 @@ export function createApp(prisma = createPrismaClient()) {
       }
 
       try {
-        // One transaction: the signal and the comment that carries it are the
-        // same event. A timestamp with no comment is invisible to IT Staff
-        // reading the thread, and a comment with no timestamp leaves the badge
-        // off the screen - either half alone is a worse outcome than neither.
-        const updated = await prisma.$transaction(async (tx) => {
-          const result = await tx.ticket.update({
-            where: { id: ticket.id },
-            // BR-24: currentStatus is deliberately absent. Only IT Staff
-            // resolve or close a Ticket (BR-05); this is the Requester saying
-            // it looks fixed from where they are sitting.
-            data: { requesterResolvedAt: new Date() },
-            select: {
-              id: true,
-              currentStatus: true,
-              requesterResolvedAt: true,
-            },
-          });
+        // The guard that actually holds, as opposed to the one above it, which
+        // only produces a better message. Both conditions live in the WHERE,
+        // so a second submit from another tab and a staff resolve landing in
+        // between are refused by the database rather than by a check made a
+        // moment earlier: updateMany reports 0 rows and nothing is written.
+        const claimed = await prisma.ticket.updateMany({
+          where: {
+            id: ticket.id,
+            requesterResolvedAt: null,
+            currentStatus: { notIn: ["RESOLVED", "CLOSED", "CANCELLED"] },
+          },
+          data: { requesterResolvedAt: new Date() },
+        });
 
+        if (claimed.count === 0) {
+          return res.status(409).json({
+            error: "This Ticket has already been resolved or closed",
+          });
+        }
+      } catch {
+        return res
+          .status(500)
+          .json({ error: "Unable to record that the problem appears resolved" });
+      }
+
+      try {
+        // The comment that carries the signal. BR-24 pairs the two, so a
+        // failure here has to undo the timestamp above - a signal nobody can
+        // see in the thread is the half that fails silently.
+        const updated = await prisma.$transaction(async (tx) => {
           await tx.ticketComment.create({
             data: {
               ticketId: ticket.id,
@@ -699,11 +720,28 @@ export function createApp(prisma = createPrismaClient()) {
             },
           });
 
-          return result;
+          return tx.ticket.findUniqueOrThrow({
+            where: { id: ticket.id },
+            select: {
+              id: true,
+              // BR-24: never written by this route. Only IT Staff resolve or
+              // close a Ticket (BR-05); this is the Requester saying it looks
+              // fixed from where they are sitting.
+              currentStatus: true,
+              requesterResolvedAt: true,
+            },
+          });
         });
 
         res.json(updated);
       } catch {
+        // Put the Ticket back as it was: the signal and its comment are one
+        // event, and leaving the timestamp without the comment would show a
+        // badge for something the thread never mentions.
+        await prisma.ticket
+          .update({ where: { id: ticket.id }, data: { requesterResolvedAt: null } })
+          .catch(() => {});
+
         res
           .status(500)
           .json({ error: "Unable to record that the problem appears resolved" });

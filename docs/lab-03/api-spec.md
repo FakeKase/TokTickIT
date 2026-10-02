@@ -126,7 +126,11 @@ One endpoint family serves Public Comments and Internal Notes, filtered by role 
 - **`200`**: sets `requesterResolvedAt`, posts an accompanying Public Comment, and returns the updated Ticket. `currentStatus` is unchanged (BR-24).
 - **`403`**: called by IT Staff or an Administrator — this is a Requester's signal about their own Ticket.
 - **`404`**: not the authenticated Requester's Ticket.
-- **`409`**: the Ticket is already Resolved, Closed, or Cancelled.
+- **`409`**: the Ticket is already Resolved, Closed, or Cancelled, **or the signal has already been
+  recorded**. The signal is once per Ticket: a second one would overwrite the first timestamp and
+  post a duplicate comment, and there is no endpoint to take either back. Both conditions are in
+  the `WHERE` of the write rather than checked beforehand, so a second tab and a staff resolve
+  landing in between are refused by the database instead of by a check made a moment earlier.
 
 ---
 

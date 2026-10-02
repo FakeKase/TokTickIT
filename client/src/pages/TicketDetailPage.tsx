@@ -128,19 +128,32 @@ export function TicketDetailPage() {
    * page-wide error state. The Ticket is what the person came for, and the
    * thread degrades to its own retry.
    */
-  const loadComments = useCallback(async () => {
-    if (!signedInUserId || !Number.isInteger(ticketId) || ticketId <= 0) return
-    setCommentsFailed(false)
+  const loadComments = useCallback(
+    async (isCurrent: () => boolean = () => true) => {
+      if (!signedInUserId || !Number.isInteger(ticketId) || ticketId <= 0) return
+      setCommentsFailed(false)
 
-    try {
-      setComments(await fetchComments(ticketId))
-    } catch {
-      setCommentsFailed(true)
-    }
-  }, [signedInUserId, ticketId])
+      try {
+        const thread = await fetchComments(ticketId)
+        // Dropped if the id moved on while this was in flight: a slow fetch
+        // for Ticket 41 must not land in the thread for Ticket 42.
+        if (isCurrent()) setComments(thread)
+      } catch {
+        if (isCurrent()) setCommentsFailed(true)
+      }
+    },
+    [signedInUserId, ticketId],
+  )
 
   useEffect(() => {
-    void loadComments()
+    let current = true
+    // Cleared first, so the previous Ticket's conversation is not on screen
+    // while this one loads.
+    setComments([])
+    void loadComments(() => current)
+    return () => {
+      current = false
+    }
   }, [loadComments])
 
   if (!requester) return null

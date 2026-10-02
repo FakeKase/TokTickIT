@@ -229,7 +229,7 @@ describe("API-18/API-19 Internal Notes stay internal (AC-34, BR-04, BR-29)", () 
     expect(await prisma.ticketComment.count({ where: { ticketId } })).toBe(0);
   });
 
-  it("lets an Administrator read a note but not write one (BR-04, §5.1)", async () => {
+  it("lets an Administrator read and write internal notes (BR-04, §5.1)", async () => {
     await post(staffCookie, { body: "Internal detail.", visibility: "INTERNAL" });
 
     const read = await list(adminCookie);
@@ -239,8 +239,9 @@ describe("API-18/API-19 Internal Notes stay internal (AC-34, BR-04, BR-29)", () 
       body: "An Administrator note.",
       visibility: "INTERNAL",
     });
-    // The matrix gives Administrators internal-note access on both halves, so
-    // this is allowed - asserted so a later change has to be deliberate.
+    // §5.1 gives Administrators internal notes on both halves - read and
+    // write. Asserted rather than assumed, so narrowing it later has to be a
+    // deliberate change to this line.
     expect(written.status).toBe(201);
   });
 });
@@ -258,6 +259,18 @@ describe("ownership on the thread (BR-18)", () => {
     const anonymous = await request(app).get(`/api/tickets/${ticketId}/comments`);
 
     expect(anonymous.status).toBe(401);
+  });
+
+  it("answers 404 before it judges the body, so a stranger learns nothing", async () => {
+    // A malformed body or an INTERNAL visibility on somebody else's Ticket
+    // must not answer 400 or 403: either would confirm the Ticket is there.
+    const malformed = await post(otherCookie, { body: "" });
+    const internal = await post(otherCookie, {
+      body: "Trying it on.",
+      visibility: "INTERNAL",
+    });
+
+    expect([malformed.status, internal.status]).toEqual([404, 404]);
   });
 });
 
@@ -281,6 +294,32 @@ describe("API-20 Problem Appears Resolved (AC-20, BR-05, BR-24)", () => {
     expect(thread.body[0].body).toMatch(/appears resolved/i);
     expect(thread.body[0].visibility).toBe("PUBLIC");
     expect(thread.body[0].author.id).toBe(ownerId);
+  });
+
+  it("is refused a second time, and writes no duplicate comment", async () => {
+    expect((await signal(ownerCookie)).status).toBe(200);
+
+    const again = await signal(ownerCookie);
+
+    // The UI hides the button once signalled, but that is presentation: the
+    // guard is in the WHERE clause, so a second tab or a double-submit is
+    // refused rather than overwriting the first timestamp.
+    expect(again.status).toBe(409);
+    expect(
+      await prisma.ticketComment.count({ where: { ticketId } }),
+    ).toBe(1);
+  });
+
+  it("does not move the signal when a second attempt is refused", async () => {
+    const first = await signal(ownerCookie);
+    const recorded = first.body.requesterResolvedAt;
+
+    await signal(ownerCookie);
+
+    const after = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
+    expect(after.requesterResolvedAt?.toISOString()).toBe(
+      new Date(recorded).toISOString(),
+    );
   });
 
   it("is refused to IT Staff and Administrators", async () => {

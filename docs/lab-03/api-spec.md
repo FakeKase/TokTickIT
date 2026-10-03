@@ -123,7 +123,10 @@ One endpoint family serves Public Comments and Internal Notes, filtered by role 
 
 ## 7. `POST /api/tickets/:id/requester-resolved`
 
-- **`200`**: sets `requesterResolvedAt`, posts an accompanying Public Comment, and returns the updated Ticket. `currentStatus` is unchanged (BR-24).
+- **`200`**: sets `requesterResolvedAt`, posts an accompanying Public Comment, and returns
+  `{ id, currentStatus, requesterResolvedAt }` — the three fields this write can affect, not the
+  whole Ticket. `currentStatus` is included precisely so the client can see it did **not** change
+  (BR-24); the caller is looking at the Ticket already and nothing else about it moved.
 - **`403`**: called by IT Staff or an Administrator — this is a Requester's signal about their own Ticket.
 - **`404`**: not the authenticated Requester's Ticket.
 - **`409`**: the Ticket is already Resolved, Closed, or Cancelled, **or the signal has already been
@@ -131,6 +134,8 @@ One endpoint family serves Public Comments and Internal Notes, filtered by role 
   post a duplicate comment, and there is no endpoint to take either back. Both conditions are in
   the `WHERE` of the write rather than checked beforehand, so a second tab and a staff resolve
   landing in between are refused by the database instead of by a check made a moment earlier.
+  A client that receives this must reload the Ticket rather than retry: the 409 means its copy is
+  out of date, and a second attempt can only be refused the same way.
 
 ---
 

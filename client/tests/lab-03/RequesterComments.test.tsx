@@ -248,7 +248,73 @@ describe('AC-20 problem appears resolved (BR-05, BR-24)', () => {
     await openDetail()
 
     expect(screen.getByText(/you reported that this problem appears resolved/i)).toBeInTheDocument()
+    // Still open, so the Ticket is still waiting on IT Staff.
+    expect(screen.getByText(/will confirm and close the Ticket/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Problem appears resolved/i })).toBeNull()
+  })
+
+  it('stops promising a confirmation once the Ticket is settled', async () => {
+    mockApi({
+      ticket: {
+        ...TICKET,
+        currentStatus: 'CLOSED',
+        requesterResolvedAt: '2026-09-03T08:00:00.000Z',
+      },
+    })
+    await openDetail()
+
+    // The signal still happened and is still worth showing. What has stopped
+    // being true is the sentence about what happens next.
+    expect(screen.getByText(/you reported that this problem appears resolved/i)).toBeInTheDocument()
+    expect(screen.queryByText(/will confirm and close/i)).toBeNull()
+  })
+
+  it('reloads rather than retrying when the signal is already recorded', async () => {
+    // The mock reads this object on every Ticket GET, so mutating it is a
+    // second tab, or IT Staff, changing the Ticket between the two requests.
+    const ticket = { ...TICKET }
+    mockApi({
+      ticket,
+      resolve: () => {
+        ticket.requesterResolvedAt = '2026-09-03T08:00:00.000Z'
+        return Promise.resolve(
+          Response.json({ error: 'This Ticket can no longer be marked as resolved' }, { status: 409 }),
+        )
+      },
+    })
+    await openDetail()
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Problem appears resolved/i }))
+    await user.click(screen.getByRole('button', { name: /Yes, it appears resolved/i }))
+
+    // A 409 is this screen being out of date, not a failure to report. The
+    // person gets the state they were asking for, not a Retry that cannot work.
+    expect(await screen.findByText(/you reported that this problem appears resolved/i)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(resolveCalls).toBe(1)
+  })
+
+  it('takes the control away when IT Staff settled the Ticket first', async () => {
+    const ticket = { ...TICKET }
+    mockApi({
+      ticket,
+      resolve: () => {
+        ticket.currentStatus = 'RESOLVED'
+        return Promise.resolve(
+          Response.json({ error: 'This Ticket can no longer be marked as resolved' }, { status: 409 }),
+        )
+      },
+    })
+    await openDetail()
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /Problem appears resolved/i }))
+    await user.click(screen.getByRole('button', { name: /Yes, it appears resolved/i }))
+
+    await waitFor(() => expect(screen.getByText('Resolved')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /Problem appears resolved/i })).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('offers nothing on a Ticket that is already finished', async () => {

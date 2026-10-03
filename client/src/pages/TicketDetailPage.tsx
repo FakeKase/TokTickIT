@@ -234,6 +234,13 @@ export function TicketDetailPage() {
               setTicket({ ...ticket, requesterResolvedAt: signal.requesterResolvedAt })
               void loadComments()
             }}
+            onStale={() => {
+              // Both, because a refused signal means either could have moved:
+              // the Ticket's status and timestamp, and the thread that the
+              // other tab's signal appended a comment to.
+              void load()
+              void loadComments()
+            }}
           />
 
           <CommentThread

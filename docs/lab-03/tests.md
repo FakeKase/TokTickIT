@@ -121,7 +121,7 @@ is under test.
 | UI-14 | UI | AC-27, AC-28 | Ownership controls | Claim appears when unassigned; reassign lists only assignable users; both send the documented request | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
 | UI-15 | UI | AC-30, AC-31 | Priority and status controls | The status select offers only permitted transitions; a rejected transition shows the conflict message and reverts the control | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
 | UI-16 | UI | BR-04, ui-spec §5 | Two conversation streams | Public and internal composers are separate controls with distinct labels; posting through one never sends the other's visibility | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
-| UI-17 | UI | AC-34, AC-18, AC-20 | Requester Ticket Detail thread and resolved signal | Each entry shows its author, role and time; posting trims and clears only on success; a failed post keeps the text; no edit or delete control exists; nothing mentions Internal Notes; the signal confirms first, survives a reload, and is absent on a finished Ticket | `client/tests/lab-03/RequesterComments.test.tsx` | Pass |
+| UI-17 | UI | AC-34, AC-18, AC-20 | Requester Ticket Detail thread and resolved signal | Each entry shows its author, role and time; posting trims and clears only on success; a failed post keeps the text; no edit or delete control exists; nothing mentions Internal Notes; the signal confirms first, survives a reload, and is absent on a finished Ticket; a refused signal (`409`) reloads the Ticket instead of offering a Retry, so the screen ends up showing what the server actually holds; and the "IT Staff will confirm" promise disappears once the Ticket is settled | `client/tests/lab-03/RequesterComments.test.tsx` | Pass |
 | UI-18 | UI | AC-35, AC-36 | User list, search, role filter | Rows show Name, Email, Role, Status, Edit; search and filter refetch with the right query | `client/tests/lab-03/UserManagement.test.tsx` | Planned |
 | UI-19 | UI | AC-37 | Create-user dialog | Validates name, email, role, and initial password before sending; sends once | `client/tests/lab-03/UserManagement.test.tsx` | Planned |
 | UI-20 | UI | AC-38 | Duplicate email | A `409` attaches its message to the email field, not to a page-level banner | `client/tests/lab-03/UserManagement.test.tsx` | Planned |
@@ -239,7 +239,7 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 | 41 — Requester regression | `cd client && npm test` | 13 files, 121 tests passed |
 | 41 — Requester regression | `npm run e2e` | 27 specs passed |
 | 42 — Public Comments and resolved signal | `cd server && npm test` | 15 files, 185 tests passed |
-| 42 — Public Comments and resolved signal | `cd client && npm test` | 14 files, 134 tests passed |
+| 42 — Public Comments and resolved signal | `cd client && npm test` | 14 files, 137 tests passed |
 | 42 — Public Comments and resolved signal | `npm run e2e` | 27 specs passed |
 
 ## 7. Known Limitations or Deferred Tests
@@ -255,3 +255,15 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 - A session that expires mid-use now sends the person to Login rather than leaving them on a failure state: `apiFetch` reports any 401 from a protected endpoint to `AuthProvider`, which clears the session and lets the route guards do the rest (Issue #41). The auth endpoints are excluded, because a 401 from `login` is a wrong password and a 401 from `me` is an ordinary anonymous visitor. The exclusion is pinned by `ChangePassword.test.tsx`'s wrong-current-password case, which is the only place it can be: on Login the user is already anonymous, so clearing the session there changes nothing and a test cannot tell the difference.
 - **Lab 2's e2e coverage of the Development Requester selector was removed with the selector itself** (Issue #40). Seven specs and the Part 6 evidence block drove a screen that no longer exists. Their screenshots stay under `artifacts/lab-02/screenshots/` as evidence for a lab already submitted; Login's own evidence is captured by Lab 3's suite in Issue #46. The client suite likewise lost `RequesterContext.test.tsx` and `RequesterSelector.test.tsx`, 15 tests covering the deleted context.
 - **BR-06's "stored lower-cased" is not yet enforced anywhere.** Login lower-cases what it is given before looking a user up, and every row written so far is lower-case, so nothing is broken today. But no constraint or write path prevents a future endpoint storing `Alex.Morgan@…`, and the moment one does, that user cannot log in — the lookup would normalise while the stored value would not. Issue #45 owns the write paths (`POST`/`PATCH /api/users`) and must normalise there; a `CHECK (email = lower(email))` would make it impossible to get wrong, at the cost of turning a mistyped address into a constraint violation the API has to translate.
+- **The server suite fails intermittently with `socket hang up`, roughly one full run in ten.** It
+  has only ever appeared in `authorization.api.test.ts`, inside the `cookieFor` login helper, and
+  only when the whole suite runs: the file passes alone on repeat, and five consecutive full runs
+  after the failure were clean. There is no configured `testTimeout`, so Vitest's 5 s default
+  applies per test, and a login that exceeds it while files run in parallel would surface exactly
+  this way — the request is still in flight when the ephemeral Supertest server goes away. That is
+  a hypothesis, not a diagnosis: total suite duration on the failing run (9.05 s) was
+  indistinguishable from a clean one (8.93 s), which is what a single slow test among parallel
+  files looks like, but is not proof. Recorded rather than papered over with a longer timeout,
+  because raising the limit would hide the symptom without establishing the cause. The run recorded
+  in §6 is a clean one, and the discrepancy between 185 and the 182 first reported on PR #54 was
+  this flake: 182 passed of 185 on that run.

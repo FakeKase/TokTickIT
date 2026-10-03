@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ApiError, fetchTicket } from '../api'
-import type { RequestedPriority, TicketDetail } from '../api'
+import { ApiError, fetchComments, fetchTicket } from '../api'
+import type { RequestedPriority, TicketComment, TicketDetail } from '../api'
 import { Badge } from '../components/Badge'
 import type { BadgeTone } from '../components/Badge'
 import { AttachmentSection } from '../components/AttachmentSection'
+import { CommentThread } from '../components/CommentThread'
+import { ResolvedSignal } from '../components/ResolvedSignal'
 import { Card } from '../components/Card'
 import { ErrorState } from '../components/ErrorState'
 import { LoadingSpinner } from '../components/LoadingSpinner'
@@ -58,12 +60,13 @@ function ReadOnlyField({
 }
 
 /**
- * Requester Ticket Detail (ui-spec.md §6.4): a read-only header card plus the
- * Attachments panel, kept in separate cards so the acting controls are never
- * mixed into fields AC-17 requires to be inert.
+ * Requester Ticket Detail (ui-spec.md §6): a read-only header card, the
+ * Attachments panel, and - new in Lab 3 - the public comment thread and the
+ * "problem appears resolved" signal.
  *
- * Public Comments, Internal Notes, Actions Taken and any status control stay
- * out entirely (handout §4.2).
+ * Still no status control and no internal notes. The Requester says what they
+ * see; IT Staff decide what the Ticket is (BR-05), and an internal note never
+ * reaches this screen because the server does not send it (BR-04).
  */
 export function TicketDetailPage() {
   const { id } = useParams()
@@ -73,6 +76,8 @@ export function TicketDetailPage() {
   const { user: requester } = useAuth()
 
   const [ticket, setTicket] = useState<TicketDetail | null>(null)
+  const [comments, setComments] = useState<TicketComment[]>([])
+  const [commentsFailed, setCommentsFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -114,6 +119,42 @@ export function TicketDetailPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  /**
+   * The thread is loaded separately from the Ticket on purpose.
+   *
+   * Fetching both together means one failure takes the other down: a comments
+   * endpoint having a bad minute would replace a perfectly good Ticket with a
+   * page-wide error state. The Ticket is what the person came for, and the
+   * thread degrades to its own retry.
+   */
+  const loadComments = useCallback(
+    async (isCurrent: () => boolean = () => true) => {
+      if (!signedInUserId || !Number.isInteger(ticketId) || ticketId <= 0) return
+      setCommentsFailed(false)
+
+      try {
+        const thread = await fetchComments(ticketId)
+        // Dropped if the id moved on while this was in flight: a slow fetch
+        // for Ticket 41 must not land in the thread for Ticket 42.
+        if (isCurrent()) setComments(thread)
+      } catch {
+        if (isCurrent()) setCommentsFailed(true)
+      }
+    },
+    [signedInUserId, ticketId],
+  )
+
+  useEffect(() => {
+    let current = true
+    // Cleared first, so the previous Ticket's conversation is not on screen
+    // while this one loads.
+    setComments([])
+    void loadComments(() => current)
+    return () => {
+      current = false
+    }
+  }, [loadComments])
 
   if (!requester) return null
 
@@ -178,11 +219,38 @@ export function TicketDetailPage() {
       )}
 
       {!loading && ticket && (
-        <AttachmentSection
-          ticketId={ticket.id}
-          attachments={ticket.attachments}
-          onChange={(attachments) => setTicket({ ...ticket, attachments })}
-        />
+        <>
+          <AttachmentSection
+            ticketId={ticket.id}
+            attachments={ticket.attachments}
+            onChange={(attachments) => setTicket({ ...ticket, attachments })}
+          />
+
+          <ResolvedSignal
+            ticketId={ticket.id}
+            currentStatus={ticket.currentStatus}
+            resolvedAt={ticket.requesterResolvedAt ?? null}
+            onSignalled={(signal) => {
+              setTicket({ ...ticket, requesterResolvedAt: signal.requesterResolvedAt })
+              void loadComments()
+            }}
+            onStale={() => {
+              // Both, because a refused signal means either could have moved:
+              // the Ticket's status and timestamp, and the thread that the
+              // other tab's signal appended a comment to.
+              void load()
+              void loadComments()
+            }}
+          />
+
+          <CommentThread
+            ticketId={ticket.id}
+            comments={comments}
+            failed={commentsFailed}
+            onRetry={() => void loadComments()}
+            onPosted={(comment) => setComments((previous) => [...previous, comment])}
+          />
+        </>
       )}
     </div>
   )

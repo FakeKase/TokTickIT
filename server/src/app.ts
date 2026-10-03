@@ -36,6 +36,7 @@ import {
 } from "./lib/ticket-number.js";
 import { validateTicketInput } from "./lib/ticket-validation.js";
 import { parseTicketQuery } from "./lib/ticket-query.js";
+import { validateComment } from "./lib/comment-validation.js";
 import {
   ALLOWED_TYPES_LABEL,
   MAX_ACTIVE_ATTACHMENTS,
@@ -465,6 +466,9 @@ export function createApp(prisma = createPrismaClient()) {
           description: true,
           requestedPriority: true,
           currentStatus: true,
+          // BR-24: the Requester's "this looks fixed" signal, so the screen can
+          // show it after a reload rather than only in the session that sent it.
+          requesterResolvedAt: true,
           createdAt: true,
           updatedAt: true,
           requester: { select: { id: true, name: true } },
@@ -498,6 +502,239 @@ export function createApp(prisma = createPrismaClient()) {
       res.status(500).json({ error: "Unable to load the Ticket" });
     }
   });
+
+  /**
+   * Authenticated and past the first-login gate, with no role restriction.
+   *
+   * The comment endpoints serve all three roles, so the role decides what the
+   * caller may see and write rather than whether they may knock at all
+   * (BR-04). Spread where a route branches on role internally.
+   */
+  const asAnyUser = [requireAuth(prisma), requirePasswordChanged];
+
+  /**
+   * Resolves the Ticket a comment route is about, or the reason it cannot.
+   *
+   * The two roles fail differently on purpose. A Requester asking about
+   * somebody else's Ticket gets the same 404 as one that does not exist
+   * (BR-18) - they must not learn it is there. Staff may read any Ticket, so
+   * for them 404 means only that the id is wrong.
+   */
+  async function resolveCommentTicket(
+    user: { id: number; role: string },
+    // Express types a route param as string, but a wildcard route can hand
+    // over an array; Number() of one is NaN, which the guard below rejects.
+    rawId: string | string[],
+  ) {
+    const ticketId = Number(rawId);
+    if (!Number.isInteger(ticketId) || ticketId <= 0) return null;
+
+    const ticket = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      select: { id: true, requesterId: true, currentStatus: true },
+    });
+    if (!ticket) return null;
+
+    if (user.role === "REQUESTER" && ticket.requesterId !== user.id) return null;
+    return ticket;
+  }
+
+  /** The response shape for one comment (api-spec.md §6). */
+  const toComment = (comment: {
+    id: number;
+    ticketId: number;
+    visibility: string;
+    body: string;
+    createdAt: Date;
+    author: { id: number; name: string; role: string };
+  }) => ({
+    id: comment.id,
+    ticketId: comment.ticketId,
+    visibility: comment.visibility,
+    body: comment.body,
+    author: comment.author,
+    createdAt: comment.createdAt,
+  });
+
+  // api-spec.md §6.
+  app.get(
+    "/api/tickets/:id/comments",
+    ...asAnyUser,
+    async (req: AuthenticatedRequest, res) => {
+      const user = req.auth!.user;
+
+      if (user.role === "REQUESTER" && req.query.visibility === "INTERNAL") {
+        // Asked for explicitly, so answered explicitly: 403 rather than an
+        // empty list. A silent empty collection would read as "there are
+        // none", which is a different and false statement.
+        return res.status(403).json({
+          error: "You do not have permission to perform this action",
+        });
+      }
+
+      const ticket = await resolveCommentTicket(user, req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+      try {
+        const comments = await prisma.ticketComment.findMany({
+          // BR-04 applied as a WHERE clause, not a filter over the result: an
+          // internal note is never read out of the database for a Requester,
+          // so it cannot reach the response by being forgotten later.
+          where: {
+            ticketId: ticket.id,
+            ...(user.role === "REQUESTER" ? { visibility: "PUBLIC" as const } : {}),
+          },
+          // id as a same-direction tie-break: two comments written in the
+          // same millisecond would otherwise come back in either order, and a
+          // conversation that reorders itself between loads is worse than one
+          // that is a millisecond out.
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: {
+            id: true,
+            ticketId: true,
+            visibility: true,
+            body: true,
+            createdAt: true,
+            author: { select: { id: true, name: true, role: true } },
+          },
+        });
+
+        res.json(comments.map(toComment));
+      } catch {
+        res.status(500).json({ error: "Unable to load the comments" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/tickets/:id/comments",
+    ...asAnyUser,
+    async (req: AuthenticatedRequest, res) => {
+      const user = req.auth!.user;
+
+      // Ownership first, before the body is even looked at. The GET above
+      // refuses to tell a Requester whether somebody else's Ticket exists, and
+      // answering 400 or 403 here would answer a question 404 is meant to
+      // leave open.
+      const ticket = await resolveCommentTicket(user, req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+      const parsed = validateComment(req.body ?? {});
+      if (!parsed.ok) {
+        return res
+          .status(400)
+          .json({ error: "Validation failed", fields: parsed.fields });
+      }
+
+      if (parsed.value.visibility === "INTERNAL" && user.role === "REQUESTER") {
+        return res.status(403).json({
+          error: "You do not have permission to perform this action",
+        });
+      }
+
+      try {
+        const comment = await prisma.ticketComment.create({
+          data: {
+            ticketId: ticket.id,
+            // BR-27: author and timestamp come from the session and the
+            // database, never from the body. A client that sends either is
+            // ignored rather than corrected.
+            authorId: user.id,
+            visibility: parsed.value.visibility,
+            body: parsed.value.body,
+          },
+          select: {
+            id: true,
+            ticketId: true,
+            visibility: true,
+            body: true,
+            createdAt: true,
+            author: { select: { id: true, name: true, role: true } },
+          },
+        });
+
+        res.status(201).json(toComment(comment));
+      } catch {
+        res.status(500).json({ error: "Unable to post the comment" });
+      }
+    },
+  );
+
+  // api-spec.md §7 (FR-12, BR-05, BR-24).
+  app.post(
+    "/api/tickets/:id/requester-resolved",
+    ...asRequester,
+    async (req: AuthenticatedRequest, res) => {
+      const user = req.auth!.user;
+
+      const ticket = await resolveCommentTicket(user, req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+      if (
+        ticket.currentStatus === "RESOLVED" ||
+        ticket.currentStatus === "CLOSED" ||
+        ticket.currentStatus === "CANCELLED"
+      ) {
+        return res.status(409).json({
+          error: "This Ticket can no longer be marked as resolved",
+        });
+      }
+
+      try {
+        // One transaction, both guarantees. The WHERE is the guard that
+        // actually holds - already-signalled, or a status that moved to
+        // Resolved, Closed or Cancelled in the meantime - and the comment is
+        // written inside the same transaction, so there is no window where the
+        // timestamp exists without it. An earlier version committed the
+        // timestamp first and compensated on failure, which reintroduced
+        // exactly the gap the transaction was there to close.
+        const updated = await prisma.$transaction(async (tx) => {
+          const claimed = await tx.ticket.updateMany({
+            where: {
+              id: ticket.id,
+              requesterResolvedAt: null,
+              currentStatus: { notIn: ["RESOLVED", "CLOSED", "CANCELLED"] },
+            },
+            data: { requesterResolvedAt: new Date() },
+          });
+          if (claimed.count === 0) return null;
+
+          await tx.ticketComment.create({
+            data: {
+              ticketId: ticket.id,
+              authorId: user.id,
+              visibility: "PUBLIC",
+              body: "The Requester reported that this problem appears resolved.",
+            },
+          });
+
+          return tx.ticket.findUniqueOrThrow({
+            where: { id: ticket.id },
+            select: {
+              id: true,
+              // BR-24: never written by this route. Only IT Staff resolve or
+              // close a Ticket (BR-05); this is the Requester saying it looks
+              // fixed from where they are sitting.
+              currentStatus: true,
+              requesterResolvedAt: true,
+            },
+          });
+        });
+
+        if (!updated) {
+          return res
+            .status(409)
+            .json({ error: "This Ticket can no longer be marked as resolved" });
+        }
+
+        res.json(updated);
+      } catch {
+        res
+          .status(500)
+          .json({ error: "Unable to record that the problem appears resolved" });
+      }
+    },
+  );
 
   // api-spec.md §7. The auth chain runs first, so an anonymous or wrong-role
   // caller is turned away before multer writes anything; multer then parses the

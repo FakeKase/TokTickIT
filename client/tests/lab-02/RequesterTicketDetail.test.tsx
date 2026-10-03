@@ -29,6 +29,10 @@ function mockApi(detail: () => Promise<Response>) {
     const url = String(input)
     const auth = authRoutes(signedIn)(url)
     if (auth) return auth
+    // Lab 3 added the thread; without this it falls through to the list
+    // branch below and the detail screen gets a paginated object where it
+    // expects an array.
+    if (/\/api\/tickets\/\d+\/comments$/.test(url)) return Promise.resolve(Response.json([]))
     if (/\/api\/tickets\/\d+$/.test(url)) return detail()
     if (url.includes('/api/tickets')) {
       return Promise.resolve(
@@ -103,17 +107,28 @@ describe('Requester Ticket Detail', () => {
     expect(description.textContent).toContain('Second line.')
   })
 
-  it('handout §4.2: shows no Comments, Notes, Actions Taken or status control', async () => {
+  // Lab 2 asserted this screen had no comments at all, which handout §4.2 put
+  // out of scope for that sprint. Lab 3 Issue #42 adds the public thread and
+  // the "appears resolved" signal, so what is left to assert is the boundary
+  // that still holds: no internal notes, no Actions Taken, and no control that
+  // changes the Ticket's status (BR-05).
+  it('handout §4.6: no Internal Notes, no Actions Taken, no status control', async () => {
     mockApi(() => Promise.resolve(Response.json(TICKET)))
 
     await renderDetail()
     await screen.findByText('TKT-2026-000042')
 
-    for (const forbidden of [/public comment/i, /internal note/i, /actions taken/i]) {
+    for (const forbidden of [/internal note/i, /actions taken/i]) {
       expect(screen.queryByText(forbidden)).not.toBeInTheDocument()
     }
-    // Current Status is displayed, but nothing offers to change it.
-    expect(screen.queryByRole('button', { name: /change status|resolve|close/i })).not.toBeInTheDocument()
+
+    // Current Status is displayed, and nothing offers to change it. The
+    // resolved signal is not a status control: it is excluded by name below so
+    // this assertion cannot pass by accident if one is ever added.
+    const statusControl = screen
+      .queryAllByRole('button')
+      .filter((button) => /change status|mark .*(resolved|closed)|close ticket/i.test(button.textContent ?? ''))
+    expect(statusControl).toHaveLength(0)
   })
 
   it('AC-03/BR-08: a 404 is reported without claiming the Ticket exists', async () => {

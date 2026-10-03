@@ -342,6 +342,7 @@ export interface TicketAttachment {
 export interface TicketDetail {
   id: number
   ticketNumber: string
+  requesterResolvedAt?: string | null
   requester: { id: number; name: string }
   category: { id: number; name: string }
   relatedSystem: { id: number; name: string }
@@ -368,6 +369,67 @@ export async function fetchTicket(ticketId: number): Promise<TicketDetail> {
   }
 
   return (await response.json()) as TicketDetail
+}
+
+export type CommentVisibility = 'PUBLIC' | 'INTERNAL'
+
+/** One entry on a Ticket's thread (api-spec.md §6). A Requester only ever
+ *  receives `PUBLIC` entries; an internal note is filtered out of the
+ *  collection server-side, not hidden here (BR-04). */
+export interface TicketComment {
+  id: number
+  ticketId: number
+  visibility: CommentVisibility
+  body: string
+  author: { id: number; name: string; role: Role }
+  createdAt: string
+}
+
+export async function fetchComments(ticketId: number): Promise<TicketComment[]> {
+  const response = await apiFetch(`/api/tickets/${ticketId}/comments`)
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to load the comments')
+  }
+
+  return (await response.json()) as TicketComment[]
+}
+
+/** `visibility` is deliberately not a parameter: this is the Requester's
+ *  composer, and the server refuses INTERNAL from them anyway (BR-04). Issue
+ *  #44 adds the IT Staff composer that needs the choice. */
+export async function postComment(ticketId: number, body: string): Promise<TicketComment> {
+  const response = await apiFetch(`/api/tickets/${ticketId}/comments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to post the comment')
+  }
+
+  return (await response.json()) as TicketComment
+}
+
+export interface ResolvedSignal {
+  id: number
+  currentStatus: string
+  requesterResolvedAt: string
+}
+
+/** api-spec.md §7. Records the signal and posts the comment that carries it;
+ *  the Ticket's status is untouched (BR-24). */
+export async function markProblemResolved(ticketId: number): Promise<ResolvedSignal> {
+  const response = await apiFetch(`/api/tickets/${ticketId}/requester-resolved`, {
+    method: 'POST',
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to record that the problem appears resolved')
+  }
+
+  return (await response.json()) as ResolvedSignal
 }
 
 /**

@@ -1,0 +1,90 @@
+/* Public Comments (ui-spec.md §6). One column, oldest first, with the author
+   and role above each entry — a thread where you cannot see who said something
+   is not a conversation. */
+
+.ttk-thread__head {
+  margin-bottom: var(--zg-space-4);
+}
+
+.ttk-thread__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--zg-text);
+}
+
+.ttk-thread__note {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--zg-text);
+  opacity: 0.75;
+}
+
+.ttk-thread__empty {
+  margin: 0 0 var(--zg-space-4);
+  color: var(--zg-text);
+  opacity: 0.75;
+}
+
+.ttk-thread__list {
+  list-style: none;
+  margin: 0 0 var(--zg-space-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-3);
+}
+
+.ttk-thread__item {
+  padding: 12px 14px;
+  background: var(--zg-pale);
+  border-radius: 8px;
+}
+
+.ttk-thread__meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.ttk-thread__author {
+  font-weight: 600;
+  color: var(--zg-text);
+}
+
+.ttk-thread__role {
+  padding: 1px 8px;
+  border: 1px solid var(--zg-border);
+  border-radius: 999px;
+  color: var(--zg-text);
+  opacity: 0.8;
+}
+
+.ttk-thread__when {
+  margin-left: auto;
+  color: var(--zg-text);
+  opacity: 0.7;
+}
+
+/* Preserves the line breaks somebody typed, without letting a pasted wall of
+   text widen the card. */
+.ttk-thread__body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--zg-text);
+}
+
+.ttk-thread__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-3);
+  align-items: flex-start;
+}
+
+.ttk-thread__form textarea {
+  resize: vertical;
+}

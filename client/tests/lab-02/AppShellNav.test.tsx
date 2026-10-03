@@ -72,6 +72,9 @@ describe('Primary nav active state', () => {
       // The nav is what this file tests, but a Ticket Detail route still has to
       // render something: an unparseable answer throws inside the page and
       // takes the shell - and therefore the nav - down with it.
+      // Lab 3's thread lives under the same prefix, so it is matched first:
+      // handing the detail object to fetchComments throws inside the thread.
+      if (/\/api\/tickets\/\d+\/comments/.test(url)) return Promise.resolve(Response.json([]))
       if (/\/api\/tickets\/\d+/.test(url)) return Promise.resolve(Response.json(TICKET_DETAIL))
       return Promise.resolve(Response.json([]))
     }) as typeof fetch)

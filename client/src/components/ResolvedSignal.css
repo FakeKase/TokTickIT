@@ -1,0 +1,30 @@
+/* The Requester's "this looks fixed" signal (ui-spec.md §6). Pale green when
+   sent, so it reads as information rather than as a control still waiting to
+   be used. */
+
+.ttk-resolved__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zg-space-3);
+}
+
+.ttk-resolved__prompt {
+  margin: 0 0 var(--zg-space-3);
+  color: var(--zg-text);
+  line-height: 1.5;
+}
+
+.ttk-resolved--done {
+  background: var(--zg-pale);
+}
+
+.ttk-resolved__done {
+  margin: 0;
+  color: var(--zg-text);
+  line-height: 1.5;
+}
+
+.ttk-resolved__error {
+  margin: 0 0 var(--zg-space-3);
+  color: var(--zg-error);
+}

@@ -51,7 +51,11 @@ function mockApi(respond: (body: { email: string; password: string }) => Respons
 
 const fillAndSubmit = async (email: string, password: string) => {
   const user = userEvent.setup()
-  await user.type(screen.getByLabelText(/Email address/i), email)
+  // findBy, not getBy: a caller that arrives here by redirect has only waited
+  // for the URL to change, and the URL changes before React has painted the
+  // form. A synchronous query then throws, which is where this file's
+  // intermittent failures were coming from.
+  await user.type(await screen.findByLabelText(/Email address/i), email)
   await user.type(screen.getByLabelText(/^Password/i), password)
   await user.click(screen.getByRole('button', { name: /Sign in/i }))
 }
@@ -127,7 +131,10 @@ describe('the remembered destination (review of PR #52)', () => {
     mockApi(() => Response.json({ user: authUser({ role: 'REQUESTER' }) }))
     window.history.pushState({}, '', '/tickets/42')
     await renderApp()
-    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+    // Waited for by content: the redirect changes the URL before the Login
+    // screen exists, so a pathname assertion can pass too early.
+    await screen.findByRole('heading', { name: /Sign in/i })
+    expect(window.location.pathname).toBe('/login')
 
     await fillAndSubmit('peter.parker@toktickit.test', 'ChangeMe123!')
 
@@ -143,7 +150,10 @@ describe('the remembered destination (review of PR #52)', () => {
     mockApi(() => Response.json({ user: authUser({ role: 'IT_STAFF' }) }))
     window.history.pushState({}, '', '/tickets/42')
     await renderApp()
-    await waitFor(() => expect(window.location.pathname).toBe('/login'))
+    // Waited for by content: the redirect changes the URL before the Login
+    // screen exists, so a pathname assertion can pass too early.
+    await screen.findByRole('heading', { name: /Sign in/i })
+    expect(window.location.pathname).toBe('/login')
 
     await fillAndSubmit('sarah.chen@toktickit.test', 'ChangeMe123!')
 

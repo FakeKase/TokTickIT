@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "../../src/app.js";
 import { createPrismaClient } from "../../src/prisma.js";
@@ -348,12 +348,41 @@ describe("API-20 Problem Appears Resolved (AC-20, BR-05, BR-24)", () => {
     expect(await prisma.ticketComment.count({ where: { ticketId } })).toBe(0);
   });
 
-  it("leaves no half-written signal when it fails", async () => {
-    // The timestamp and its comment are one event: a 409 must write neither.
-    await prisma.ticket.update({ where: { id: ticketId }, data: { currentStatus: "CLOSED" } });
+  it("writes neither half when the comment fails", async () => {
+    // The 409 cases return before touching anything, so they prove nothing
+    // about atomicity. This makes the second write fail inside the
+    // transaction, which is the only way to tell a real transaction from a
+    // timestamp that commits first and is compensated afterwards.
+    const failing = createPrismaClient();
+    const brokenApp = createApp(failing);
 
-    await signal(ownerCookie);
+    // The transaction client is a different object from the top-level one, so
+    // spying on `failing.ticketComment` would never be reached. This wraps the
+    // real transaction and breaks only the comment write inside it, leaving
+    // the rest - including the rollback - genuinely in Postgres's hands.
+    const runTransaction = failing.$transaction.bind(failing);
+    vi.spyOn(failing, "$transaction").mockImplementation((async (
+      callback: (tx: unknown) => Promise<unknown>,
+    ) =>
+      runTransaction(async (tx: Record<string, unknown>) =>
+        callback({
+          ...tx,
+          ticketComment: {
+            create: () => Promise.reject(new Error("connection terminated unexpectedly")),
+          },
+        }),
+      )) as never);
 
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await request(brokenApp)
+      .post(`/api/tickets/${ticketId}/requester-resolved`)
+      .set("Cookie", ownerCookie);
+
+    quiet.mockRestore();
+    await failing.$disconnect();
+
+    expect(response.status).toBe(500);
     const after = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
     expect(after.requesterResolvedAt).toBeNull();
     expect(await prisma.ticketComment.count({ where: { ticketId } })).toBe(0);

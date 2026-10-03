@@ -676,41 +676,29 @@ export function createApp(prisma = createPrismaClient()) {
         ticket.currentStatus === "CANCELLED"
       ) {
         return res.status(409).json({
-          error: "This Ticket has already been resolved or closed",
+          error: "This Ticket can no longer be marked as resolved",
         });
       }
 
       try {
-        // The guard that actually holds, as opposed to the one above it, which
-        // only produces a better message. Both conditions live in the WHERE,
-        // so a second submit from another tab and a staff resolve landing in
-        // between are refused by the database rather than by a check made a
-        // moment earlier: updateMany reports 0 rows and nothing is written.
-        const claimed = await prisma.ticket.updateMany({
-          where: {
-            id: ticket.id,
-            requesterResolvedAt: null,
-            currentStatus: { notIn: ["RESOLVED", "CLOSED", "CANCELLED"] },
-          },
-          data: { requesterResolvedAt: new Date() },
-        });
-
-        if (claimed.count === 0) {
-          return res.status(409).json({
-            error: "This Ticket has already been resolved or closed",
-          });
-        }
-      } catch {
-        return res
-          .status(500)
-          .json({ error: "Unable to record that the problem appears resolved" });
-      }
-
-      try {
-        // The comment that carries the signal. BR-24 pairs the two, so a
-        // failure here has to undo the timestamp above - a signal nobody can
-        // see in the thread is the half that fails silently.
+        // One transaction, both guarantees. The WHERE is the guard that
+        // actually holds - already-signalled, or a status that moved to
+        // Resolved, Closed or Cancelled in the meantime - and the comment is
+        // written inside the same transaction, so there is no window where the
+        // timestamp exists without it. An earlier version committed the
+        // timestamp first and compensated on failure, which reintroduced
+        // exactly the gap the transaction was there to close.
         const updated = await prisma.$transaction(async (tx) => {
+          const claimed = await tx.ticket.updateMany({
+            where: {
+              id: ticket.id,
+              requesterResolvedAt: null,
+              currentStatus: { notIn: ["RESOLVED", "CLOSED", "CANCELLED"] },
+            },
+            data: { requesterResolvedAt: new Date() },
+          });
+          if (claimed.count === 0) return null;
+
           await tx.ticketComment.create({
             data: {
               ticketId: ticket.id,
@@ -733,15 +721,14 @@ export function createApp(prisma = createPrismaClient()) {
           });
         });
 
+        if (!updated) {
+          return res
+            .status(409)
+            .json({ error: "This Ticket can no longer be marked as resolved" });
+        }
+
         res.json(updated);
       } catch {
-        // Put the Ticket back as it was: the signal and its comment are one
-        // event, and leaving the timestamp without the comment would show a
-        // badge for something the thread never mentions.
-        await prisma.ticket
-          .update({ where: { id: ticket.id }, data: { requesterResolvedAt: null } })
-          .catch(() => {});
-
         res
           .status(500)
           .json({ error: "Unable to record that the problem appears resolved" });

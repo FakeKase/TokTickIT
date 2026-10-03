@@ -64,7 +64,7 @@ is under test.
 | API-17 | API | AC-19, BR-25 | Empty and whitespace-only bodies, and one over 2000 characters | `400`; nothing stored | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
 | API-18 | API | AC-34, BR-04 | Visibility filtering | A Requester's comment list contains the public entries and no trace of the internal ones — not a redacted entry, not a count | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
 | API-19 | API | BR-04, BR-16 | Requester posts with `visibility: INTERNAL` | `403`; nothing stored | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
-| API-20 | API | AC-20, BR-24 | Problem appears resolved | `200`; `requesterResolvedAt` set; `currentStatus` unchanged; an accompanying Public Comment exists. A second signal is `409` and writes no duplicate, and a failure part-way leaves neither the timestamp nor the comment | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
+| API-20 | API | AC-20, BR-24 | Problem appears resolved | `200`; `requesterResolvedAt` set; `currentStatus` unchanged; an accompanying Public Comment exists. A second signal is `409` and writes no duplicate; the first timestamp does not move when one is refused; and a comment write that fails inside the transaction leaves neither the timestamp nor the comment | `server/tests/lab-03/comments-notes.api.test.ts` | Pass |
 
 ### API — IT Staff queue and detail
 

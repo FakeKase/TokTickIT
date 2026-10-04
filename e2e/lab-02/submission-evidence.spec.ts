@@ -8,6 +8,10 @@ import {
   firstRequester,
   secondRequester,
   selectRequester,
+  sessionCookieFor,
+  signInThroughLogin,
+  signOut,
+  DEV_PASSWORD,
   shot,
 } from './helpers'
 
@@ -25,93 +29,11 @@ import {
 
 const DESCRIPTION = `Reported during the ${FIXTURE_MARKER}, with enough body text for the Detail screen to render realistically.`
 
-test.describe('Part 6 — Development Requester Selection', () => {
-  test('screen, dropdown, selected-user display and Change Requester action', async ({
-    page,
-    request,
-  }) => {
-    await page.setViewportSize(VIEWPORTS.desktop)
-    const requester = await firstRequester(request)
-
-    // --- The Selection screen itself ------------------------------------
-    await page.goto('/tickets')
-    await expect(page).toHaveURL(/\/select-requester$/)
-    await expect(
-      page.getByText(/Select a Development Requester to test requester-specific/i),
-    ).toBeVisible()
-    await expect(page.getByText(/not a login screen/i)).toBeVisible()
-    await page.screenshot({ path: shot('dev-requester-selection', 'screen'), fullPage: true })
-
-    // --- The Requester options, loaded and selectable --------------------
-    // A native <select> popup is painted by the browser's own UI layer rather
-    // than by the page, so page.screenshot() cannot photograph it expanded on
-    // any browser. Focusing it only draws a focus ring, which is why the
-    // earlier capture was 0.017% different from 'screen' above and showed the
-    // "Choose a Requester…" placeholder rather than any Requester at all.
-    // The option list is proven by assertion; the capture carries the part a
-    // screenshot honestly can — a real Requester chosen and displayed.
-    const dropdown = page.getByLabel('Development Requester')
-    const options = await dropdown.locator('option').allInnerTexts()
-    // BR-04: only active Requesters are offered. The inactive seed row must
-    // not appear among them.
-    expect(options.length).toBeGreaterThan(1)
-    expect(options.join('|')).not.toContain('David Kim')
-    await dropdown.selectOption(String(requester.id))
-    await expect(dropdown).toHaveValue(String(requester.id))
-    // The chosen Requester's name must be on screen, so the file cannot drift
-    // from what its name claims.
-    await expect(dropdown.locator('option:checked')).toContainText(requester.name)
-    await page.screenshot({
-      path: shot('dev-requester-selection', 'requester-options-loaded'),
-      fullPage: true,
-    })
-
-    // --- Continue, and the selected user showing in the shell ------------
-    await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page).toHaveURL(/\/tickets$/)
-    const header = page.locator('.ttk-shell__requester')
-    await expect(header).toContainText(requester.name)
-    await page.screenshot({
-      path: shot('dev-requester-selection', 'selected-user-display'),
-      fullPage: true,
-    })
-
-    // --- The Change Requester action, actually taken ---------------------
-    // Captured after the click, on the screen it returns to, so the file
-    // shows the action's effect rather than the button sitting unused.
-    await page.getByRole('link', { name: /Change Requester/i }).click()
-    await expect(page).toHaveURL(/\/select-requester$/)
-    await expect(page.getByLabel('Development Requester')).toBeVisible()
-    await page.screenshot({
-      path: shot('dev-requester-selection', 'change-requester-action'),
-      fullPage: true,
-    })
-  })
-
-  test('loading and failure states', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.desktop)
-
-    // --- Loading: hold the response open long enough to capture ----------
-    await page.route('**/api/requesters', async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-      await route.continue()
-    })
-    await page.goto('/select-requester')
-    await expect(page.getByText(/Loading Development Requesters/i)).toBeVisible()
-    await page.screenshot({ path: shot('dev-requester-selection', 'loading'), fullPage: true })
-    await page.unroute('**/api/requesters')
-
-    // --- Failure: AC-24, a safe message and a Retry ----------------------
-    await page.route('**/api/requesters', (route) => route.abort('failed'))
-    await page.goto('/select-requester')
-    const alert = page.getByRole('alert')
-    await expect(alert).toContainText(/Unable to load Development Requesters/i)
-    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
-    // The safe message must not leak the underlying failure.
-    await expect(alert).not.toContainText(/fetch|network|ECONN/i)
-    await page.screenshot({ path: shot('dev-requester-selection', 'failure'), fullPage: true })
-  })
-})
+// The "Part 6 — Development Requester Selection" block that stood here covered
+// the selector screen, which Lab 3 replaced with real authentication (Issue
+// #40). Its screenshots remain under artifacts/lab-02/screenshots/ as evidence
+// for a lab that has already been submitted; the tests could not outlive the
+// screen they drove. Login's own evidence is captured by Lab 3's suite.
 
 test.describe('Part 6 — Create Ticket submitting state', () => {
   test('submit is busy and disabled while the request is in flight (AC-06)', async ({
@@ -154,10 +76,10 @@ test.describe('Part 7 — My Tickets', () => {
     const a = await firstRequester(request)
     const b = await secondRequester(request)
 
-    const ownedByA = await createTicket(request, a.id, {
+    const ownedByA = await createTicket(request, a, {
       summary: `Belongs to ${a.name} ${Date.now()}`,
     })
-    const ownedByB = await createTicket(request, b.id, {
+    const ownedByB = await createTicket(request, b, {
       summary: `Belongs to ${b.name} ${Date.now()}`,
     })
 
@@ -170,10 +92,11 @@ test.describe('Part 7 — My Tickets', () => {
     await page.screenshot({ path: shot('my-tickets', 'requester-a-list'), fullPage: true })
 
     // --- Switch to B, and A's Ticket is gone -----------------------------
-    await page.getByRole('link', { name: /Change Requester/i }).click()
-    await page.getByLabel('Development Requester').selectOption(String(b.id))
-    await page.getByRole('button', { name: 'Continue' }).click()
-    await expect(page.locator('.ttk-shell__requester')).toContainText(b.name)
+    // There is no "Change Requester" any more: being somebody else means
+    // signing in as them.
+    await signOut(page)
+    await signInThroughLogin(page, b)
+    await expect(page.locator('.ttk-shell__identity')).toContainText(b.name)
 
     await page.getByLabel(/^Search/).fill(ownedByA.ticketNumber)
     await page.getByRole('button', { name: 'Apply' }).click()
@@ -193,7 +116,7 @@ test.describe('Part 7 — My Tickets', () => {
     // Enough rows to page. Created up front so the list has depth to sort.
     const categories = await request.get(`${API}/api/categories`).then((r) => r.json())
     for (let i = 0; i < 12; i += 1) {
-      await createTicket(request, requester.id, {
+      await createTicket(request, requester, {
         summary: `Evidence ticket ${i + 1} — ${['VPN', 'printer', 'laptop'][i % 3]} issue`,
         categoryId: categories[i % categories.length].id,
         requestedPriority: (['LOW', 'MEDIUM', 'HIGH'] as const)[i % 3],
@@ -261,7 +184,7 @@ test.describe('Part 8 — Ticket Detail and attachments', () => {
   }) => {
     await page.setViewportSize(VIEWPORTS.desktop)
     const requester = await firstRequester(request)
-    const ticket = await createTicket(request, requester.id, {
+    const ticket = await createTicket(request, requester, {
       summary: `Attachment lifecycle ${Date.now()}`,
     })
     await selectRequester(page, requester)
@@ -321,8 +244,10 @@ test.describe('Part 8 — Ticket Detail and attachments', () => {
     // --- The removed file is no longer downloadable (AC-21, BR-26) -------
     // Asserted against the API, since the block is a server rule and the page
     // simply stops offering the link. Both halves are evidence.
-    const blockedUrl = `${API}/api/attachments/${attachmentId}/download?requesterId=${requester.id}`
-    const blocked = await request.get(blockedUrl)
+    const blockedUrl = `${API}/api/attachments/${attachmentId}/download`
+    const blocked = await request.get(blockedUrl, {
+      headers: { Cookie: await sessionCookieFor(request, requester.email) },
+    })
     expect(blocked.status()).toBe(404)
 
     // Navigated to directly, so the refusal is what the screenshot shows.
@@ -346,10 +271,10 @@ test.describe('Part 8 — Ticket Detail and attachments', () => {
     const owner = await firstRequester(request)
     const other = await secondRequester(request)
 
-    const ticket = await createTicket(request, owner.id, {
+    const ticket = await createTicket(request, owner, {
       summary: `Unauthorized-access evidence ${Date.now()}`,
     })
-    const attachment = await attachFile(request, ticket.id, owner.id, 'private-evidence.png')
+    const attachment = await attachFile(request, ticket.id, owner, 'private-evidence.png')
 
     // The other Requester, navigating directly to the URL.
     await selectRequester(page, other)
@@ -364,13 +289,17 @@ test.describe('Part 8 — Ticket Detail and attachments', () => {
 
     // AC-34: the same 404 for the Attachment's metadata, download and removal,
     // identical to a nonexistent id.
+    // As the other Requester: the identity is their session, not a parameter
+    // they chose (BR-03).
+    const asOther = { Cookie: await sessionCookieFor(request, other.email) }
     const [metadata, download, removal, nonexistent] = await Promise.all([
-      request.get(`${API}/api/attachments/${attachment.id}?requesterId=${other.id}`),
-      request.get(`${API}/api/attachments/${attachment.id}/download?requesterId=${other.id}`),
+      request.get(`${API}/api/attachments/${attachment.id}`, { headers: asOther }),
+      request.get(`${API}/api/attachments/${attachment.id}/download`, { headers: asOther }),
       request.delete(`${API}/api/attachments/${attachment.id}`, {
-        data: { requesterId: other.id, reason: 'not mine to remove' },
+        headers: asOther,
+        data: { reason: 'not mine to remove' },
       }),
-      request.get(`${API}/api/attachments/999999999?requesterId=${other.id}`),
+      request.get(`${API}/api/attachments/999999999`, { headers: asOther }),
     ])
     expect([metadata.status(), download.status(), removal.status()]).toEqual([404, 404, 404])
     expect(await metadata.json()).toEqual(await nonexistent.json())

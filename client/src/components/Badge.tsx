@@ -6,8 +6,12 @@ import type { ReactNode } from 'react'
  * - warning: amber tint (Medium priority)
  * - danger: error-red tint (High priority)
  * - neutral: fallback for anything not yet covered by the spec
+ *
+ * Lab 3 (ui-spec.md §3) adds:
+ * - active: secondary-green tint (In Progress)
+ * - urgent: solid red, white text (Urgent IT Priority) — the only filled badge
  */
-export type BadgeTone = 'neutral' | 'pale' | 'warning' | 'danger'
+export type BadgeTone = 'neutral' | 'pale' | 'warning' | 'danger' | 'active' | 'urgent'
 
 export interface BadgeProps {
   tone?: BadgeTone

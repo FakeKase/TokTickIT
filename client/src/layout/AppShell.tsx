@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
-import { useSelectedRequester } from '../requester/useSelectedRequester'
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../auth/useAuth'
+import type { Role } from '../api'
+import { Badge } from '../components/Badge'
 import { ThemeToggle } from '../theme/ThemeToggle'
 import './AppShell.css'
 
@@ -13,35 +15,83 @@ import './AppShell.css'
  * Adding `end` would fix that but then leave no item indicated at all while
  * reading a ticket, which handout §8 asks for.
  */
-const NAV_ITEMS = [
-  {
-    to: '/tickets',
-    label: 'My Tickets',
-    // The list and every ticket detail, but not the create form.
-    isActive: (pathname: string) =>
-      pathname === '/tickets' ||
-      (pathname.startsWith('/tickets/') && pathname !== '/tickets/new'),
-  },
-  {
-    to: '/tickets/new',
-    label: 'Create Ticket',
-    isActive: (pathname: string) => pathname === '/tickets/new',
-  },
-]
+interface NavItem {
+  to: string
+  label: string
+  isActive: (pathname: string) => boolean
+}
 
 /**
- * Application shell: header, primary nav, and the current-Requester area
- * (ui-spec.md §5). The Requester name comes from the selection context, and
- * "Change Requester" returns to the selector, which replaces the selection
- * outright per BR-05.
+ * Navigation per role (ui-spec.md §2). Items a role may not reach are not
+ * rendered at all, rather than rendered and disabled: a disabled link to a
+ * place you can never go is an invitation, and the server refuses the route
+ * regardless of what this table says.
+ */
+const NAV_BY_ROLE: Record<Role, NavItem[]> = {
+  REQUESTER: [
+    {
+      to: '/tickets',
+      label: 'My Tickets',
+      // The list and every ticket detail, but not the create form.
+      isActive: (pathname) =>
+        pathname === '/tickets' ||
+        (pathname.startsWith('/tickets/') && pathname !== '/tickets/new'),
+    },
+    {
+      to: '/tickets/new',
+      label: 'Create Ticket',
+      isActive: (pathname) => pathname === '/tickets/new',
+    },
+  ],
+  IT_STAFF: [
+    {
+      to: '/staff/tickets',
+      label: 'Ticket Queue',
+      isActive: (pathname) => pathname.startsWith('/staff/tickets'),
+    },
+  ],
+  ADMINISTRATOR: [
+    {
+      to: '/staff/tickets',
+      label: 'Ticket Queue',
+      isActive: (pathname) => pathname.startsWith('/staff/tickets'),
+    },
+    {
+      to: '/admin/users',
+      label: 'User Management',
+      isActive: (pathname) => pathname.startsWith('/admin/users'),
+    },
+  ],
+}
+
+const ROLE_LABEL: Record<Role, string> = {
+  REQUESTER: 'Requester',
+  IT_STAFF: 'IT Staff',
+  ADMINISTRATOR: 'Administrator',
+}
+
+/**
+ * Application shell: header, role-specific nav, and the signed-in user
+ * (ui-spec.md §2). Lab 2's Requester selector and its "Change Requester"
+ * action are gone; the identity here is the authenticated session, and the
+ * only way to change it is to sign out.
  */
 export function AppShell() {
   const [navOpen, setNavOpen] = useState(false)
-  const { requester } = useSelectedRequester()
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
   const { pathname } = useLocation()
+
+  const navItems = user ? NAV_BY_ROLE[user.role] : []
 
   function closeNav() {
     setNavOpen(false)
+  }
+
+  async function handleSignOut() {
+    closeNav()
+    await signOut()
+    navigate('/login', { replace: true })
   }
 
   return (
@@ -70,7 +120,7 @@ export function AppShell() {
             className={`ttk-shell__nav ${navOpen ? 'ttk-shell__nav--open' : ''}`}
             aria-label="Primary"
           >
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const active = item.isActive(pathname)
 
               return (
@@ -87,34 +137,33 @@ export function AppShell() {
             })}
           </nav>
 
-          <div className="ttk-shell__requester">
+          <div className="ttk-shell__identity">
             <ThemeToggle />
-            <span className="ttk-shell__requester-name">
-              {requester ? (
-                <>
-                  <span className="ttk-visually-hidden">Signed in for testing as </span>
-                  {requester.name}
-                </>
-              ) : (
-                'No Requester selected'
-              )}
-            </span>
-            {/* The full label does not fit beside the wordmark, toggle and
-                menu control at 375px, so mobile shows a shortened one. The
+            {user && (
+              <span className="ttk-shell__user">
+                <span className="ttk-shell__user-name">
+                  <span className="ttk-visually-hidden">Signed in as </span>
+                  {user.name}
+                </span>
+                <Badge className="ttk-shell__role">{ROLE_LABEL[user.role]}</Badge>
+              </span>
+            )}
+            {/* The full label does not fit beside the wordmark, toggle and menu
+                control at 375px, so mobile shows a shortened one. The
                 accessible name stays the full phrase either way. */}
-            <Link
-              to="/select-requester"
-              className="ttk-btn ttk-btn--tertiary ttk-shell__change-requester"
-              aria-label={requester ? 'Change Requester' : 'Select Requester'}
-              onClick={closeNav}
+            <button
+              type="button"
+              className="ttk-btn ttk-btn--tertiary ttk-shell__signout"
+              aria-label="Log out"
+              onClick={() => {
+                void handleSignOut()
+              }}
             >
-              <span className="ttk-shell__change-long">
-                {requester ? 'Change Requester' : 'Select Requester'}
+              <span className="ttk-shell__signout-long">Log out</span>
+              <span className="ttk-shell__signout-short" aria-hidden="true">
+                Out
               </span>
-              <span className="ttk-shell__change-short" aria-hidden="true">
-                {requester ? 'Change' : 'Select'}
-              </span>
-            </Link>
+            </button>
           </div>
         </div>
       </header>

@@ -56,7 +56,7 @@
   border-bottom-color: var(--zg-nav-active);
 }
 
-.ttk-shell__requester {
+.ttk-shell__identity {
   display: flex;
   align-items: center;
   gap: var(--zg-space-3);
@@ -64,19 +64,43 @@
   white-space: nowrap;
 }
 
-.ttk-shell__requester-name {
+/* Name and role badge as one unit that can give way. The longest role label,
+   "Administrator", does not fit beside the other header controls on a phone,
+   so the badge truncates rather than pushing the header wider than the screen
+   (ui-spec.md §9). The gap also keeps the name from running into the badge. */
+.ttk-shell__identity,
+.ttk-shell__user {
+  min-width: 0;
+}
+
+.ttk-shell__user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zg-space-2);
+  flex-shrink: 1;
+}
+
+.ttk-shell__role {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttk-shell__user-name {
   color: #ffffff;
   font-size: 14px;
 }
 
-.ttk-shell__change-requester.ttk-btn--tertiary {
+.ttk-shell__signout.ttk-btn--tertiary {
   color: #ffffff;
 }
 
 /* Only one of these is ever rendered; the hidden one leaves the
    accessibility tree with it, and the link's aria-label carries the full
    phrase regardless of which is visible. */
-.ttk-shell__change-short {
+.ttk-shell__signout-short {
   display: none;
 }
 
@@ -140,11 +164,11 @@
     padding: var(--zg-space-2) var(--zg-space-4);
   }
 
-  .ttk-shell__change-long {
+  .ttk-shell__signout-long {
     display: none;
   }
 
-  .ttk-shell__change-short {
+  .ttk-shell__signout-short {
     display: inline;
   }
 
@@ -186,12 +210,13 @@
     border-bottom-color: var(--zg-nav-active);
   }
 
-  .ttk-shell__requester {
+  .ttk-shell__identity {
     order: 2;
     margin-left: 0;
+    gap: var(--zg-space-2);
   }
 
-  .ttk-shell__requester-name {
+  .ttk-shell__user-name {
     display: none;
   }
 }

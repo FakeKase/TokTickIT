@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import App from '../../src/App'
+import { MemoryRouter } from 'react-router-dom'
+import { CheckSystemPage } from '../../src/pages/CheckSystemPage'
 
+// Rendered as the page rather than through <App />: Lab 3 put every screen
+// behind a session, and these tests are about the Check System screen itself.
 // UI-02 (Issue 3): The app fetches and displays the four IT request categories
 // in a grid layout. Tests cover success (categories render) and failure (error
 // message when fetch fails).
@@ -31,7 +34,11 @@ describe('UI-02 Category list', () => {
     )
     const user = userEvent.setup()
 
-    render(<App />)
+    render(
+      <MemoryRouter>
+        <CheckSystemPage />
+      </MemoryRouter>,
+    )
     await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     await waitFor(() => {
@@ -51,7 +58,11 @@ describe('UI-02 Category list', () => {
     )
     const user = userEvent.setup()
 
-    render(<App />)
+    render(
+      <MemoryRouter>
+        <CheckSystemPage />
+      </MemoryRouter>,
+    )
     await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     await waitFor(() => {
@@ -71,7 +82,11 @@ describe('UI-02 Category list', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'))
     const user = userEvent.setup()
 
-    render(<App />)
+    render(
+      <MemoryRouter>
+        <CheckSystemPage />
+      </MemoryRouter>,
+    )
     await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     await waitFor(() => {
@@ -88,7 +103,11 @@ describe('UI-02 Category list', () => {
     )
     const user = userEvent.setup()
 
-    render(<App />)
+    render(
+      <MemoryRouter>
+        <CheckSystemPage />
+      </MemoryRouter>,
+    )
     await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     await waitFor(() => {

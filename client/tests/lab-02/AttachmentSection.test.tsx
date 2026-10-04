@@ -1,8 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import App from '../../src/App'
-import { REQUESTER_STORAGE_KEY } from '../../src/requester/requesterContext'
+import { renderApp } from '../helpers/renderApp'
+import { authRoutes, authUser } from '../helpers/auth'
 
 // UI-13 (AC-18, AC-20, AC-22): the Ticket Detail attachment panel.
 
@@ -52,6 +52,8 @@ function mockApi({ detail, upload, remove }: Handlers) {
     init?: RequestInit,
   ) => {
     const url = String(input)
+    const auth = authRoutes(signedIn)(url)
+    if (auth) return auth
     if (url.includes('/attachments') && init?.method === 'POST') {
       return upload
         ? upload()
@@ -70,7 +72,11 @@ function mockApi({ detail, upload, remove }: Handlers) {
             ),
           )
     }
-    if (/\/api\/tickets\/\d+\?/.test(url)) return Promise.resolve(Response.json(detail))
+    // Lab 3 added the thread; without this it falls through to the list
+    // branch below and the detail screen gets a paginated object where it
+    // expects an array.
+    if (/\/api\/tickets\/\d+\/comments$/.test(url)) return Promise.resolve(Response.json([]))
+    if (/\/api\/tickets\/\d+$/.test(url)) return Promise.resolve(Response.json(detail))
     return Promise.resolve(Response.json([]))
   }) as typeof fetch)
 }
@@ -78,7 +84,7 @@ function mockApi({ detail, upload, remove }: Handlers) {
 async function renderPanel(handlers: Handlers) {
   const spy = mockApi(handlers)
   window.history.pushState({}, '', '/tickets/42')
-  render(<App />)
+  await renderApp()
   await screen.findByText('TKT-2026-000042')
   return spy
 }
@@ -86,11 +92,13 @@ async function renderPanel(handlers: Handlers) {
 const pdf = (name = 'new.pdf') =>
   new File([new Uint8Array(512)], name, { type: 'application/pdf' })
 
+let signedIn = authUser()
+
 describe('Ticket Detail attachments', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     window.localStorage.clear()
-    window.localStorage.setItem(REQUESTER_STORAGE_KEY, JSON.stringify(REQUESTER))
+    signedIn = authUser({ id: REQUESTER.id, name: REQUESTER.name, email: REQUESTER.email })
   })
 
   afterEach(() => {
@@ -98,12 +106,14 @@ describe('Ticket Detail attachments', () => {
     window.history.pushState({}, '', '/')
   })
 
-  it('lists active attachments with a Download link carrying the requesterId', async () => {
+  it('lists active attachments with a plain Download link', async () => {
     await renderPanel({ detail: ticketWith([attachment(1)]) })
 
     const download = screen.getByRole('link', { name: /Download/i })
     expect(download).toHaveAttribute('href', expect.stringContaining('/api/attachments/1/download'))
-    expect(download).toHaveAttribute('href', expect.stringContaining('requesterId=1'))
+    // No identity in the URL any more: the browser sends the session cookie on
+    // a same-site navigation, and the server reads ownership from it (BR-03).
+    expect(download).toHaveAttribute('href', expect.not.stringContaining('requesterId'))
   })
 
   it('UI-13 (AC-18): a new attachment appears without a reload', async () => {

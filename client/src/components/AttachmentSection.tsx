@@ -17,7 +17,6 @@ import './AttachmentSection.css'
 
 interface AttachmentSectionProps {
   ticketId: number
-  requesterId: number
   attachments: TicketAttachment[]
   onChange: (attachments: TicketAttachment[]) => void
 }
@@ -31,7 +30,6 @@ interface AttachmentSectionProps {
  */
 export function AttachmentSection({
   ticketId,
-  requesterId,
   attachments,
   onChange,
 }: AttachmentSectionProps) {
@@ -66,7 +64,7 @@ export function AttachmentSection({
     setUploading(true)
     setUploadError(null)
     try {
-      const created = await uploadAttachment(ticketId, requesterId, file)
+      const created = await uploadAttachment(ticketId, file)
       // api-spec.md §7's 201 body has no removal fields, since a fresh upload
       // cannot be removed. Filled in here so the list stays one shape rather
       // than widening the response contract to carry two always-null columns.
@@ -95,7 +93,7 @@ export function AttachmentSection({
 
     setBusyId(id)
     try {
-      const removed = await removeAttachment(id, requesterId, reason.trim())
+      const removed = await removeAttachment(id, reason.trim())
       // AC-20: the row stays, now marked removed — it is not dropped.
       onChange(attachments.map((a) => (a.id === id ? removed : a)))
       setRemovingId(null)
@@ -174,7 +172,7 @@ export function AttachmentSection({
                 <div className="ttk-attachments__actions">
                   <a
                     className="ttk-btn ttk-btn--tertiary"
-                    href={attachmentDownloadUrl(attachment.id, requesterId)}
+                    href={attachmentDownloadUrl(attachment.id)}
                   >
                     Download
                   </a>

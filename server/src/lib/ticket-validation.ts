@@ -12,7 +12,6 @@ export const REQUESTED_PRIORITIES = ["LOW", "MEDIUM", "HIGH"] as const;
 export type RequestedPriority = (typeof REQUESTED_PRIORITIES)[number];
 
 export interface TicketInput {
-  requesterId: number;
   categoryId: number;
   relatedSystemId: number;
   summary: string;
@@ -52,9 +51,6 @@ export function validateTicketInput(
     unknown
   >;
 
-  const requesterId = parseId(input.requesterId);
-  if (requesterId === null) fields.requesterId = "A Requester must be selected.";
-
   const categoryId = parseId(input.categoryId);
   if (categoryId === null) fields.categoryId = "Category is required.";
 
@@ -91,7 +87,6 @@ export function validateTicketInput(
   return {
     ok: true,
     value: {
-      requesterId: requesterId!,
       categoryId: categoryId!,
       relatedSystemId: relatedSystemId!,
       summary,

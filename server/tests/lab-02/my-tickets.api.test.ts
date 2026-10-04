@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import { createApp } from "../../src/app.js";
 import { createPrismaClient } from "../../src/prisma.js";
+import { fixtureUser } from "../helpers/users.js";
+import { signInAs } from "../helpers/session.js";
 
 // API-05, API-06, API-07, API-08, API-23, API-24, API-25, API-26:
 // GET /api/tickets. Ownership is the security boundary here (BR-07/BR-08),
@@ -13,6 +15,7 @@ const app = createApp();
 const TAG = "my-tickets.api.test";
 
 let ownerId: number;
+let ownerCookie: string;
 let otherId: number;
 let emptyId: number;
 let hardwareId: number;
@@ -45,38 +48,54 @@ async function seedTicket(
       summary: overrides.summary,
       description: "Seeded for the My Tickets query tests.",
       requestedPriority: overrides.requestedPriority ?? "MEDIUM",
+      // Mirrors what POST /api/tickets does at creation (BR-21); these rows
+      // bypass the route, so the copy has to be made here too.
+      itPriority: overrides.requestedPriority ?? "MEDIUM",
       ...(overrides.createdAt ? { createdAt: overrides.createdAt } : {}),
     },
   });
   return created.id;
 }
 
+/** The list as the owner sees it. The identity is the session, so `params`
+ *  carries only the query the screen actually sends (BR-03). */
 function list(params: Record<string, string | number> = {}) {
-  const query = new URLSearchParams({ requesterId: String(ownerId) });
+  const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     query.set(key, String(value));
   }
-  return request(app).get(`/api/tickets?${query.toString()}`);
+  const path = query.toString() ? `/api/tickets?${query}` : "/api/tickets";
+  return request(app).get(path).set("Cookie", ownerCookie);
 }
 
 beforeAll(async () => {
   const stale = { email: { contains: TAG } };
   await prisma.attachment.deleteMany({ where: { ticket: { requester: stale } } });
   await prisma.ticket.deleteMany({ where: { requester: stale } });
-  await prisma.requester.deleteMany({ where: stale });
+  await prisma.user.deleteMany({ where: stale });
 
   const [owner, other, empty] = await Promise.all([
-    prisma.requester.create({
-      data: { name: `Owner ${TAG}`, email: `owner.${TAG}@toktickit.test` },
+    prisma.user.create({
+      data: fixtureUser({
+        name: `Owner ${TAG}`,
+        email: `owner.${TAG}@toktickit.test`,
+      }),
     }),
-    prisma.requester.create({
-      data: { name: `Other ${TAG}`, email: `other.${TAG}@toktickit.test` },
+    prisma.user.create({
+      data: fixtureUser({
+        name: `Other ${TAG}`,
+        email: `other.${TAG}@toktickit.test`,
+      }),
     }),
-    prisma.requester.create({
-      data: { name: `Empty ${TAG}`, email: `empty.${TAG}@toktickit.test` },
+    prisma.user.create({
+      data: fixtureUser({
+        name: `Empty ${TAG}`,
+        email: `empty.${TAG}@toktickit.test`,
+      }),
     }),
   ]);
   ownerId = owner.id;
+  ownerCookie = await signInAs(app, owner.email);
   otherId = other.id;
   emptyId = empty.id;
 
@@ -117,7 +136,7 @@ afterAll(async () => {
   const owners = { in: [ownerId, otherId, emptyId] };
   await prisma.attachment.deleteMany({ where: { ticket: { requesterId: owners } } });
   await prisma.ticket.deleteMany({ where: { requesterId: owners } });
-  await prisma.requester.deleteMany({ where: { email: { contains: TAG } } });
+  await prisma.user.deleteMany({ where: { email: { contains: TAG } } });
   await prisma.$disconnect();
 });
 
@@ -138,23 +157,48 @@ describe("API-05 ownership scoping (AC-11, BR-07/BR-08)", () => {
     expect(response.body.data[0].summary).toBe("VPN keeps dropping");
   });
 
-  it("scopes to the other Requester when they ask", async () => {
-    const response = await request(app).get(`/api/tickets?requesterId=${otherId}`);
+  it("scopes to whoever is signed in", async () => {
+    const response = await request(app)
+      .get("/api/tickets")
+      .set("Cookie", await signInAs(app, `other.${TAG}@toktickit.test`));
 
     expect(response.body.data).toHaveLength(1);
     expect(response.body.data[0].summary).toContain("someone else");
   });
 
-  it("rejects a missing or non-numeric requesterId", async () => {
-    const missing = await request(app).get("/api/tickets");
-    const bogus = await request(app).get("/api/tickets?requesterId=abc");
+  // Replaces "rejects a missing or non-numeric requesterId". There is no such
+  // parameter any more, so the question is no longer whether a bad one is
+  // rejected but whether a *good-looking* one is ignored (AC-03, BR-03).
+  it("AC-03: ignores a requesterId the client supplies", async () => {
+    const spoofed = await request(app)
+      .get(`/api/tickets?requesterId=${otherId}`)
+      .set("Cookie", ownerCookie);
 
-    expect(missing.status).toBe(400);
-    expect(bogus.status).toBe(400);
+    // Compared against the same call without the parameter rather than against
+    // a hard-coded count: the point is that the parameter changed nothing.
+    const honest = await list();
+
+    expect(spoofed.status).toBe(200);
+    expect(spoofed.body.pagination.totalItems).toBe(honest.body.pagination.totalItems);
+    expect(spoofed.body.data).toEqual(honest.body.data);
+    expect(
+      spoofed.body.data.every(
+        (row: { summary: string }) => !row.summary.includes("someone else"),
+      ),
+    ).toBe(true);
+  });
+
+  it("requires a session at all", async () => {
+    const anonymous = await request(app).get("/api/tickets");
+
+    expect(anonymous.status).toBe(401);
+    expect(anonymous.body).toEqual({ error: "Authentication required" });
   });
 
   it("returns an empty page for a Requester who owns nothing", async () => {
-    const response = await request(app).get(`/api/tickets?requesterId=${emptyId}`);
+    const response = await request(app)
+      .get("/api/tickets")
+      .set("Cookie", await signInAs(app, `empty.${TAG}@toktickit.test`));
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual([]);
@@ -232,7 +276,8 @@ describe("API-23 filters (AC-30, BR-10)", () => {
   });
 
   it("ignores an unparseable filter rather than failing the request", async () => {
-    // api-spec.md §5: requesterId is the only strict parameter.
+    // api-spec.md §5: no query parameter here is strict — ownership is the
+    // session's, and everything else is a display preference.
     const response = await list({ categoryId: "not-a-number", pageSize: 50 });
 
     expect(response.status).toBe(200);

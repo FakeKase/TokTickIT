@@ -1,8 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import App from '../../src/App'
-import { REQUESTER_STORAGE_KEY } from '../../src/requester/requesterContext'
+import { renderApp } from '../helpers/renderApp'
+import { authRoutes, authUser } from '../helpers/auth'
 
 // UI-05, UI-06, UI-07, UI-08, UI-09, UI-14: the Create Ticket screen
 // (ui-spec.md §6.2). Rendered through <App /> at /tickets/new so the guard,
@@ -34,6 +34,8 @@ const TICKET = {
 function mockApi(overrides: { createTicket?: () => Promise<Response> } = {}) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
     const url = String(input)
+    const auth = authRoutes(signedIn)(url)
+    if (auth) return auth
     if (url.includes('/api/categories')) return Promise.resolve(Response.json(CATEGORIES))
     if (url.includes('/api/related-systems')) {
       return Promise.resolve(Response.json(RELATED_SYSTEMS))
@@ -52,7 +54,7 @@ function mockApi(overrides: { createTicket?: () => Promise<Response> } = {}) {
 
 async function renderForm() {
   window.history.pushState({}, '', '/tickets/new')
-  render(<App />)
+  await renderApp()
   // Wait for the reference data to land so the form is on screen.
   await screen.findByLabelText(/^Category/)
 }
@@ -76,11 +78,13 @@ function pngFile(name = 'shot.png', bytes = 1024) {
   return new File([new Uint8Array(bytes)], name, { type: 'image/png' })
 }
 
+let signedIn = authUser()
+
 describe('Create Ticket', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     window.localStorage.clear()
-    window.localStorage.setItem(REQUESTER_STORAGE_KEY, JSON.stringify(REQUESTER))
+    signedIn = authUser({ id: REQUESTER.id, name: REQUESTER.name, email: REQUESTER.email })
   })
 
   afterEach(() => {
@@ -303,6 +307,8 @@ describe('Create Ticket', () => {
   it('BR-22: keeps the Ticket and offers a retry when an attachment upload fails', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
       const url = String(input)
+    const auth = authRoutes(signedIn)(url)
+    if (auth) return auth
       if (url.includes('/api/categories')) return Promise.resolve(Response.json(CATEGORIES))
       if (url.includes('/api/related-systems')) {
         return Promise.resolve(Response.json(RELATED_SYSTEMS))
@@ -372,9 +378,14 @@ describe('Create Ticket', () => {
   })
 
   it('shows a retryable failure state when the reference data cannot load', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Failed to fetch'))
+    // Only the reference data fails. Rejecting everything would take the
+    // session check with it and land on Login, which is a different test.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
+      const auth = authRoutes(signedIn)(String(input))
+      return auth ?? Promise.reject(new Error('Failed to fetch'))
+    }) as typeof fetch)
     window.history.pushState({}, '', '/tickets/new')
-    render(<App />)
+    await renderApp()
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Unable to load the form/i)
     expect(screen.getByRole('button', { name: /Retry/i })).toBeInTheDocument()

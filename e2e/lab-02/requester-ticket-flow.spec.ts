@@ -5,7 +5,9 @@ import {
   createTicket,
   firstRequester,
   secondRequester,
-  signInThroughSelector,
+  signInThroughLogin,
+  signOut,
+  DEV_PASSWORD,
 } from './helpers'
 
 /**
@@ -26,7 +28,7 @@ test.describe('E2E-01: the full Requester journey', () => {
     const requester = await firstRequester(request)
 
     // --- 1. Sign in through the selector (AC-02) ------------------------
-    await signInThroughSelector(page, requester)
+    await signInThroughLogin(page, requester)
 
     // --- 2. Create a Ticket (AC-01) -------------------------------------
     await page.getByRole('button', { name: 'Create Ticket' }).first().click()
@@ -142,18 +144,18 @@ test.describe('E2E-02 (AC-03): one Requester cannot reach another’s Ticket', (
 
     // Owner's Ticket, created out of band so this spec tests access, not
     // creation.
-    const ticket = await createTicket(request, owner.id, {
+    const ticket = await createTicket(request, owner, {
       summary: `Owned by ${owner.name} ${Date.now()}`,
     })
 
     // The other Requester gets a Ticket of their own. Without one they land in
     // the Empty state, which hides the toolbar by design (BR-28) — and
     // "B sees their own but not A's" is a stronger claim than "B sees nothing".
-    const theirs = await createTicket(request, other.id, {
+    const theirs = await createTicket(request, other, {
       summary: `Owned by ${other.name} ${Date.now()}`,
     })
 
-    await signInThroughSelector(page, other)
+    await signInThroughLogin(page, other)
 
     // Their own Ticket is there.
     await expect(page.locator('tbody tr', { hasText: theirs.ticketNumber })).toHaveCount(1)
@@ -179,11 +181,11 @@ test.describe('E2E-02 (AC-03): one Requester cannot reach another’s Ticket', (
   }) => {
     await page.setViewportSize(VIEWPORTS.desktop)
     const owner = await firstRequester(request)
-    const ticket = await createTicket(request, owner.id, {
+    const ticket = await createTicket(request, owner, {
       summary: `Reachable by owner ${Date.now()}`,
     })
 
-    await signInThroughSelector(page, owner)
+    await signInThroughLogin(page, owner)
     await page.goto(`/tickets/${ticket.id}`)
 
     // Same URL, different Requester, opposite outcome — which is what makes
@@ -195,23 +197,24 @@ test.describe('E2E-02 (AC-03): one Requester cannot reach another’s Ticket', (
     await page.setViewportSize(VIEWPORTS.desktop)
     const owner = await firstRequester(request)
     const other = await secondRequester(request)
-    const ticket = await createTicket(request, owner.id, {
+    const ticket = await createTicket(request, owner, {
       summary: `Switch check ${Date.now()}`,
     })
 
     // Both need a Ticket: the switch target would otherwise land in the Empty
     // state, where the toolbar is deliberately absent.
-    await createTicket(request, other.id, { summary: `Theirs ${Date.now()}` })
+    await createTicket(request, other, { summary: `Theirs ${Date.now()}` })
 
-    await signInThroughSelector(page, owner)
+    await signInThroughLogin(page, owner)
     await page.getByLabel(/^Search/).fill(ticket.ticketNumber)
     await page.getByRole('button', { name: 'Apply' }).click()
     await expect(page.locator('tbody tr', { hasText: ticket.ticketNumber })).toHaveCount(1)
 
-    // Change Requester, and the previous one's Ticket goes with them.
-    await page.getByRole('link', { name: /Change Requester/i }).click()
-    await page.getByLabel('Development Requester').selectOption(String(other.id))
-    await page.getByRole('button', { name: 'Continue' }).click()
+    // Become somebody else, and the previous Requester's Ticket goes with
+    // them. Lab 2 switched identity with a "Change Requester" link; Lab 3 has
+    // no such thing - the only way to be somebody else is to sign in as them.
+    await signOut(page)
+    await signInThroughLogin(page, other)
 
     await expect(page.getByText(other.name).first()).toBeVisible()
     await expect(page.locator('tbody tr', { hasText: ticket.ticketNumber })).toHaveCount(0)

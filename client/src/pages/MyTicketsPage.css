@@ -59,6 +59,24 @@
   vertical-align: top;
 }
 
+/* Summary is free text, and can hold a word with nowhere to break: a file
+   name, a URL. A table cell cannot be narrower than its longest word, so
+   without this one pasted file name makes the whole table wider than the
+   page, at any width. */
+.ttk-my-tickets__table td:nth-child(5) {
+  overflow-wrap: anywhere;
+}
+
+/* Summary is the column that gives way, so the others must not be squeezed
+   instead: a Ticket Number over three lines or a badge broken in two stops
+   reading as what it is. Category still wraps, but only between words. */
+.ttk-my-tickets__table td:nth-child(1),
+.ttk-my-tickets__table td:nth-child(2),
+.ttk-my-tickets__table td:nth-child(7),
+.ttk-my-tickets__table .ttk-badge {
+  white-space: nowrap;
+}
+
 .ttk-my-tickets__table thead th {
   background: var(--zg-pale);
   font-size: var(--zg-font-size-label);
@@ -112,6 +130,14 @@
   .ttk-my-tickets__table th,
   .ttk-my-tickets__table td {
     padding: var(--zg-space-2);
+  }
+
+  /* Seven columns do not fit here on one line each. The headers and the
+     longest badge wrap between words, which costs a second line; the Ticket
+     Number and the dates stay whole, because those are read as one token. */
+  .ttk-my-tickets__table thead th,
+  .ttk-my-tickets__table .ttk-badge {
+    white-space: normal;
   }
 }
 

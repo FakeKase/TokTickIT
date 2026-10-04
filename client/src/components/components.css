@@ -155,12 +155,32 @@
 
 .ttk-badge--warning {
   background: var(--zg-warning-tint);
-  color: var(--zg-warning);
+  color: var(--zg-warning-text);
 }
 
 .ttk-badge--danger {
   background: var(--zg-error-tint);
   color: var(--zg-error);
+}
+
+/* Lab 3 additions (ui-spec.md §3). */
+
+.ttk-badge--active {
+  background: var(--zg-active-tint);
+  color: var(--zg-active-text);
+}
+
+/* Urgent: the only filled badge in the system, so it is the one thing that
+   catches the eye across a full queue. */
+.ttk-badge--urgent {
+  background: var(--zg-error-solid);
+  color: #ffffff;
+}
+
+/* Cancelled. The label is still there and still readable; the line through
+   it is a second signal on top of the text, never instead of it. */
+.ttk-badge--struck {
+  text-decoration: line-through;
 }
 
 /* ---------- Card (§6) ---------- */

@@ -1,7 +1,9 @@
 import { expect } from '@playwright/test'
 import type { APIRequestContext, Page } from '@playwright/test'
 
-export const API = 'http://localhost:3001'
+/** The API the suite talks to. Follows playwright.config.ts, which follows
+ *  E2E_API_PORT, so a run on its own ports reaches its own server. */
+export const API = `http://localhost:${process.env.E2E_API_PORT ?? 3001}`
 
 /** ui-spec.md §8's three breakpoints, and the widths §11 names its files after. */
 export const VIEWPORTS = {
@@ -22,45 +24,99 @@ export interface SeedRequester {
 }
 
 /** The first active seeded Requester, used as the demo identity throughout. */
-export async function firstRequester(request: APIRequestContext): Promise<SeedRequester> {
-  const response = await request.get(`${API}/api/requesters`)
-  expect(response.ok(), 'GET /api/requesters must succeed — is the database seeded?').toBe(true)
-  const requesters = (await response.json()) as SeedRequester[]
-  expect(requesters.length, 'seed must provide at least one active Requester').toBeGreaterThan(0)
-  return requesters[0]
+/**
+ * The seeded Requesters these specs drive, by the addresses the README
+ * documents.
+ *
+ * Lab 2 asked the API for them, through an endpoint that existed to feed the
+ * selector. That endpoint is gone (api-spec.md §5) and listing people is an
+ * Administrator capability now, so the fixtures are named here instead - which
+ * is also more honest about what they are: a seed the suite depends on, not a
+ * discovery mechanism.
+ */
+const SEEDED_REQUESTERS = [
+  { email: 'peter.parker@toktickit.test', name: 'Peter Parker' },
+  { email: 'ned.leeds@toktickit.test', name: 'Ned Leeds' },
+  { email: 'michelle.jones@toktickit.test', name: 'Michelle Jones' },
+  { email: 'roronoa.zoro@toktickit.test', name: 'Roronoa Zoro' },
+] as const
+
+/**
+ * Reserved for the Empty state, and deliberately not in the list above: the
+ * first spec to create a Ticket for a Requester destroys that Requester as an
+ * Empty-state fixture, so the one account BR-28 needs is kept out of the
+ * general pool.
+ */
+const EMPTY_STATE_REQUESTER = {
+  email: 'grace.lim@toktickit.test',
+  name: 'Grace Lim',
+} as const
+
+/** Signs in with the API context and returns the identity the session carries. */
+async function identify(
+  request: APIRequestContext,
+  account: { email: string; name: string },
+): Promise<SeedRequester> {
+  const response = await request.post(`${API}/api/auth/login`, {
+    data: { email: account.email, password: DEV_PASSWORD },
+  })
+  expect(
+    response.ok(),
+    `could not sign in as ${account.email} — is the database seeded?`,
+  ).toBe(true)
+  const { user } = (await response.json()) as { user: SeedRequester }
+  return user
 }
 
-/** A second Requester, for anything needing two distinct identities. */
+/** The identity these specs use by default. */
+export async function firstRequester(request: APIRequestContext): Promise<SeedRequester> {
+  return identify(request, SEEDED_REQUESTERS[0])
+}
+
+/** A second identity, for anything that needs two distinct Requesters. */
 export async function secondRequester(request: APIRequestContext): Promise<SeedRequester> {
-  const response = await request.get(`${API}/api/requesters`)
-  const requesters = (await response.json()) as SeedRequester[]
-  expect(requesters.length).toBeGreaterThan(1)
-  return requesters[1]
+  return identify(request, SEEDED_REQUESTERS[1])
 }
 
 /**
- * An active Requester who currently owns nothing, for the Empty state.
+ * The Requester reserved for the Empty state (BR-28).
  *
- * Found by asking rather than by index: other specs create Tickets for the
- * Requesters they use, so a fixed position is only empty until something else
- * in the run touches it.
+ * Asserted rather than searched for. Lab 2 asked every Requester whether they
+ * owned anything, which needed an endpoint that listed people and a query
+ * parameter naming one; both are gone. Naming the account makes the dependency
+ * explicit, and failing loudly here is better than silently returning somebody
+ * who happens to be empty today.
  */
 export async function requesterWithoutTickets(
   request: APIRequestContext,
 ): Promise<SeedRequester> {
-  const response = await request.get(`${API}/api/requesters`)
-  const requesters = (await response.json()) as SeedRequester[]
+  const requester = await identify(request, EMPTY_STATE_REQUESTER)
 
-  for (const requester of requesters) {
-    const list = await request.get(`${API}/api/tickets?requesterId=${requester.id}&pageSize=1`)
-    const { pagination } = (await list.json()) as { pagination: { totalItems: number } }
-    if (pagination.totalItems === 0) return requester
-  }
+  const list = await request.get(`${API}/api/tickets?pageSize=1`, {
+    headers: { Cookie: await sessionCookieFor(request, EMPTY_STATE_REQUESTER.email) },
+  })
+  const { pagination } = (await list.json()) as { pagination: { totalItems: number } }
+  expect(
+    pagination.totalItems,
+    `${EMPTY_STATE_REQUESTER.email} is reserved for the Empty state but owns Tickets — ` +
+      'run the e2e teardown, or reseed',
+  ).toBe(0)
 
-  throw new Error(
-    'every seeded Requester owns Tickets, so the Empty state cannot be shown — ' +
-      'seed another active Requester, or run the teardown first',
-  )
+  return requester
+}
+
+/** The raw Set-Cookie value for a seeded account, for a request made outside
+ *  the page's own context. */
+export async function sessionCookieFor(
+  request: APIRequestContext,
+  email: string,
+): Promise<string> {
+  const response = await request.post(`${API}/api/auth/login`, {
+    data: { email, password: DEV_PASSWORD },
+  })
+  expect(response.ok(), `could not sign in as ${email}`).toBe(true)
+  const header = response.headers()['set-cookie'] ?? ''
+  return header.split(';')[0]
 }
 
 /**
@@ -71,7 +127,7 @@ export async function requesterWithoutTickets(
  * A Ticket submitted through the form counts too: it is a real row in the same
  * database, and one that skips this marker leaks on every run.
  */
-export const FIXTURE_MARKER = 'Lab 2 walkthrough'
+export const FIXTURE_MARKER = 'TokTickIT walkthrough'
 
 /** Rotated so a captured list looks like real tickets, not one fixture repeated. */
 const SUMMARIES = [
@@ -86,17 +142,21 @@ let summaryCursor = 0
 
 export async function createTicket(
   request: APIRequestContext,
-  requesterId: number,
+  requester: SeedRequester,
   overrides: Record<string, unknown> = {},
 ) {
+  // The API takes the Requester from the session now, so the fixture signs in
+  // as them rather than naming them (BR-03).
+  const cookie = await sessionCookieFor(request, requester.email)
+
   const [categories, systems] = await Promise.all([
     request.get(`${API}/api/categories`).then((r) => r.json()),
     request.get(`${API}/api/related-systems`).then((r) => r.json()),
   ])
 
   const response = await request.post(`${API}/api/tickets`, {
+    headers: { Cookie: cookie },
     data: {
-      requesterId,
       categoryId: categories[0].id,
       relatedSystemId: systems[0].id,
       requestedPriority: 'HIGH',
@@ -112,12 +172,12 @@ export async function createTicket(
 export async function attachFile(
   request: APIRequestContext,
   ticketId: number,
-  requesterId: number,
+  requester: SeedRequester,
   name = 'evidence.png',
 ) {
   const response = await request.post(`${API}/api/tickets/${ticketId}/attachments`, {
+    headers: { Cookie: await sessionCookieFor(request, requester.email) },
     multipart: {
-      requesterId: String(requesterId),
       file: {
         name,
         mimeType: 'image/png',
@@ -133,38 +193,53 @@ export async function attachFile(
   return response.json()
 }
 
+/** The password every seeded account shares (README, BR-39). */
+export const DEV_PASSWORD = 'ChangeMe123!'
+
 /**
- * Puts the app in the "Requester already selected" state.
+ * Puts the browser in the "already signed in" state.
  *
- * Writes the same localStorage key the app uses rather than clicking through
- * the selector, so a failure in these specs points at the screen under test
- * rather than at the selection flow.
+ * Lab 2 wrote a localStorage key here, because identity was a client-side
+ * choice. It is a session cookie now, so the shortcut is a real login through
+ * the API: the session it produces is indistinguishable from one obtained by
+ * typing in the form, and a failure in these specs still points at the screen
+ * under test rather than at the login flow.
  */
 export async function selectRequester(page: Page, requester: SeedRequester) {
-  await page.addInitScript((value) => {
-    window.localStorage.setItem('toktickit.selectedRequester', value)
-  }, JSON.stringify(requester))
+  const response = await page.request.post(`${API}/api/auth/login`, {
+    data: { email: requester.email, password: DEV_PASSWORD },
+  })
+  expect(
+    response.ok(),
+    `could not sign in as ${requester.email} - is the database seeded?`,
+  ).toBe(true)
 }
 
 /**
- * Signs in the way a person does: through the Development Requester Selection
- * screen (AC-02).
+ * Signs in the way a person does: through the Login screen (AC-01).
  *
- * The localStorage shortcut above is right for the visual specs, where the
- * selector is not what is under test — but an end-to-end flow that skips the
- * selector never proves the selector works, so E2E-01 uses this instead.
+ * The API shortcut above is right for the visual specs, where login is not
+ * what is under test — but a flow that skips the form never proves the form
+ * works, so E2E-01 uses this instead.
  */
-export async function signInThroughSelector(page: Page, requester: SeedRequester) {
-  // Landing on a guarded route must send us to the selector (AC-02).
+export async function signInThroughLogin(page: Page, requester: SeedRequester) {
+  // Landing on a guarded route must send us to Login (AC-13).
   await page.goto('/tickets')
-  await expect(page).toHaveURL(/\/select-requester$/)
+  await expect(page).toHaveURL(/\/login$/)
 
-  await page.getByLabel('Development Requester').selectOption(String(requester.id))
-  await page.getByRole('button', { name: 'Continue' }).click()
+  await page.getByLabel('Email address').fill(requester.email)
+  await page.getByLabel(/^Password/).fill(DEV_PASSWORD)
+  await page.getByRole('button', { name: 'Sign in' }).click()
 
   // Resumes the route the guard interrupted.
   await expect(page).toHaveURL(/\/tickets$/)
   await expect(page.getByText(requester.name).first()).toBeVisible()
+}
+
+/** Ends the session, for a spec that needs to become somebody else. */
+export async function signOut(page: Page) {
+  await page.getByRole('button', { name: 'Log out' }).click()
+  await expect(page).toHaveURL(/\/login$/)
 }
 
 /**

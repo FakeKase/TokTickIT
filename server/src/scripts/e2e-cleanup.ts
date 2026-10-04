@@ -13,8 +13,13 @@ import { createPrismaClient } from "../prisma.js";
  *
  * Matches on the marker the e2e helper writes into every description, so a
  * Ticket created by hand during a demo is never touched.
+ *
+ * Lab 3's specs also create users. Those are found by a reserved email
+ * domain, which no seeded or hand-made account uses, and a spec asserts this
+ * script and the helper agree on it.
  */
-const MARKER = "Lab 2 walkthrough";
+const MARKER = "TokTickIT walkthrough";
+const USER_DOMAIN = "@e2e.toktickit.test";
 
 const UPLOADS_DIR = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -33,7 +38,21 @@ async function main() {
   });
 
   const attachments = await prisma.attachment.deleteMany({ where: { ticket: where } });
+  // Comments hold a RESTRICT foreign key to their Ticket, the same as
+  // Attachments do, so they have to go first. Without this the whole teardown
+  // throws the moment a spec posts a comment - which Lab 3's specs will.
+  const comments = await prisma.ticketComment.deleteMany({ where: { ticket: where } });
   const tickets = await prisma.ticket.deleteMany({ where });
+
+  // Users the suite created. A deleted user cannot be left as an author or an
+  // owner, so what they wrote goes and what they owned is handed back first.
+  // They file no Tickets of their own: every fixture Ticket is filed by a
+  // seeded Requester and carries the marker above.
+  const fixtureUser = { email: { endsWith: USER_DOMAIN } };
+  await prisma.ticketComment.deleteMany({ where: { author: fixtureUser } });
+  await prisma.ticket.updateMany({ where: { owner: fixtureUser }, data: { ownerId: null } });
+  await prisma.session.deleteMany({ where: { user: fixtureUser } });
+  const users = await prisma.user.deleteMany({ where: fixtureUser });
 
   // The rows are gone, so nothing can reach these files any more.
   for (const { storedFilename } of doomed) {
@@ -41,7 +60,7 @@ async function main() {
   }
 
   console.log(
-    `e2e cleanup: removed ${tickets.count} tickets, ${attachments.count} attachments, ${doomed.length} files`,
+    `e2e cleanup: removed ${tickets.count} tickets, ${attachments.count} attachments, ${comments.count} comments, ${doomed.length} files, ${users.count} users`,
   );
   await prisma.$disconnect();
 }

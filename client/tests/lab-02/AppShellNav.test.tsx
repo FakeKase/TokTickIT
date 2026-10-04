@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
-import App from '../../src/App'
-import { REQUESTER_STORAGE_KEY } from '../../src/requester/requesterContext'
+import { screen, within } from '@testing-library/react'
+import { renderApp } from '../helpers/renderApp'
+import { authRoutes, authUser } from '../helpers/auth'
 import shellCss from '../../src/layout/AppShell.css?raw'
 import themeCss from '../../src/theme.css?raw'
 
@@ -22,7 +22,7 @@ const ACTIVE_CLASS = 'ttk-shell__nav-link--active'
 
 function renderAt(path: string) {
   window.history.pushState({}, '', path)
-  return render(<App />)
+  return renderApp()
 }
 
 // Scoped to the Primary nav landmark: pages may legitimately link to the same
@@ -43,12 +43,41 @@ function activeLinkNames() {
     .map((link) => link.textContent)
 }
 
+const TICKET_DETAIL = {
+  id: 42,
+  ticketNumber: 'TKT-2026-000042',
+  requester: { id: 1, name: 'Peter Parker' },
+  category: { id: 10, name: 'Hardware' },
+  relatedSystem: { id: 20, name: 'Corporate Laptop' },
+  summary: 'Laptop will not start',
+  description: 'Nothing happens when the power button is pressed.',
+  requestedPriority: 'MEDIUM',
+  currentStatus: 'NEW',
+  createdAt: '2026-09-01T09:00:00.000Z',
+  updatedAt: '2026-09-01T09:00:00.000Z',
+  attachments: [],
+}
+
+let signedIn = authUser()
+
 describe('Primary nav active state', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     window.localStorage.clear()
-    window.localStorage.setItem(REQUESTER_STORAGE_KEY, JSON.stringify(REQUESTER))
-    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(Response.json([])))
+    signedIn = authUser({ id: REQUESTER.id, name: REQUESTER.name, email: REQUESTER.email })
+    vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL) => {
+      const url = String(input)
+      const auth = authRoutes(signedIn)(url)
+      if (auth) return auth
+      // The nav is what this file tests, but a Ticket Detail route still has to
+      // render something: an unparseable answer throws inside the page and
+      // takes the shell - and therefore the nav - down with it.
+      // Lab 3's thread lives under the same prefix, so it is matched first:
+      // handing the detail object to fetchComments throws inside the thread.
+      if (/\/api\/tickets\/\d+\/comments/.test(url)) return Promise.resolve(Response.json([]))
+      if (/\/api\/tickets\/\d+/.test(url)) return Promise.resolve(Response.json(TICKET_DETAIL))
+      return Promise.resolve(Response.json([]))
+    }) as typeof fetch)
   })
 
   afterEach(() => {
@@ -56,41 +85,41 @@ describe('Primary nav active state', () => {
     window.history.pushState({}, '', '/')
   })
 
-  it('marks only My Tickets active on /tickets', () => {
-    renderAt('/tickets')
+  it('marks only My Tickets active on /tickets', async () => {
+    await renderAt('/tickets')
 
     expect(navLink(/My Tickets/i)).toHaveClass(ACTIVE_CLASS)
     expect(navLink(/Create Ticket/i)).not.toHaveClass(ACTIVE_CLASS)
     expect(activeLinkNames()).toEqual(['My Tickets'])
   })
 
-  it('marks only Create Ticket active on /tickets/new', () => {
-    renderAt('/tickets/new')
+  it('marks only Create Ticket active on /tickets/new', async () => {
+    await renderAt('/tickets/new')
 
     expect(navLink(/Create Ticket/i)).toHaveClass(ACTIVE_CLASS)
     expect(navLink(/My Tickets/i)).not.toHaveClass(ACTIVE_CLASS)
     expect(activeLinkNames()).toEqual(['Create Ticket'])
   })
 
-  it('keeps My Tickets active on a Ticket Detail route', () => {
+  it('keeps My Tickets active on a Ticket Detail route', async () => {
     // Detail is a child of the list, so the list stays the current section —
     // otherwise no nav item is indicated at all on that screen.
-    renderAt('/tickets/42')
+    await renderAt('/tickets/42')
 
     expect(navLink(/My Tickets/i)).toHaveClass(ACTIVE_CLASS)
     expect(navLink(/Create Ticket/i)).not.toHaveClass(ACTIVE_CLASS)
     expect(activeLinkNames()).toEqual(['My Tickets'])
   })
 
-  it('marks the active item for assistive tech, not just visually', () => {
-    renderAt('/tickets/new')
+  it('marks the active item for assistive tech, not just visually', async () => {
+    await renderAt('/tickets/new')
 
     expect(navLink(/Create Ticket/i)).toHaveAttribute('aria-current', 'page')
     expect(navLink(/My Tickets/i)).not.toHaveAttribute('aria-current')
   })
 
-  it('marks nothing active outside the ticket section', () => {
-    renderAt('/select-requester')
+  it('marks nothing active outside the ticket section', async () => {
+    await renderAt('/')
 
     expect(activeLinkNames()).toEqual([])
   })
@@ -107,14 +136,14 @@ describe('Active nav underline styling', () => {
     return [...shellCss.matchAll(/\.ttk-shell__nav-link--active\s*\{([^}]*)\}/g)].map((m) => m[1])
   }
 
-  it('never underlines the text', () => {
+  it('never underlines the text', async () => {
     for (const rule of activeRules()) {
       expect(rule).not.toMatch(/text-decoration:\s*underline/)
     }
     expect(shellCss).not.toMatch(/text-decoration:\s*underline/)
   })
 
-  it('marks the active item with the green rule at every breakpoint', () => {
+  it('marks the active item with the green rule at every breakpoint', async () => {
     const rules = activeRules()
 
     // Desktop and the mobile dropdown both need it: the mobile block re-declares
@@ -126,13 +155,13 @@ describe('Active nav underline styling', () => {
     }
   })
 
-  it('does not let the mobile shorthand reset the active border', () => {
+  it('does not let the mobile shorthand reset the active border', async () => {
     const mobileBlock = shellCss.slice(shellCss.indexOf('@media (max-width: 767px)'))
 
     expect(mobileBlock).not.toMatch(/\.ttk-shell__nav-link\s*\{[^}]*border-bottom:\s/)
   })
 
-  it('uses a theme-independent colour, since the header is the same in both themes', () => {
+  it('uses a theme-independent colour, since the header is the same in both themes', async () => {
     const light = themeCss.match(/:root\s*\{([\s\S]*?)\}/)?.[1] ?? ''
     const dark = themeCss.match(/:root\[data-theme='dark'\]\s*\{([\s\S]*?)\}/)?.[1] ?? ''
 

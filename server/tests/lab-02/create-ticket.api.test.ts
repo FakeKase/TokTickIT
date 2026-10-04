@@ -2,6 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
 import { createApp } from "../../src/app.js";
 import { createPrismaClient } from "../../src/prisma.js";
+import { fixtureUser } from "../helpers/users.js";
+import { signInAs } from "../helpers/session.js";
 
 // API-01, API-02, API-03, API-20, API-21, API-22: POST /api/tickets.
 // Runs against the real database, like the other API tests, so BR-18's
@@ -15,12 +17,14 @@ const TAG = "create-ticket.api.test";
 
 let requesterId: number;
 let inactiveRequesterId: number;
+let staffId: number;
+let requesterCookie: string;
+let staffCookie: string;
 let categoryId: number;
 let relatedSystemId: number;
 
 function validBody(overrides: Record<string, unknown> = {}) {
   return {
-    requesterId,
     categoryId,
     relatedSystemId,
     requestedPriority: "MEDIUM",
@@ -40,20 +44,33 @@ beforeAll(async () => {
   const stale = { email: { contains: TAG } };
   await prisma.attachment.deleteMany({ where: { ticket: { requester: stale } } });
   await prisma.ticket.deleteMany({ where: { requester: stale } });
-  await prisma.requester.deleteMany({ where: stale });
+  await prisma.user.deleteMany({ where: stale });
 
-  const active = await prisma.requester.create({
-    data: { name: `Active ${TAG}`, email: `active.${TAG}@toktickit.test` },
+  const active = await prisma.user.create({
+    data: fixtureUser({
+      name: `Active ${TAG}`,
+      email: `active.${TAG}@toktickit.test`,
+    }),
   });
-  const inactive = await prisma.requester.create({
-    data: {
+  const inactive = await prisma.user.create({
+    data: fixtureUser({
       name: `Inactive ${TAG}`,
       email: `inactive.${TAG}@toktickit.test`,
       isActive: false,
-    },
+    }),
+  });
+  const staff = await prisma.user.create({
+    data: fixtureUser({
+      name: `Staff ${TAG}`,
+      email: `staff.${TAG}@toktickit.test`,
+      role: "IT_STAFF",
+    }),
   });
   requesterId = active.id;
   inactiveRequesterId = inactive.id;
+  staffId = staff.id;
+  requesterCookie = await signInAs(app, active.email);
+  staffCookie = await signInAs(app, staff.email);
 
   const category = await prisma.category.findFirstOrThrow();
   const relatedSystem = await prisma.relatedSystem.findFirstOrThrow();
@@ -63,15 +80,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.ticket.deleteMany({
-    where: { requesterId: { in: [requesterId, inactiveRequesterId] } },
+    where: { requesterId: { in: [requesterId, inactiveRequesterId, staffId] } },
   });
-  await prisma.requester.deleteMany({ where: { email: { contains: TAG } } });
+  await prisma.user.deleteMany({ where: { email: { contains: TAG } } });
   await prisma.$disconnect();
 });
 
 describe("API-01 POST /api/tickets — valid creation", () => {
   it("returns 201 with a generated Ticket Number and NEW status", async () => {
-    const response = await request(app).post("/api/tickets").send(validBody());
+    const response = await request(app).post("/api/tickets").set("Cookie", requesterCookie).send(validBody());
 
     expect(response.status).toBe(201);
     expect(response.body.ticketNumber).toMatch(/^TKT-\d{4}-\d{6}$/);
@@ -80,7 +97,7 @@ describe("API-01 POST /api/tickets — valid creation", () => {
   });
 
   it("persists exactly what it returned", async () => {
-    const response = await request(app).post("/api/tickets").send(validBody());
+    const response = await request(app).post("/api/tickets").set("Cookie", requesterCookie).send(validBody());
 
     const stored = await prisma.ticket.findUnique({
       where: { id: response.body.id },
@@ -92,6 +109,7 @@ describe("API-01 POST /api/tickets — valid creation", () => {
   it("BR-02: ignores a client-supplied currentStatus", async () => {
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ currentStatus: "RESOLVED" }));
 
     expect(response.status).toBe(201);
@@ -99,7 +117,7 @@ describe("API-01 POST /api/tickets — valid creation", () => {
   });
 
   it("BR-01: never leaves a PENDING placeholder as the official number", async () => {
-    const response = await request(app).post("/api/tickets").send(validBody());
+    const response = await request(app).post("/api/tickets").set("Cookie", requesterCookie).send(validBody());
 
     expect(response.body.ticketNumber).not.toMatch(/^PENDING-/);
     expect(
@@ -109,8 +127,8 @@ describe("API-01 POST /api/tickets — valid creation", () => {
 
   it("BR-01: issues a distinct number to each Ticket", async () => {
     const [first, second] = await Promise.all([
-      request(app).post("/api/tickets").send(validBody()),
-      request(app).post("/api/tickets").send(validBody()),
+      request(app).post("/api/tickets").set("Cookie", requesterCookie).send(validBody()),
+      request(app).post("/api/tickets").set("Cookie", requesterCookie).send(validBody()),
     ]);
 
     expect(first.body.ticketNumber).not.toBe(second.body.ticketNumber);
@@ -119,6 +137,7 @@ describe("API-01 POST /api/tickets — valid creation", () => {
   it("BR-13/BR-14: stores the trimmed Summary and Description", async () => {
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(
         validBody({
           summary: "   Padded summary   ",
@@ -135,7 +154,7 @@ describe("API-02 POST /api/tickets — missing required selections", () => {
   it("BR-15: returns 400 with a message per missing field and saves nothing", async () => {
     const before = await ticketCount();
 
-    const response = await request(app).post("/api/tickets").send({
+    const response = await request(app).post("/api/tickets").set("Cookie", requesterCookie).send({
       requesterId,
       summary: "Printer is offline",
       description: "The shared printer does not appear on the network.",
@@ -156,6 +175,7 @@ describe("API-02 POST /api/tickets — missing required selections", () => {
 
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ requestedPriority: "URGENT" }));
 
     expect(response.status).toBe(400);
@@ -164,7 +184,7 @@ describe("API-02 POST /api/tickets — missing required selections", () => {
   });
 
   it("rejects an empty body without throwing", async () => {
-    const response = await request(app).post("/api/tickets").send({});
+    const response = await request(app).post("/api/tickets").set("Cookie", requesterCookie).send({});
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("Validation failed");
@@ -177,6 +197,7 @@ describe("API-03 / API-21 POST /api/tickets — Summary bounds (BR-13)", () => {
 
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ summary: "abcd" }));
 
     expect(response.status).toBe(400);
@@ -189,6 +210,7 @@ describe("API-03 / API-21 POST /api/tickets — Summary bounds (BR-13)", () => {
 
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ summary: "a".repeat(121) }));
 
     expect(response.status).toBe(400);
@@ -199,9 +221,11 @@ describe("API-03 / API-21 POST /api/tickets — Summary bounds (BR-13)", () => {
   it("accepts both boundary lengths", async () => {
     const atMin = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ summary: "abcde" }));
     const atMax = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ summary: "a".repeat(120) }));
 
     expect(atMin.status).toBe(201);
@@ -213,6 +237,7 @@ describe("API-03 / API-21 POST /api/tickets — Summary bounds (BR-13)", () => {
     // trimmed value, so this must fail rather than sneak past on whitespace.
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ summary: "   ab   " }));
 
     expect(response.status).toBe(400);
@@ -226,6 +251,7 @@ describe("API-20 POST /api/tickets — Description bounds (BR-14)", () => {
 
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ description: "too short" }));
 
     expect(response.status).toBe(400);
@@ -238,6 +264,7 @@ describe("API-20 POST /api/tickets — Description bounds (BR-14)", () => {
 
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ description: "a".repeat(2001) }));
 
     expect(response.status).toBe(400);
@@ -248,9 +275,11 @@ describe("API-20 POST /api/tickets — Description bounds (BR-14)", () => {
   it("accepts both boundary lengths", async () => {
     const atMin = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ description: "a".repeat(10) }));
     const atMax = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ description: "a".repeat(2000) }));
 
     expect(atMin.status).toBe(201);
@@ -264,6 +293,7 @@ describe("API-22 POST /api/tickets — unrecognized references", () => {
 
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ categoryId: 2_000_000_000 }));
 
     expect(response.status).toBe(404);
@@ -276,6 +306,7 @@ describe("API-22 POST /api/tickets — unrecognized references", () => {
 
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ relatedSystemId: 2_000_000_000 }));
 
     expect(response.status).toBe(404);
@@ -283,33 +314,57 @@ describe("API-22 POST /api/tickets — unrecognized references", () => {
     expect(await ticketCount()).toBe(before);
   });
 
-  it("BR-12: returns 404 for an inactive Requester", async () => {
+  // The three cases that stood here - inactive, non-Requester, and unknown
+  // requesterId - tested a field the client no longer supplies. Each one has
+  // moved to the layer that now answers it: an inactive account cannot obtain
+  // a session at all (auth.api.test.ts API-03), a staff account is refused by
+  // role, and an id that names somebody else is simply ignored.
+
+  it("AC-03: ignores a requesterId the client supplies", async () => {
+    const before = await prisma.ticket.count({
+      where: { requesterId: { in: [inactiveRequesterId, staffId] } },
+    });
+
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ requesterId: inactiveRequesterId }));
 
-    expect(response.status).toBe(404);
+    // Created, and created for the session's user - not for the id in the body.
+    expect(response.status).toBe(201);
+    expect(response.body.requesterId).toBe(requesterId);
     expect(
-      await prisma.ticket.count({ where: { requesterId: inactiveRequesterId } }),
-    ).toBe(0);
+      await prisma.ticket.count({
+        where: { requesterId: { in: [inactiveRequesterId, staffId] } },
+      }),
+    ).toBe(before);
   });
 
-  it("BR-12: returns 404 for a requesterId with no row at all", async () => {
-    // API-04 covers "inactive OR unknown". The inactive half is above; this is
-    // the other half, which was missing until the final tests.md audit.
+  it("refuses an IT Staff account by role, not by id (§5.1)", async () => {
     const before = await prisma.ticket.count();
 
     const response = await request(app)
       .post("/api/tickets")
-      .send(validBody({ requesterId: 2_000_000_000 }));
+      .set("Cookie", staffCookie)
+      .send(validBody());
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(403);
+    expect(await prisma.ticket.count()).toBe(before);
+  });
+
+  it("requires a session", async () => {
+    const before = await prisma.ticket.count();
+
+    const response = await request(app).post("/api/tickets").send(validBody());
+
+    expect(response.status).toBe(401);
     expect(await prisma.ticket.count()).toBe(before);
   });
 
   it("returns a safe message that leaks no internal detail", async () => {
     const response = await request(app)
       .post("/api/tickets")
+      .set("Cookie", requesterCookie)
       .send(validBody({ categoryId: 2_000_000_000 }));
 
     expect(JSON.stringify(response.body)).not.toMatch(/prisma|sql|stack|at /i);

@@ -1,0 +1,85 @@
+/* ui-spec.md §1: Login and Change Password sit outside the application shell.
+   One centred card on the page background, the wordmark above it, and no
+   navigation at all — from either screen there is nowhere legitimate to go. */
+
+.ttk-auth {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--zg-bg);
+}
+
+.ttk-auth__card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: 10px;
+  padding: 32px 28px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
+}
+
+.ttk-auth__wordmark {
+  margin: 0 0 24px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--zg-primary);
+  text-align: center;
+}
+
+.ttk-auth__title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--zg-text);
+}
+
+.ttk-auth__lede {
+  margin: 0 0 20px;
+  color: var(--zg-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ttk-auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* One region above the primary action, not beside a field: the server does not
+   say which of the two inputs was wrong, so neither does this (BR-08). */
+.ttk-auth__error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--zg-error);
+  border-radius: 6px;
+  color: var(--zg-error);
+  background: color-mix(in srgb, var(--zg-error) 8%, var(--zg-surface));
+  font-size: 14px;
+}
+
+.ttk-auth__submit {
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.ttk-auth__signout {
+  display: block;
+  margin: 16px auto 0;
+}
+
+@media (max-width: 480px) {
+  .ttk-auth {
+    align-items: flex-start;
+    padding-top: 40px;
+  }
+
+  .ttk-auth__card {
+    padding: 24px 18px;
+  }
+}

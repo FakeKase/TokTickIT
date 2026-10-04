@@ -1,37 +1,56 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './layout/AppShell'
 import { CheckSystemPage } from './pages/CheckSystemPage'
+import { ChangePasswordPage } from './pages/ChangePasswordPage'
 import { CreateTicketPage } from './pages/CreateTicketPage'
+import { LoginPage } from './pages/LoginPage'
 import { MyTicketsPage } from './pages/MyTicketsPage'
-import { RequesterSelectionPage } from './pages/RequesterSelectionPage'
+import { StaffTicketDetailPage } from './pages/StaffTicketDetailPage'
+import { StaffTicketQueuePage } from './pages/StaffTicketQueuePage'
 import { TicketDetailPage } from './pages/TicketDetailPage'
-import { RequesterProvider } from './requester/RequesterProvider'
-import { RequireRequester } from './requester/RequireRequester'
+import { UserManagementPage } from './pages/UserManagementPage'
+import { AuthProvider } from './auth/AuthProvider'
+import { RequireAuth } from './auth/RequireAuth'
+import { RequireRole } from './auth/RequireRole'
 import { ThemeProvider } from './theme/ThemeProvider'
 
 function App() {
   return (
     <ThemeProvider>
-      <RequesterProvider>
+      <AuthProvider>
         <BrowserRouter>
           <Routes>
-            <Route element={<AppShell />}>
-              <Route index element={<CheckSystemPage />} />
-              <Route path="select-requester" element={<RequesterSelectionPage />} />
+            {/* Outside the shell: neither screen has anywhere to navigate to
+                (ui-spec.md §1). */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/change-password" element={<ChangePasswordPage />} />
 
-              {/* Requester-scoped screens: AC-02 sends the user to the selector
-                  when no Development Requester has been chosen. */}
-              <Route element={<RequireRequester />}>
-                <Route path="tickets" element={<MyTicketsPage />} />
-                <Route path="tickets/new" element={<CreateTicketPage />} />
-                <Route path="tickets/:id" element={<TicketDetailPage />} />
+            {/* Everything else requires a session and a settled password. */}
+            <Route element={<RequireAuth />}>
+              <Route element={<AppShell />}>
+                <Route index element={<CheckSystemPage />} />
+
+                <Route element={<RequireRole allow={['REQUESTER']} />}>
+                  <Route path="tickets" element={<MyTicketsPage />} />
+                  <Route path="tickets/new" element={<CreateTicketPage />} />
+                  <Route path="tickets/:id" element={<TicketDetailPage />} />
+                </Route>
+
+                <Route element={<RequireRole allow={['IT_STAFF', 'ADMINISTRATOR']} />}>
+                  <Route path="staff/tickets" element={<StaffTicketQueuePage />} />
+                  <Route path="staff/tickets/:id" element={<StaffTicketDetailPage />} />
+                </Route>
+
+                <Route element={<RequireRole allow={['ADMINISTRATOR']} />}>
+                  <Route path="admin/users" element={<UserManagementPage />} />
+                </Route>
+
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
-
-              <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
         </BrowserRouter>
-      </RequesterProvider>
+      </AuthProvider>
     </ThemeProvider>
   )
 }

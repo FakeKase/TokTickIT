@@ -11,11 +11,12 @@ import { Badge } from '../components/Badge'
 import type { BadgeTone } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
+import { StatusBadge } from '../components/TicketBadges'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { Field } from '../components/Field'
 import { LoadingSpinner } from '../components/LoadingSpinner'
-import { useSelectedRequester } from '../requester/useSelectedRequester'
+import { useAuth } from '../auth/useAuth'
 import './MyTicketsPage.css'
 
 type Filters = {
@@ -55,16 +56,15 @@ function formatDate(iso: string) {
   })
 }
 
-function statusLabel(status: string) {
-  return status.charAt(0) + status.slice(1).toLowerCase()
-}
-
 /**
  * My Tickets (ui-spec.md §6.3): toolbar, desktop table / mobile cards,
  * pagination, and BR-28's two distinct zero-result states.
  */
 export function MyTicketsPage() {
-  const { requester } = useSelectedRequester()
+  // Identity comes from the session and never leaves this component: no call
+  // below carries a Requester id, because the server takes it from the cookie
+  // (BR-03).
+  const { user: requester } = useAuth()
   const navigate = useNavigate()
 
   const [categories, setCategories] = useState<Category[]>([])
@@ -81,15 +81,15 @@ export function MyTicketsPage() {
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
 
-  const requesterId = requester?.id
+  const signedInUserId = requester?.id
 
   const load = useCallback(async () => {
-    if (!requesterId) return
+    if (!signedInUserId) return
     setLoading(true)
     setFailed(false)
     try {
       setResponse(
-        await fetchTickets(requesterId, {
+        await fetchTickets({
           search: applied.search || undefined,
           categoryId: applied.categoryId ? Number(applied.categoryId) : undefined,
           requestedPriority: applied.requestedPriority || undefined,
@@ -104,7 +104,7 @@ export function MyTicketsPage() {
     } finally {
       setLoading(false)
     }
-  }, [requesterId, applied, sortBy, sortDir, page])
+  }, [signedInUserId, applied, sortBy, sortDir, page])
 
   useEffect(() => {
     void load()
@@ -116,7 +116,7 @@ export function MyTicketsPage() {
     setFilters(NO_FILTERS)
     setApplied(NO_FILTERS)
     setPage(1)
-  }, [requesterId])
+  }, [signedInUserId])
 
   useEffect(() => {
     fetchCategories()
@@ -336,7 +336,7 @@ export function MyTicketsPage() {
                     </Badge>
                   </td>
                   <td>
-                    <Badge tone="pale">{statusLabel(ticket.currentStatus)}</Badge>
+                    <StatusBadge status={ticket.currentStatus} />
                   </td>
                   <td>{ticket.summary}</td>
                   <td>{ticket.categoryName}</td>
@@ -357,7 +357,7 @@ export function MyTicketsPage() {
                     <Badge tone={PRIORITY_TONE[ticket.requestedPriority]}>
                       {PRIORITY_LABEL[ticket.requestedPriority]}
                     </Badge>{' '}
-                    <Badge tone="pale">{statusLabel(ticket.currentStatus)}</Badge>
+                    <StatusBadge status={ticket.currentStatus} />
                   </p>
                   <p className="ttk-my-tickets__card-meta">
                     {ticket.categoryName} · Created {formatDate(ticket.createdAt)}

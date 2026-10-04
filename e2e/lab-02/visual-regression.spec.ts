@@ -28,8 +28,8 @@ test.describe('RESP-01 (AC-25): the three screens at three breakpoints', () => {
     test(`create-ticket, my-tickets and ticket-detail at ${name}`, async ({ page, request }) => {
       await page.setViewportSize(viewport)
       const requester = await firstRequester(request)
-      const ticket = await createTicket(request, requester.id)
-      await attachFile(request, ticket.id, requester.id)
+      const ticket = await createTicket(request, requester)
+      await attachFile(request, ticket.id, requester)
       await selectRequester(page, requester)
 
       // --- Create Ticket -------------------------------------------------
@@ -76,7 +76,7 @@ test.describe('RESP-01: sorting stays reachable where the table is hidden', () =
   test('mobile exposes a sort control outside the table (FR-07)', async ({ page, request }) => {
     await page.setViewportSize(VIEWPORTS.mobile)
     const requester = await firstRequester(request)
-    await createTicket(request, requester.id)
+    await createTicket(request, requester)
     await selectRequester(page, requester)
 
     await page.goto('/tickets')
@@ -94,7 +94,7 @@ test.describe('RESP-02 (ui-spec §7): badge consistency across screens', () => {
   }) => {
     await page.setViewportSize(VIEWPORTS.desktop)
     const requester = await firstRequester(request)
-    const ticket = await createTicket(request, requester.id, { requestedPriority: 'HIGH' })
+    const ticket = await createTicket(request, requester, { requestedPriority: 'HIGH' })
     await selectRequester(page, requester)
 
     await page.goto('/tickets')
@@ -122,7 +122,7 @@ test.describe('RESP-02 (ui-spec §7): badge consistency across screens', () => {
   test('badges always carry their label, never colour alone', async ({ page, request }) => {
     await page.setViewportSize(VIEWPORTS.desktop)
     const requester = await firstRequester(request)
-    await createTicket(request, requester.id)
+    await createTicket(request, requester)
     await selectRequester(page, requester)
 
     await page.goto('/tickets')
@@ -146,8 +146,8 @@ test.describe('ui-spec §10: field states are distinguishable', () => {
     await selectRequester(page, requester)
 
     await page.goto('/tickets/new')
-    // Role-scoped: the header's "Change Requester" link also carries an
-    // aria-label containing "Requester".
+    // Role-scoped and exact: "Requester" appears in the header too, as the
+    // read-only field's own label, and a loose match would find both.
     const readOnly = page.getByRole('textbox', { name: 'Requester', exact: true })
     const editable = page.getByRole('textbox', { name: /^Summary/ })
 
@@ -273,7 +273,7 @@ test.describe('ui-spec §11: the named state captures', () => {
     // --grep, is this same Requester. Resolving it first and creating after
     // would hand a Ticket to the account the test needs to be empty, and the
     // assertion below would then be checking the wrong state.
-    await createTicket(request, withTickets.id)
+    await createTicket(request, withTickets)
 
     // Asked for, not assumed: other specs in this run create Tickets for the
     // Requesters they use, so a fixed index is not reliably empty.
@@ -316,9 +316,9 @@ test.describe('ui-spec §11: the named state captures', () => {
   test('ticket-detail: active and removed attachment states', async ({ page, request }) => {
     await page.setViewportSize(VIEWPORTS.desktop)
     const requester = await firstRequester(request)
-    const ticket = await createTicket(request, requester.id)
-    await attachFile(request, ticket.id, requester.id, 'active-evidence.png')
-    await attachFile(request, ticket.id, requester.id, 'to-be-removed.png')
+    const ticket = await createTicket(request, requester)
+    await attachFile(request, ticket.id, requester, 'active-evidence.png')
+    await attachFile(request, ticket.id, requester, 'to-be-removed.png')
     await selectRequester(page, requester)
 
     await page.goto(`/tickets/${ticket.id}`)
@@ -347,8 +347,8 @@ test.describe('ui-spec §10: button hierarchy and touch targets', () => {
   test('the four button variants are visually distinct (§4)', async ({ page, request }) => {
     await page.setViewportSize(VIEWPORTS.desktop)
     const requester = await firstRequester(request)
-    const ticket = await createTicket(request, requester.id)
-    await attachFile(request, ticket.id, requester.id)
+    const ticket = await createTicket(request, requester)
+    await attachFile(request, ticket.id, requester)
     await selectRequester(page, requester)
 
     await page.goto(`/tickets/${ticket.id}`)
@@ -379,8 +379,8 @@ test.describe('ui-spec §10: button hierarchy and touch targets', () => {
   }) => {
     await page.setViewportSize(VIEWPORTS.mobile)
     const requester = await firstRequester(request)
-    const ticket = await createTicket(request, requester.id)
-    await attachFile(request, ticket.id, requester.id)
+    const ticket = await createTicket(request, requester)
+    await attachFile(request, ticket.id, requester)
     await selectRequester(page, requester)
 
     await page.goto('/tickets')

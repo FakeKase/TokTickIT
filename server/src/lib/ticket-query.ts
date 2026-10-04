@@ -1,9 +1,13 @@
 // BR-09..BR-12: the My Tickets query contract (api-spec.md §5).
 //
-// Posture, taken from the spec: `requesterId` is the only strict parameter —
-// everything else is a display preference, so a value that cannot be honoured
-// falls back to its default rather than failing the request. A reader whose
-// bookmarked URL has gone stale should still see their tickets.
+// Posture, taken from the spec: every parameter here is a display preference,
+// so a value that cannot be honoured falls back to its default rather than
+// failing the request. A reader whose bookmarked URL has gone stale should
+// still see their tickets.
+//
+// There is no strict parameter left to contrast that with: ownership used to
+// arrive as `requesterId` and was validated hard, and since Issue #41 it comes
+// from the session and never passes through here at all.
 
 export const DEFAULT_PAGE_SIZE = 10;
 export const MAX_PAGE_SIZE = 50;
@@ -93,5 +97,102 @@ export function parseTicketQuery(query: Record<string, unknown>): TicketQuery {
     // same set is presented, so landing on page 3 of an empty account is
     // still the Empty state, not No-Results.
     filtered: Boolean(search || categoryId || requestedPriority),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// BR-30, BR-31: the IT Staff Ticket Queue (api-spec.md §8).
+//
+// Same posture as My Tickets above, and the same helpers: nothing here can
+// fail a request. The queue differs in what it may narrow by, not in how a
+// bad value is treated.
+
+export const QUEUE_SORTABLE_FIELDS = [
+  "createdAt",
+  "updatedAt",
+  "ticketNumber",
+  "itPriority",
+  "currentStatus",
+] as const;
+export type QueueSortField = (typeof QUEUE_SORTABLE_FIELDS)[number];
+
+export const IT_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
+export type ItPriorityValue = (typeof IT_PRIORITIES)[number];
+
+export const TICKET_STATUSES = [
+  "NEW",
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_FOR_REQUESTER",
+  "RESOLVED",
+  "CLOSED",
+  "REOPENED",
+  "CANCELLED",
+] as const;
+export type TicketStatusValue = (typeof TICKET_STATUSES)[number];
+
+/** `me` stays symbolic here: the parser has no session, and resolving it is
+ *  the route's job. A number is a specific user's id. */
+export type OwnerFilter = "me" | "unassigned" | number;
+
+export interface StaffQueueQuery {
+  search?: string;
+  status?: TicketStatusValue;
+  itPriority?: ItPriorityValue;
+  categoryId?: number;
+  owner?: OwnerFilter;
+  sortBy: QueueSortField;
+  sortDir: "asc" | "desc";
+  page: number;
+  pageSize: number;
+  /** True when any narrowing parameter survived parsing, so the client can
+   *  tell an empty queue from a search that matched nothing (AC-23). */
+  filtered: boolean;
+}
+
+function oneOf<T extends string>(
+  allowed: readonly T[],
+  raw: unknown,
+): T | undefined {
+  const value = firstValue(raw);
+  return (allowed as readonly string[]).includes(value ?? "")
+    ? (value as T)
+    : undefined;
+}
+
+function parseOwner(raw: unknown): OwnerFilter | undefined {
+  const value = firstValue(raw);
+  if (value === "me" || value === "unassigned") return value;
+  return parsePositiveInt(raw);
+}
+
+export function parseStaffQueueQuery(
+  query: Record<string, unknown>,
+): StaffQueueQuery {
+  const search = firstValue(query.search)?.trim() || undefined;
+  const status = oneOf(TICKET_STATUSES, query.status);
+  const itPriority = oneOf(IT_PRIORITIES, query.itPriority);
+  const categoryId = parsePositiveInt(query.categoryId);
+  const owner = parseOwner(query.owner);
+
+  return {
+    search,
+    status,
+    itPriority,
+    categoryId,
+    owner,
+    // BR-31: Last Updated descending is the default, because a queue is read
+    // for what moved most recently.
+    sortBy: oneOf(QUEUE_SORTABLE_FIELDS, query.sortBy) ?? "updatedAt",
+    sortDir: firstValue(query.sortDir) === "asc" ? "asc" : "desc",
+    page: parsePage(query.page),
+    pageSize: parsePageSize(query.pageSize),
+    // Computed from what was kept, not what was sent: `?status=BOGUS` narrows
+    // nothing, so an empty result under it is the Empty state, and telling
+    // staff "no Tickets match these filters" would point at a filter that
+    // was never applied.
+    filtered: Boolean(
+      search || status || itPriority || categoryId || owner !== undefined,
+    ),
   };
 }

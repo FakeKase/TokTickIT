@@ -1,0 +1,93 @@
+[
+  {
+    "who": "Nobody (no session)",
+    "call": "read the Ticket Queue",
+    "request": "GET /api/staff/tickets",
+    "status": 401,
+    "body": "{\"error\":\"Authentication required\"}"
+  },
+  {
+    "who": "Requester",
+    "call": "read the Ticket Queue",
+    "request": "GET /api/staff/tickets",
+    "status": 403,
+    "body": "{\"error\":\"You do not have permission to perform this action\"}"
+  },
+  {
+    "who": "Requester",
+    "call": "open the staff view of their own Ticket",
+    "request": "GET /api/staff/tickets/43",
+    "status": 403,
+    "body": "{\"error\":\"You do not have permission to perform this action\"}"
+  },
+  {
+    "who": "Requester",
+    "call": "set their own Ticket to Resolved",
+    "request": "PATCH /api/staff/tickets/43/status",
+    "status": 403,
+    "body": "{\"error\":\"You do not have permission to perform this action\"}"
+  },
+  {
+    "who": "Requester",
+    "call": "make themselves the Ticket Owner",
+    "request": "PATCH /api/staff/tickets/43/owner",
+    "status": 403,
+    "body": "{\"error\":\"You do not have permission to perform this action\"}"
+  },
+  {
+    "who": "Requester",
+    "call": "ask for the Internal Notes on their own Ticket",
+    "request": "GET /api/tickets/43/comments?visibility=INTERNAL",
+    "status": 403,
+    "body": "{\"error\":\"You do not have permission to perform this action\"}"
+  },
+  {
+    "who": "Requester",
+    "call": "post an Internal Note",
+    "request": "POST /api/tickets/43/comments",
+    "status": 403,
+    "body": "{\"error\":\"You do not have permission to perform this action\"}"
+  },
+  {
+    "who": "Another Requester",
+    "call": "open somebody else's Ticket",
+    "request": "GET /api/tickets/43",
+    "status": 404,
+    "body": "{\"error\":\"Ticket not found\"}"
+  },
+  {
+    "who": "Another Requester",
+    "call": "read somebody else's comments",
+    "request": "GET /api/tickets/43/comments",
+    "status": 404,
+    "body": "{\"error\":\"Ticket not found\"}"
+  },
+  {
+    "who": "Requester",
+    "call": "list users",
+    "request": "GET /api/users",
+    "status": 403,
+    "body": "{\"error\":\"You do not have permission to perform this action\"}"
+  },
+  {
+    "who": "IT Staff",
+    "call": "list users",
+    "request": "GET /api/users",
+    "status": 403,
+    "body": "{\"error\":\"You do not have permission to perform this action\"}"
+  },
+  {
+    "who": "IT Staff",
+    "call": "create a user",
+    "request": "POST /api/users",
+    "status": 403,
+    "body": "{\"error\":\"You do not have permission to perform this action\"}"
+  },
+  {
+    "who": "IT Staff",
+    "call": "file a Ticket on a Requester's behalf",
+    "request": "POST /api/tickets",
+    "status": 403,
+    "body": "{\"error\":\"You do not have permission to perform this action\"}"
+  }
+]

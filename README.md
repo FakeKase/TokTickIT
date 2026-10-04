@@ -201,7 +201,15 @@ $ npm run e2e
 
 `npm run e2e` starts the API and the Vite dev server itself, so nothing needs to be
 running first. It writes screenshots to `artifacts/lab-02/screenshots/` and removes the
-Tickets it created afterwards, so repeated runs do not fill the demo database.
+Tickets and users it created afterwards, so repeated runs do not fill the demo database.
+
+`npm run e2e:fresh` runs the same suite against a database built for the run: it creates
+`<your database>_e2e` beside the development one, migrates and seeds it, and starts its own
+API and client on ports 3101 and 5273, so it does not matter what else is running. This is
+the command that produces the Lab 3 submission screenshots in `artifacts/lab-03/screenshots/`;
+they are only captured in this mode, so that they show the seed and nothing left in a
+development database. Anything after `--` is passed to Playwright, for example
+`npm run e2e:fresh -- e2e/lab-03`.
 
 Test files live in `server/tests/lab-0{1,2}/`, `client/tests/lab-0{1,2}/` and `e2e/lab-02/`.
 See [`docs/lab-01/tests.md`](docs/lab-01/tests.md) and

@@ -1,7 +1,9 @@
 import { expect } from '@playwright/test'
 import type { APIRequestContext, Page } from '@playwright/test'
 
-export const API = 'http://localhost:3001'
+/** The API the suite talks to. Follows playwright.config.ts, which follows
+ *  E2E_API_PORT, so a run on its own ports reaches its own server. */
+export const API = `http://localhost:${process.env.E2E_API_PORT ?? 3001}`
 
 /** ui-spec.md §8's three breakpoints, and the widths §11 names its files after. */
 export const VIEWPORTS = {
@@ -125,7 +127,7 @@ export async function sessionCookieFor(
  * A Ticket submitted through the form counts too: it is a real row in the same
  * database, and one that skips this marker leaks on every run.
  */
-export const FIXTURE_MARKER = 'Lab 2 walkthrough'
+export const FIXTURE_MARKER = 'TokTickIT walkthrough'
 
 /** Rotated so a captured list looks like real tickets, not one fixture repeated. */
 const SUMMARIES = [

@@ -743,6 +743,9 @@ describe("a user edit does not hold up unrelated writes", () => {
     const holding = createPrismaClient();
     const realTransaction = holding.$transaction.bind(holding);
     let insert: "finished" | "blocked" | "not tried" = "not tried";
+    // The write itself, kept so the test can wait for it to settle before it
+    // ends. If it was blocked it only completes once the edit commits.
+    let pending: Promise<unknown> = Promise.resolve();
 
     vi.spyOn(holding, "$transaction").mockImplementation(((fn: unknown, ...rest: unknown[]) =>
       (realTransaction as never as (...a: unknown[]) => unknown)(async (tx: object) => {
@@ -760,9 +763,7 @@ describe("a user edit does not hold up unrelated writes", () => {
                 .then(() => "finished" as const);
               const giveUp = new Promise<"blocked">((resolve) => setTimeout(() => resolve("blocked"), 1500));
               insert = await Promise.race([write, giveUp]);
-              // If it was blocked it completes once the edit commits; wait for
-              // it then, so the cleanup below does not race it.
-              void write.catch(() => {});
+              pending = write.catch(() => {});
               return rows;
             };
           },
@@ -771,6 +772,9 @@ describe("a user edit does not hold up unrelated writes", () => {
       }, ...rest)) as never);
 
     const response = await edit(subject.id, { name: `Lock Subject ${TAG}` }, adminCookie, createApp(holding));
+    // Now actually waited for, so a blocked insert cannot land after this
+    // test has finished and race the cleanup.
+    await pending;
     await holding.$disconnect();
 
     expect(response.status).toBe(200);

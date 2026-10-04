@@ -99,3 +99,100 @@ export function parseTicketQuery(query: Record<string, unknown>): TicketQuery {
     filtered: Boolean(search || categoryId || requestedPriority),
   };
 }
+
+// ---------------------------------------------------------------------------
+// BR-30, BR-31: the IT Staff Ticket Queue (api-spec.md §8).
+//
+// Same posture as My Tickets above, and the same helpers: nothing here can
+// fail a request. The queue differs in what it may narrow by, not in how a
+// bad value is treated.
+
+export const QUEUE_SORTABLE_FIELDS = [
+  "createdAt",
+  "updatedAt",
+  "ticketNumber",
+  "itPriority",
+  "currentStatus",
+] as const;
+export type QueueSortField = (typeof QUEUE_SORTABLE_FIELDS)[number];
+
+export const IT_PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
+export type ItPriorityValue = (typeof IT_PRIORITIES)[number];
+
+export const TICKET_STATUSES = [
+  "NEW",
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_FOR_REQUESTER",
+  "RESOLVED",
+  "CLOSED",
+  "REOPENED",
+  "CANCELLED",
+] as const;
+export type TicketStatusValue = (typeof TICKET_STATUSES)[number];
+
+/** `me` stays symbolic here: the parser has no session, and resolving it is
+ *  the route's job. A number is a specific user's id. */
+export type OwnerFilter = "me" | "unassigned" | number;
+
+export interface StaffQueueQuery {
+  search?: string;
+  status?: TicketStatusValue;
+  itPriority?: ItPriorityValue;
+  categoryId?: number;
+  owner?: OwnerFilter;
+  sortBy: QueueSortField;
+  sortDir: "asc" | "desc";
+  page: number;
+  pageSize: number;
+  /** True when any narrowing parameter survived parsing, so the client can
+   *  tell an empty queue from a search that matched nothing (AC-23). */
+  filtered: boolean;
+}
+
+function oneOf<T extends string>(
+  allowed: readonly T[],
+  raw: unknown,
+): T | undefined {
+  const value = firstValue(raw);
+  return (allowed as readonly string[]).includes(value ?? "")
+    ? (value as T)
+    : undefined;
+}
+
+function parseOwner(raw: unknown): OwnerFilter | undefined {
+  const value = firstValue(raw);
+  if (value === "me" || value === "unassigned") return value;
+  return parsePositiveInt(raw);
+}
+
+export function parseStaffQueueQuery(
+  query: Record<string, unknown>,
+): StaffQueueQuery {
+  const search = firstValue(query.search)?.trim() || undefined;
+  const status = oneOf(TICKET_STATUSES, query.status);
+  const itPriority = oneOf(IT_PRIORITIES, query.itPriority);
+  const categoryId = parsePositiveInt(query.categoryId);
+  const owner = parseOwner(query.owner);
+
+  return {
+    search,
+    status,
+    itPriority,
+    categoryId,
+    owner,
+    // BR-31: Last Updated descending is the default, because a queue is read
+    // for what moved most recently.
+    sortBy: oneOf(QUEUE_SORTABLE_FIELDS, query.sortBy) ?? "updatedAt",
+    sortDir: firstValue(query.sortDir) === "asc" ? "asc" : "desc",
+    page: parsePage(query.page),
+    pageSize: parsePageSize(query.pageSize),
+    // Computed from what was kept, not what was sent: `?status=BOGUS` narrows
+    // nothing, so an empty result under it is the Empty state, and telling
+    // staff "no Tickets match these filters" would point at a filter that
+    // was never applied.
+    filtered: Boolean(
+      search || status || itPriority || categoryId || owner !== undefined,
+    ),
+  };
+}

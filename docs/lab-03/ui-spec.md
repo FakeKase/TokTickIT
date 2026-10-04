@@ -84,6 +84,19 @@ Purpose: let IT Staff find the next thing to work on, then open it. Not a report
 Category filter, and an Owner filter with `All / Mine / Unassigned`. `Clear filters` is a secondary
 button, shown only when at least one filter is active.
 
+The four selects apply as they change. Search applies on submit, not per keystroke: a request for
+every character typed would race itself and flicker the list. Changing any of them returns to
+page 1.
+
+A **Sort by** select and a direction button sit in the same row at every width. The table's
+headers sort too, but only four of the five keys have a column — Created Date does not — so the
+select is the one place all five are offered, and the only one on mobile, where the table is gone.
+
+**The view is in the address bar.** Filters, sort and page are query parameters on
+`/staff/tickets`, with defaults left out, so the plain queue has a plain URL. Staff open a Ticket
+and come back, and Back has to mean the view they left; state held only in the component would be
+gone. A value in the URL that is not recognised is ignored, the same posture the API takes.
+
 **Desktop table (≥992px)** — columns, in order:
 
 | Column | Notes |
@@ -103,7 +116,11 @@ runs on priority, status, and ownership. Created Date is likewise dropped in fav
 Updated, which is what tells staff whether a Ticket is moving.
 
 **Tablet (768–991px)** — Category and Requested Priority collapse into the Summary cell as a
-secondary line.
+secondary line. The Summary wraps here rather than truncating: the one-line ellipsis relies on the
+`title` tooltip to show the rest, and a touch device has no hover to raise it.
+
+At every table width, each cell other than Summary stays on one line. A badge broken across two
+lines stops reading as a label, so Summary is the column that gives way.
 
 **Mobile (<768px)** — one card per Ticket: Ticket Number and Status on the first row, Summary on
 the second, IT Priority and Owner on the third. Filters collapse behind a `Filters` toggle showing
@@ -112,7 +129,9 @@ an active-count. Whole card is the tap target, ≥44px tall.
 **States** — Loading (skeleton rows, not a bare spinner, so the layout does not jump), Empty ("No
 Tickets in the queue yet."), No-Results ("No Tickets match these filters." + `Clear filters`),
 Forbidden, and safe Failure with a Retry action. Empty and No-Results are distinct, as in Lab 2
-BR-28.
+BR-28. The controls are hidden in the Empty state, since there is nothing to narrow. Forbidden
+offers a link to the user's own landing page and no Retry: a `403` is answered the same way however
+often it is asked.
 
 ## 5. IT Staff Ticket Detail (`/staff/tickets/:id`)
 

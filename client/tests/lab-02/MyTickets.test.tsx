@@ -302,6 +302,27 @@ describe('My Tickets', () => {
     expect(table.getByText('New')).toBeInTheDocument()
   })
 
+  it('spells a Lab 3 status as words, not as the enum it arrives as', async () => {
+    // Lab 2 derived the label from the value, which was fine while New was the
+    // only status. Once IT Staff move a Ticket on, that turned
+    // WAITING_FOR_REQUESTER into "Waiting_for_requester" on the Requester's
+    // own list.
+    mockApi(() =>
+      listResponse([
+        ticket(1, { currentStatus: 'WAITING_FOR_REQUESTER' }),
+        ticket(2, { currentStatus: 'IN_PROGRESS' }),
+      ]),
+    )
+
+    await renderList()
+    await screen.findByText('TKT-2026-000001')
+
+    const table = within(screen.getByRole('table'))
+    expect(table.getByText('Waiting for Requester')).toBeInTheDocument()
+    expect(table.getByText('In Progress')).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/_/)
+  })
+
   it('shows a retryable failure state when the list cannot load', async () => {
     // Only the ticket list fails. Rejecting every request would take the
     // session check down with it and land on Login, which is a different test.

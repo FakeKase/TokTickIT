@@ -157,6 +157,24 @@ The IT Staff Ticket Queue. Requires IT Staff or Administrator.
 | `page` | integer ≥ 1, clamped | `1` |
 | `pageSize` | 1–50, clamped | `10` |
 
+Nothing in this table can fail the request. A value that is not recognised — an unknown status, a
+sort key that is not offered, an `owner` that is none of the three forms — is dropped and its
+default applies, exactly as if it had not been sent (BR-30). Enum values are matched as spelled
+above; `status=new` is not `NEW`.
+
+- **Ordering.** The chosen key first, then Last Updated descending, then `id` descending
+  (BR-31, AC-25). The second key is skipped when Last Updated is itself the chosen key. The
+  tie-break stays descending whichever way the sort runs. `itPriority` and `currentStatus` sort in
+  their declared order, not alphabetically: Low → Medium → High → Urgent, and New → Open → In
+  Progress → Waiting for Requester → Resolved → Closed → Reopened → Cancelled.
+- **`owner=me`** is resolved from the session, so the same URL means a different set for each
+  caller.
+- **A page past the end is served as the last real page**, and `pagination.page` reports the page
+  that was served rather than the one requested (AC-26). A queue changes while it is being read —
+  Tickets leave a filter as their status moves — so a page that existed a moment ago can stop
+  existing, and answering with zero rows would be indistinguishable from an empty queue. With no
+  rows at all, `page` is `1` and `totalPages` is `0`.
+
 - **`200`**:
 ```json
 {
@@ -170,10 +188,18 @@ The IT Staff Ticket Queue. Requires IT Staff or Administrator.
       "requesterResolvedAt": null,
       "createdAt": "...", "updatedAt": "..." }
   ],
-  "pagination": { "page": 1, "pageSize": 10, "totalItems": 37, "totalPages": 4 }
+  "pagination": { "page": 1, "pageSize": 10, "totalItems": 37, "totalPages": 4 },
+  "filtered": false
 }
 ```
-  `owner` is `null` for an unassigned Ticket.
+  `owner` is `null` for an unassigned Ticket. `requester` and `owner` carry an id and a name and
+  nothing else: no email address travels with a list row.
+
+  `filtered` is `true` when at least one narrowing parameter was **applied** — `search`, `status`,
+  `itPriority`, `categoryId` or `owner` — and is what lets the client tell an empty queue from a
+  search that matched nothing (AC-23). A parameter that was dropped as unrecognised does not count:
+  `?status=BOGUS` narrows nothing, so an empty result under it is an empty queue. Sorting and
+  paging never count.
 - **`401`** / **`403`**: unauthenticated, or a Requester calling it (AC-14).
 
 ## 9. `GET /api/staff/tickets/:id`

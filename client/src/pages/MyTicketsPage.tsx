@@ -11,6 +11,7 @@ import { Badge } from '../components/Badge'
 import type { BadgeTone } from '../components/Badge'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
+import { StatusBadge } from '../components/TicketBadges'
 import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { Field } from '../components/Field'
@@ -53,10 +54,6 @@ function formatDate(iso: string) {
     month: 'short',
     day: 'numeric',
   })
-}
-
-function statusLabel(status: string) {
-  return status.charAt(0) + status.slice(1).toLowerCase()
 }
 
 /**
@@ -339,7 +336,7 @@ export function MyTicketsPage() {
                     </Badge>
                   </td>
                   <td>
-                    <Badge tone="pale">{statusLabel(ticket.currentStatus)}</Badge>
+                    <StatusBadge status={ticket.currentStatus} />
                   </td>
                   <td>{ticket.summary}</td>
                   <td>{ticket.categoryName}</td>
@@ -360,7 +357,7 @@ export function MyTicketsPage() {
                     <Badge tone={PRIORITY_TONE[ticket.requestedPriority]}>
                       {PRIORITY_LABEL[ticket.requestedPriority]}
                     </Badge>{' '}
-                    <Badge tone="pale">{statusLabel(ticket.currentStatus)}</Badge>
+                    <StatusBadge status={ticket.currentStatus} />
                   </p>
                   <p className="ttk-my-tickets__card-meta">
                     {ticket.categoryName} · Created {formatDate(ticket.createdAt)}

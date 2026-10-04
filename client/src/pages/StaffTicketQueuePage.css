@@ -1,0 +1,315 @@
+/* IT Staff Ticket Queue (ui-spec.md §4): table on desktop and tablet, cards on
+   mobile. As on My Tickets, both markups are rendered and a media query turns
+   one off; `display: none` takes it out of the accessibility tree too, so each
+   Ticket is announced once at any width. */
+
+.ttk-queue__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--zg-space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--zg-space-4);
+}
+
+.ttk-queue__head h2,
+.ttk-queue__count {
+  margin: 0;
+}
+
+.ttk-queue__count {
+  font-size: var(--zg-font-size-label);
+  opacity: 0.75;
+}
+
+/* ---------- Controls ---------- */
+
+/* Mobile only: at wider widths the controls are simply there. */
+.ttk-queue__filters-toggle {
+  display: none;
+}
+
+.ttk-queue__controls {
+  display: grid;
+  grid-template-columns: 2fr repeat(4, 1fr);
+  align-items: end;
+  gap: var(--zg-space-3);
+  padding: var(--zg-space-4);
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+  margin-bottom: var(--zg-space-4);
+}
+
+.ttk-queue__sort {
+  grid-column: 1 / 3;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--zg-space-2);
+}
+
+.ttk-queue__actions {
+  grid-column: 3 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--zg-space-2);
+}
+
+/* ---------- Loading ---------- */
+
+.ttk-queue__skeleton {
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+  overflow: hidden;
+}
+
+.ttk-queue__skeleton-row {
+  height: 48px;
+  border-bottom: 1px solid var(--zg-border);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--zg-neutral-tint) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: ttk-queue-shimmer 1.4s ease-in-out infinite;
+}
+
+.ttk-queue__skeleton-row:last-child {
+  border-bottom: none;
+}
+
+@keyframes ttk-queue-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* The shimmer is decoration; the rows alone still say "loading". */
+@media (prefers-reduced-motion: reduce) {
+  .ttk-queue__skeleton-row {
+    animation: none;
+    background: var(--zg-neutral-tint);
+    opacity: 0.5;
+  }
+}
+
+/* ---------- Desktop / tablet table ---------- */
+
+/* Scrolls inside itself if a row still cannot fit, so the page never scrolls
+   sideways (ui-spec.md §9). */
+.ttk-queue__table-wrap {
+  overflow-x: auto;
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+}
+
+.ttk-queue__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ttk-queue__table th,
+.ttk-queue__table td {
+  text-align: left;
+  padding: var(--zg-space-3);
+  border-bottom: 1px solid var(--zg-border);
+  vertical-align: top;
+}
+
+/* Every cell but Summary holds one short thing - a badge, a name, a category -
+   and a badge broken across two lines reads as a blob rather than a label.
+   Summary is the column built to give way: it truncates, with the whole text
+   in its title. */
+.ttk-queue__table td {
+  white-space: nowrap;
+}
+
+.ttk-queue__table thead th {
+  background: var(--zg-pale);
+  font-size: var(--zg-font-size-label);
+  font-weight: var(--zg-font-weight-label);
+  white-space: nowrap;
+}
+
+.ttk-queue__table thead button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ttk-queue__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ttk-queue__number {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* One line, with the whole Summary in `title`. max-width: 0 is what lets a
+   table cell shrink below its content so the ellipsis can happen at all. */
+.ttk-queue__summary-cell {
+  width: 100%;
+  max-width: 0;
+}
+
+.ttk-queue__summary {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttk-queue__summary-meta {
+  display: none;
+  margin-top: var(--zg-space-1);
+  font-size: 13px;
+  white-space: normal;
+}
+
+.ttk-queue__updated {
+  white-space: nowrap;
+}
+
+.ttk-queue__cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ttk-queue__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zg-space-4);
+  margin-top: var(--zg-space-4);
+  flex-wrap: wrap;
+}
+
+/* Tablet (768-991px): Category and Requested Priority leave their columns and
+   become the Summary's second line. */
+@media (max-width: 991px) {
+  .ttk-queue__controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ttk-queue__search,
+  .ttk-queue__sort,
+  .ttk-queue__actions {
+    grid-column: 1 / -1;
+  }
+
+  .ttk-queue__wide-only {
+    display: none;
+  }
+
+  .ttk-queue__summary-meta {
+    display: block;
+  }
+
+  /* Wraps here instead of truncating. The ellipsis leans on a `title`
+     tooltip to show the rest, and a tablet has no hover to raise one - so
+     at this width a cut-off Summary would simply be unreadable. */
+  .ttk-queue__summary {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .ttk-queue__table th,
+  .ttk-queue__table td {
+    padding: var(--zg-space-2);
+  }
+}
+
+/* Mobile (<768px): one card per Ticket; the controls fold behind a toggle. */
+@media (max-width: 767px) {
+  .ttk-queue__filters-toggle {
+    display: inline-flex;
+    margin-bottom: var(--zg-space-3);
+  }
+
+  .ttk-queue__controls {
+    grid-template-columns: 1fr;
+  }
+
+  .ttk-queue__controls[data-open='false'] {
+    display: none;
+  }
+
+  .ttk-queue__actions .ttk-btn {
+    flex: 1;
+  }
+
+  .ttk-queue__table-wrap {
+    display: none;
+  }
+
+  .ttk-queue__cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--zg-space-3);
+  }
+
+  .ttk-queue__card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--zg-space-2);
+    min-height: 44px;
+    padding: var(--zg-space-4);
+    background: var(--zg-surface);
+    border: 1px solid var(--zg-border);
+    border-radius: var(--zg-radius-lg);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .ttk-queue__card:focus-visible {
+    outline: 2px solid var(--zg-secondary);
+    outline-offset: 2px;
+  }
+
+  .ttk-queue__card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--zg-space-2);
+    flex-wrap: wrap;
+  }
+
+  .ttk-queue__card-summary {
+    overflow-wrap: anywhere;
+  }
+
+  .ttk-queue__card-owner {
+    font-size: 14px;
+  }
+
+  .ttk-queue__pagination {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--zg-space-2) var(--zg-space-3);
+  }
+
+  .ttk-queue__pagination span {
+    grid-column: 1 / -1;
+    order: -1;
+    text-align: center;
+  }
+
+  .ttk-queue__pagination .ttk-btn {
+    width: 100%;
+  }
+}

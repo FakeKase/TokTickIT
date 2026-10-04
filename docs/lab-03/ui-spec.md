@@ -152,7 +152,7 @@ read-only ticket information above it is unmistakably read-only:
 
 | Control | Behaviour |
 | :-- | :-- |
-| Ticket Owner | Shows current owner or "Unassigned", marked "(you)" when it is the person looking. `Claim` primary button when unassigned or owned by someone else; a `Reassign to` select listing active IT Staff and Administrators other than the current owner, which acts on selection; `Unassign` as a tertiary action, shown only when there is an owner |
+| Ticket Owner | Shows current owner or "Unassigned", marked "(you)" when it is the person looking. `Claim` primary button when unassigned or owned by someone else; a `Reassign to` select listing active IT Staff and Administrators other than the current owner, which acts on selection; `Unassign` as a tertiary action, shown only when there is an owner, and disabled with the reason beside it on a Resolved or Closed Ticket, which must keep its owner |
 | IT Priority | Select of the four values; saves on change with an inline saving indicator. It is bound to the saved value, so a failed save leaves it showing what is true |
 | Status | The current status as a badge, then a `Move to` select offering **only the transitions permitted from the current status**, taken from the Ticket's own `transitions` (api-spec §9). A move to Resolved or Closed with no owner is disabled with an adjacent reason, and the backend rejects it regardless. The move is made by a separate `Change status` button, not on selection: a priority can be put back, a Cancelled Ticket cannot. A final status shows a sentence saying so and no control |
 | Requested Priority | Read-only, shown beside IT Priority so the difference between what was asked for and what was decided is visible |
@@ -196,10 +196,13 @@ The Lab 2 screen keeps its read-only header and attachment management, and gains
 
 One screen. Intentionally the plainest surface in the application.
 
-**Controls row** — search box (name or email), Role filter, and a `New user` primary button.
+**Controls row** — search box (name or email), Role filter, and a `New user` primary button. Search
+applies on submit; the role filter applies on change and takes whatever is in the search box with
+it. `Clear filters` appears only while a filter is active.
 
 **Table** — Name, Email, Role badge, Status (`Active` / `Inactive` chip), Edit action. Unpaginated
-(BR-38). Below 768px each row becomes a card with the same five fields stacked.
+(BR-38). Below 768px each row becomes a card with the same five fields stacked. The row belonging
+to the person looking is marked "(you)". Inactive users stay in the list.
 
 **Create / Edit panel** — a modal dialog on desktop, a full-screen sheet on mobile, with a focus
 trap and `Esc` to dismiss:
@@ -212,12 +215,40 @@ trap and `Esc` to dismiss:
 | Active | Checkbox, default on | Editable; disabled with a reason when editing yourself or the last active Administrator |
 | Initial password | Required, at least 8 characters and at most 72 bytes (BR-13) | Not shown; replaced by a `Set new initial password` secondary action with its own confirmation |
 
+On an edit only the fields that changed are sent, and nothing is sent if nothing changed.
+
+`Set new initial password` opens a password field inside the dialog with the consequence stated
+("This signs them out everywhere"), a `Confirm new password` button and a `Keep current password`
+way back. Nothing is sent until it is confirmed. On your own account the action is replaced by a
+link to Change Password, since using it would sign you out and then make you change the password
+you had just chosen.
+
+A duplicate email (`409`) is shown on the Email field. Either safety-rule refusal from the server is
+shown at the top of the dialog in the server's words. A `400` puts each message on its field. Any
+other failure shows a generic message, repeats nothing the server said, and keeps what was typed.
+
 **Guard-rail feedback** — the two safety rules (BR-32, BR-33) are shown as disabled controls *with
 a visible reason beside them*, never as a silent absence, and are enforced by the backend
 regardless of what the dialog allows:
 
 - "You cannot deactivate your own account."
 - "This is the last active Administrator. Promote another Administrator first."
+
+For the last active Administrator both the Active checkbox and the Role radios are disabled, since
+either change would remove them. Which account that is comes from the server (`api-spec.md` §14),
+not from counting rows in a list that may be filtered.
+
+**The dialog** is labelled by its heading and takes focus on its first field when it opens. `Tab`
+and `Shift+Tab` wrap inside it, and `Esc` closes it without saving. Both keep working if focus has
+fallen out of the dialog, which is what a browser does when the button holding focus is disabled
+while it saves. Closing returns focus to the control that opened it.
+
+While a save is in flight the dialog cannot be dismissed: `Cancel` is disabled and `Esc` is ignored.
+If it closed and the save then failed, the failure would have nowhere to appear.
+
+**Editing your own account** re-reads the session once the save succeeds, so the header, the
+navigation and the route guard reflect a new name or role at once. An Administrator who demotes
+themselves sees the Forbidden state under their new role, not under an "Administrator" badge.
 
 **States** — Loading, Empty ("No users yet."), No-Results ("No users match this search."),
 Forbidden, saving indicator on the dialog's primary button, success message on the list after the

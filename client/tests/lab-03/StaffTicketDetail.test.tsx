@@ -35,6 +35,7 @@ const BASE: StaffTicketDetail = {
     { to: 'RESOLVED', requiresOwner: true },
     { to: 'CANCELLED', requiresOwner: false },
   ],
+  ownerRequired: false,
 }
 
 const ASSIGNABLE = [
@@ -280,6 +281,24 @@ describe('UI-14 ownership (AC-27, AC-28)', () => {
 
     await waitFor(() => expect(screen.getByTestId('owner-current')).toHaveTextContent('Unassigned'))
     expect(sent[0].body).toEqual({ ownerId: null })
+  })
+
+  it('disables Unassign on a Ticket that must keep its owner, and says why', async () => {
+    server = {
+      ...BASE,
+      currentStatus: 'RESOLVED',
+      owner: { id: 9, name: 'Sarah Chen' },
+      ownerRequired: true,
+      transitions: [],
+    }
+    mockApi()
+    await openTicket()
+
+    const unassign = workflow().getByRole('button', { name: 'Unassign' })
+    expect(unassign).toBeDisabled()
+    expect(unassign).toHaveAccessibleDescription(/Resolved Ticket must keep its Ticket Owner/)
+    // Handing it to a colleague is still allowed, and still offered.
+    expect(workflow().getByLabelText('Reassign to')).toBeEnabled()
   })
 
   it('shows the server’s reason when an owner change is refused, and reloads the Ticket', async () => {

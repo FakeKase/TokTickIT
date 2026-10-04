@@ -1,0 +1,208 @@
+/* Administrator User Management (ui-spec.md §7). Table on desktop and tablet,
+   cards on mobile; as elsewhere both are rendered and a media query hides one. */
+
+.ttk-users__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zg-space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--zg-space-4);
+}
+
+.ttk-users__head h2 {
+  margin: 0;
+}
+
+.ttk-users__message {
+  margin: 0 0 var(--zg-space-4);
+  padding: var(--zg-space-3);
+  background: var(--zg-pale);
+  border-left: 3px solid var(--zg-secondary);
+  border-radius: var(--zg-radius);
+}
+
+.ttk-users__controls {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  align-items: end;
+  gap: var(--zg-space-3);
+  padding: var(--zg-space-4);
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+  margin-bottom: var(--zg-space-4);
+}
+
+.ttk-users__actions {
+  display: flex;
+  gap: var(--zg-space-2);
+}
+
+.ttk-users__table-wrap {
+  overflow-x: auto;
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+}
+
+.ttk-users__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ttk-users__table th,
+.ttk-users__table td {
+  text-align: left;
+  padding: var(--zg-space-3);
+  border-bottom: 1px solid var(--zg-border);
+  vertical-align: middle;
+}
+
+.ttk-users__table thead th {
+  background: var(--zg-pale);
+  font-size: var(--zg-font-size-label);
+  font-weight: var(--zg-font-weight-label);
+}
+
+.ttk-users__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ttk-users__email {
+  overflow-wrap: anywhere;
+}
+
+.ttk-users__table .ttk-users__edit {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ttk-users__you {
+  opacity: 0.75;
+}
+
+/* Outlined and uncoloured (ui-spec.md §3): a role sits beside a name and must
+   not compete with the status chip next to it. */
+.ttk-users__role {
+  background: var(--zg-surface);
+  border: 1px solid var(--zg-border);
+  white-space: nowrap;
+}
+
+.ttk-users__cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------- Dialog form ---------- */
+
+.ttk-user-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-4);
+}
+
+.ttk-user-form input[type='text'],
+.ttk-user-form input[type='email'],
+.ttk-user-form input[type='password'],
+.ttk-user-form__reset input[type='password'] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ttk-user-form__group {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.ttk-user-form__choice {
+  display: flex;
+  align-items: center;
+  gap: var(--zg-space-2);
+  min-height: 32px;
+}
+
+/* The reason a control is disabled, right beside it. */
+.ttk-user-form__reason {
+  margin: var(--zg-space-1) 0 0;
+  font-size: 13px;
+}
+
+.ttk-user-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zg-space-2);
+}
+
+.ttk-user-form__reset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-3);
+  margin-top: var(--zg-space-4);
+  padding-top: var(--zg-space-4);
+  border-top: 1px solid var(--zg-border);
+  align-items: flex-start;
+}
+
+.ttk-user-form__reset .ttk-field {
+  align-self: stretch;
+}
+
+@media (max-width: 991px) {
+  .ttk-users__controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ttk-users__actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 767px) {
+  .ttk-users__controls {
+    grid-template-columns: 1fr;
+  }
+
+  .ttk-users__actions .ttk-btn {
+    flex: 1;
+  }
+
+  .ttk-users__table-wrap {
+    display: none;
+  }
+
+  .ttk-users__cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--zg-space-3);
+  }
+
+  .ttk-users__card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--zg-space-2);
+    padding: var(--zg-space-4);
+    background: var(--zg-surface);
+    border: 1px solid var(--zg-border);
+    border-radius: var(--zg-radius-lg);
+  }
+
+  .ttk-users__card p {
+    margin: 0;
+  }
+
+  .ttk-users__card-name {
+    font-weight: var(--zg-font-weight-label);
+  }
+
+  .ttk-user-form__actions .ttk-btn {
+    flex: 1;
+  }
+}

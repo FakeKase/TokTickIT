@@ -116,6 +116,8 @@ One endpoint family serves Public Comments and Internal Notes, filtered by role 
 - **`400`**: empty, whitespace-only, or longer than 2000 characters after trimming (BR-25).
 - **`403`**: a Requester posting `INTERNAL`.
 - **`404`**: a Requester posting on a Ticket they do not own.
+- Posting does **not** advance the Ticket's `updatedAt`. Last Updated records a change to the
+  Ticket itself: its owner, priority or status. The thread carries its own timestamps.
 - There is deliberately **no 409 for a Resolved, Closed or Cancelled Ticket**, unlike §7. A
   comment is a sentence about a Ticket and stays useful after it closes — "this came back" is
   worth being able to say. The resolved signal is different: it asks IT Staff to act, and asking
@@ -212,6 +214,9 @@ above; `status=new` is not `NEW`.
   of the matrix. `requiresOwner` marks a move that is in the matrix but also needs a Ticket Owner
   (BR-23), so the screen can disable it with a reason rather than hide it.
 
+  `ownerRequired` is `true` while the Ticket's status is one that must keep its owner (§10), so the
+  screen can disable Unassign with a reason instead of offering a request that will be refused.
+
   Every `PATCH` in §10 to §12 returns this same shape.
 - **`403`**: a Requester. Note the deliberate difference from §5: a Requester is told "forbidden" here because the staff namespace itself is off-limits, and no per-ticket existence is revealed either way.
 - **`404`**: no such Ticket.
@@ -231,9 +236,11 @@ Claim or reassign (BR-19, BR-20).
 - **`409`**: the target user does not exist, is inactive, or is a Requester — `{ "error": "Ticket Owner must be an active IT Staff or Administrator" }` (AC-29). One message for all three, so the endpoint cannot be used to learn which ids are accounts.
 - **`409`**: `ownerId` is `null` and the Ticket is Resolved or Closed — `{ "error": "A Resolved or Closed Ticket must keep its Ticket Owner" }`. BR-23 would otherwise be one unassign away from meaning nothing. Such a Ticket may still be reassigned.
 
-The check on the target user and the write run in one `SERIALIZABLE` transaction, retried on a
-serialization failure, because the rule spans two tables: the Ticket being written and the User
-who must still be active staff when it is.
+The rule spans two tables: the Ticket being written and the User who must still be active staff
+when it is. The check reads the User's row `FOR SHARE` inside the transaction that writes the
+Ticket, so the row cannot change until that transaction ends. Deactivation (§16) updates the same
+row before returning that user's Tickets to the queue, so whichever of the two runs second sees the
+other's result. This holds at the default isolation level.
 
 ## 11. `PATCH /api/staff/tickets/:id/it-priority`
 
@@ -291,8 +298,14 @@ Administrator only (BR-16).
 **Query parameters**: `search` (name or email, case-insensitive partial), `role`
 (`REQUESTER`/`IT_STAFF`/`ADMINISTRATOR`). Unpaginated by design (BR-38).
 
-- **`200`**: `[{ id, name, email, role, isActive, mustChangePassword, createdAt }, ...]`, ordered by name.
-- **`403`**: any non-Administrator (AC-14).
+- **`200`**: `[{ id, name, email, role, isActive, mustChangePassword, createdAt, isLastActiveAdministrator }, ...]`, ordered by name. Inactive users are included: deactivated is not deleted.
+- **`403`**: any non-Administrator, IT Staff included (AC-14).
+
+An unrecognised `role` is ignored, as other list filters are.
+
+`isLastActiveAdministrator` is `true` for the one account §16 will refuse to deactivate or demote.
+It is counted over every user, not over the filtered list, and is there so the screen can disable
+those controls with a reason. It is a courtesy; §16 is what enforces the rule.
 
 ## 15. `POST /api/users`
 
@@ -302,24 +315,52 @@ Administrator only (BR-16).
   "role": "IT_STAFF", "isActive": true, "initialPassword": "..." }
 ```
 
-- **`201`**: the created user, with `mustChangePassword: true` (AC-37).
+- **`201`**: the created user, with `mustChangePassword: true` (AC-37) whatever the body says
+  about that flag. `isActive` defaults to `true`, and must be a boolean if sent. The email is
+  trimmed and stored lower-cased (BR-06), so it is found by the login that looks it up.
 - **`400`**: name outside 2–80 characters, invalid or over-long email, unrecognised role, or an initial password shorter than 8 characters or longer than 72 UTF-8 bytes (BR-13, BR-37).
 - **`403`**: non-Administrator.
-- **`409`**: the email address is already held — `{ "error": "That email address is already in use" }` (BR-34).
+- **`409`**: the email address is already held, compared case-insensitively — `{ "error": "That email address is already in use" }` (BR-34).
+
+All invalid fields are reported together in `fields`, the initial password among them. The
+password is never echoed back, in a success or a failure.
 
 ## 16. `PATCH /api/users/:id`
 
 **Request body**: any subset of `{ "name", "email", "role", "isActive" }`.
 
-- **`200`**: the updated user.
-- **`400`**: validation, as above.
+- **`200`**: the updated user. An empty body, or one that changes nothing, is also `200`.
+- **`400`**: validation, as above, for any field that is sent. `passwordHash`, `initialPassword`
+  and `mustChangePassword` are not editable here and are ignored.
 - **`403`**: non-Administrator.
 - **`404`**: no such user.
 - **`409`**: duplicate email (BR-34); deactivating your own account (BR-32, AC-39); deactivating or
   changing the role of the last active Administrator (BR-33, AC-40) —
   `{ "error": "The system must keep at least one active Administrator" }`.
 
+A refused edit writes nothing: when one field of several is refused, none of them is applied.
+
+Who is acting is taken from the session, so self-deactivation cannot be dodged or misattributed
+through the body. When both rules apply, the self-deactivation message is the one returned.
+
 Deactivating a user also deletes their sessions, so access ends immediately rather than at expiry.
+Reactivating does not bring them back. A role change takes effect on the user's next request.
+
+**A user who can no longer own Tickets hands back the live ones.** When an edit leaves a user
+inactive, or a Requester, every Ticket they own whose status is New, Open, In Progress, Waiting for
+Requester or Reopened becomes unassigned. Tickets they own that are Resolved, Closed or Cancelled
+keep them as owner: those must keep an owner (§10), and it is the record of who finished the work.
+
+**Concurrency.** The edit locks the user's row and every active Administrator's row, in id order,
+in one statement, before it decides anything. That makes the last-Administrator count a count of
+rows that cannot change underneath it, so two Administrators demoting each other at the same moment
+leave one. It also pairs with the owner check in §10: an assignment and a deactivation of the same
+user are ordered by that lock, and whichever runs second sees the other.
+
+The lock is `FOR NO KEY UPDATE`, not `FOR UPDATE`. Postgres checks a foreign key by taking
+`FOR KEY SHARE` on the referenced row, and `FOR UPDATE` blocks that: a comment, Ticket or session
+written for any locked user would wait for the edit to finish. The weaker lock still conflicts with
+itself and with §10's `FOR SHARE`, so both guarantees hold, and unrelated writes go through.
 
 ## 17. `POST /api/users/:id/initial-password`
 

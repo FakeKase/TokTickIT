@@ -34,6 +34,12 @@
   border-radius: var(--zg-radius-lg);
 }
 
+/* The panel is --zg-pale, which is also the fill of a pale badge. On it, such
+   a badge would be a word with no shape, so it takes the surface colour here. */
+.ttk-workflow .ttk-badge--pale {
+  background: var(--zg-surface);
+}
+
 .ttk-workflow__title {
   margin: 0 0 var(--zg-space-3);
   font-size: 18px;

@@ -16,49 +16,49 @@
   {
     "who": "Requester",
     "call": "open the staff view of their own Ticket",
-    "request": "GET /api/staff/tickets/43",
+    "request": "GET /api/staff/tickets/48",
     "status": 403,
     "body": "{\"error\":\"You do not have permission to perform this action\"}"
   },
   {
     "who": "Requester",
     "call": "set their own Ticket to Resolved",
-    "request": "PATCH /api/staff/tickets/43/status",
+    "request": "PATCH /api/staff/tickets/48/status",
     "status": 403,
     "body": "{\"error\":\"You do not have permission to perform this action\"}"
   },
   {
     "who": "Requester",
     "call": "make themselves the Ticket Owner",
-    "request": "PATCH /api/staff/tickets/43/owner",
+    "request": "PATCH /api/staff/tickets/48/owner",
     "status": 403,
     "body": "{\"error\":\"You do not have permission to perform this action\"}"
   },
   {
     "who": "Requester",
     "call": "ask for the Internal Notes on their own Ticket",
-    "request": "GET /api/tickets/43/comments?visibility=INTERNAL",
+    "request": "GET /api/tickets/48/comments?visibility=INTERNAL",
     "status": 403,
     "body": "{\"error\":\"You do not have permission to perform this action\"}"
   },
   {
     "who": "Requester",
     "call": "post an Internal Note",
-    "request": "POST /api/tickets/43/comments",
+    "request": "POST /api/tickets/48/comments",
     "status": 403,
     "body": "{\"error\":\"You do not have permission to perform this action\"}"
   },
   {
     "who": "Another Requester",
     "call": "open somebody else's Ticket",
-    "request": "GET /api/tickets/43",
+    "request": "GET /api/tickets/48",
     "status": 404,
     "body": "{\"error\":\"Ticket not found\"}"
   },
   {
     "who": "Another Requester",
     "call": "read somebody else's comments",
-    "request": "GET /api/tickets/43/comments",
+    "request": "GET /api/tickets/48/comments",
     "status": 404,
     "body": "{\"error\":\"Ticket not found\"}"
   },

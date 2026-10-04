@@ -207,10 +207,10 @@ $ cd client && npm test
       Tests  256 passed (256)
 
 $ npm run e2e:fresh
-  84 passed
+  91 passed
 
 $ npm run e2e
-  16 skipped
+  23 skipped
   68 passed
 ```
 

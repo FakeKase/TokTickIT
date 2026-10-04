@@ -4,10 +4,13 @@ import type { Page } from '@playwright/test'
 import { runCleanup } from '../cleanup'
 import {
   ACCOUNTS,
+  API,
   DEV_PASSWORD,
   FIXTURE_MARKER,
   FIXTURE_USER_DOMAIN,
   VIEWPORTS,
+  attachFile,
+  cookieFor,
   createTicket,
   createUser,
   firstRequester,
@@ -73,6 +76,22 @@ test.describe('Part 5: authentication', () => {
     await expect(page.getByText('Signing in…')).toBeVisible()
     await capture(page, 'authentication', 'login-busy')
     await expect(page).toHaveURL(/\/staff\/tickets$/)
+  })
+
+  test('an inactive account, and the API being unreachable', async ({ page }) => {
+    // AC-05: the right password for an account that is switched off gets the
+    // same sentence as a wrong one, so the screen confirms nothing about it.
+    await signInThroughForm(page, 'viktor.hale@toktickit.test', DEV_PASSWORD)
+    await expect(page.getByRole('alert')).toBeVisible()
+    await expect(page).toHaveURL(/\/login$/)
+    await capture(page, 'authentication', 'login-inactive')
+
+    // AC-44: no stack trace, no address, nothing internal.
+    await page.route('**/api/auth/login', (route) => route.abort())
+    await page.getByLabel(/^Password/).fill(DEV_PASSWORD)
+    await page.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page.getByRole('alert')).toContainText('Unable to sign in right now')
+    await capture(page, 'authentication', 'login-failure')
   })
 
   test('the mandatory password change, and a rejected attempt', async ({ page, request }) => {
@@ -150,6 +169,30 @@ test.describe('Part 6: the IT Staff Ticket Queue', () => {
     await capture(page, 'staff-queue', 'no-results')
   })
 
+  test('search, and sorting by a column', async ({ page }) => {
+    await page.goto('/staff/tickets')
+    await page.getByLabel('Search').fill('printer')
+    await page.getByRole('button', { name: 'Search' }).click()
+    await expect(page).toHaveURL(/search=printer/)
+    await expect(page.getByRole('table').getByRole('row')).toHaveCount(2)
+    await capture(page, 'staff-queue', 'search')
+
+    await page.getByRole('button', { name: 'Clear filters' }).click()
+    await page.getByRole('table').getByRole('button', { name: /IT Priority/ }).click()
+    await expect(page.getByRole('columnheader', { name: /IT Priority/ })).toHaveAttribute('aria-sort', 'descending')
+    // Urgent leads: the order is the priority's own, not the alphabet's.
+    await expect(page.getByRole('table').getByRole('row').nth(1)).toContainText('Urgent')
+    await capture(page, 'staff-queue', 'sorting')
+  })
+
+  test('a failed load offers a retry and says nothing internal', async ({ page }) => {
+    await page.route('**/api/staff/tickets?*', (route) => route.abort())
+    await page.goto('/staff/tickets')
+    await expect(page.getByRole('alert')).toContainText('Unable to load the Ticket Queue')
+    await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible()
+    await capture(page, 'staff-queue', 'failure')
+  })
+
   test('the empty queue', async ({ page }) => {
     // The seed always has Tickets, so the one state that cannot be reached
     // with real data is shown by answering the queue request with none. The
@@ -165,6 +208,25 @@ test.describe('Part 6: the IT Staff Ticket Queue', () => {
   })
 })
 
+test.describe('Part 6: pagination', () => {
+  // Apart from the captures above, which show the seed alone: the seed has
+  // eight Tickets and a page holds ten, so these five are what make a second
+  // page. They carry the fixture marker and are removed before Part 8.
+  test('a second page, reached with Next', async ({ page, request }) => {
+    const requester = await firstRequester(request)
+    for (let made = 0; made < 5; made += 1) await createTicket(request, requester)
+
+    await loginAs(page, 'staff')
+    await page.goto('/staff/tickets')
+    await expect(page.getByText('Showing 1–10 of 13')).toBeVisible()
+    await page.getByRole('button', { name: 'Next' }).click()
+    await expect(page.getByText('Showing 11–13 of 13')).toBeVisible()
+    await expect(page).toHaveURL(/page=2/)
+    await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled()
+    await capture(page, 'staff-queue', 'pagination')
+  })
+})
+
 test.describe('Part 7: the IT Staff Ticket Detail', () => {
   let ticket: { id: number; ticketNumber: string }
 
@@ -175,6 +237,12 @@ test.describe('Part 7: the IT Staff Ticket Detail', () => {
       description: `The lectern PC is on and the cable is seated, but the projector reports no signal. Two lectures were affected this morning. Reported during the ${FIXTURE_MARKER}.`,
       requestedPriority: 'MEDIUM',
     })
+    // What the Requester attached and said, before any staff member opens it.
+    await attachFile(request, ticket.id, requester, 'projector-no-signal.png')
+    const signalled = await request.post(`${API}/api/tickets/${ticket.id}/requester-resolved`, {
+      headers: { Cookie: await cookieFor(request, requester.email) },
+    })
+    expect(signalled.status()).toBe(200)
   })
 
   test('ownership, IT Priority, a status move, and both streams', async ({ page }) => {
@@ -182,10 +250,28 @@ test.describe('Part 7: the IT Staff Ticket Detail', () => {
     await page.goto(`/staff/tickets/${ticket.id}`)
     const workflow = page.getByRole('region', { name: 'Workflow' })
 
+    // The Requester's attachment is here to read and download, and only that.
+    const attachments = page.locator('.ttk-staff-detail__attachments')
+    await expect(attachments.getByText('projector-no-signal.png')).toBeVisible()
+    await expect(attachments.getByRole('link', { name: 'Download' })).toBeVisible()
+    await expect(attachments.getByRole('button')).toHaveCount(0)
+    await attachments.screenshot({ path: shot('staff-ticket-detail', 'attachment-continuity') })
+
+    // And their "this looks fixed", which is a signal and not a status.
+    await expect(workflow.getByText(/The Requester reported this appears resolved/)).toBeVisible()
+    await expect(workflow.locator('.ttk-badge', { hasText: 'New' })).toBeVisible()
+    await workflow.screenshot({ path: shot('staff-ticket-detail', 'requester-indication') })
+
     await expect(page.getByTestId('owner-current')).toHaveText('Unassigned')
     await workflow.getByRole('button', { name: 'Claim' }).click()
     await expect(page.getByTestId('owner-current')).toHaveText('Sarah Chen (you)')
     await workflow.screenshot({ path: shot('staff-ticket-detail', 'ownership') })
+
+    await workflow.getByLabel('Reassign to').selectOption({ label: 'Marcus Reed (IT Staff)' })
+    await expect(page.getByTestId('owner-current')).toHaveText('Marcus Reed')
+    await workflow.screenshot({ path: shot('staff-ticket-detail', 'reassign') })
+    await workflow.getByRole('button', { name: 'Claim' }).click()
+    await expect(page.getByTestId('owner-current')).toHaveText('Sarah Chen (you)')
 
     await workflow.getByLabel('IT Priority').selectOption('HIGH')
     await expect(workflow.getByText('Currently')).toContainText('High')
@@ -200,6 +286,11 @@ test.describe('Part 7: the IT Staff Ticket Detail', () => {
     await workflow.getByLabel('Move to').selectOption('WAITING_FOR_REQUESTER')
     await workflow.screenshot({ path: shot('staff-ticket-detail', 'status-transition') })
     await workflow.getByLabel('Move to').selectOption('')
+
+    // An empty comment is refused beside the field, and nothing is sent.
+    await page.getByRole('button', { name: 'Post comment' }).click()
+    await expect(page.getByText('Enter a comment')).toBeVisible()
+    await page.locator('.ttk-thread').filter({ hasText: 'Public Comments' }).screenshot({ path: shot('staff-ticket-detail', 'validation') })
 
     await page.getByLabel('Add a public comment').fill('Could you tell us which input the projector is set to? It is shown on its front panel.')
     await page.getByRole('button', { name: 'Post comment' }).click()
@@ -219,6 +310,46 @@ test.describe('Part 7: the IT Staff Ticket Detail', () => {
     await page.setViewportSize(VIEWPORTS.mobile)
     await expect(workflow).toBeVisible()
     await capture(page, 'staff-ticket-detail', 'mobile')
+  })
+
+  test('a change refused because a colleague got there first', async ({ page, request }) => {
+    // A second Ticket, since this ends with it Cancelled.
+    const requester = await firstRequester(request)
+    const second = await createTicket(request, requester, {
+      summary: 'Shared printer on floor 2 prints blank pages',
+      requestedPriority: 'LOW',
+    })
+    const staff = await cookieFor(request, ACCOUNTS.staff.email)
+    const colleague = await cookieFor(request, ACCOUNTS.colleague.email)
+    const me = (await (await request.get(`${API}/api/auth/me`, { headers: { Cookie: staff } })).json()).user
+    await request.patch(`${API}/api/staff/tickets/${second.id}/owner`, { headers: { Cookie: staff }, data: { ownerId: me.id } })
+    await request.patch(`${API}/api/staff/tickets/${second.id}/status`, { headers: { Cookie: staff }, data: { currentStatus: 'IN_PROGRESS' } })
+
+    await loginAs(page, 'staff')
+    await page.goto(`/staff/tickets/${second.id}`)
+    const workflow = page.getByRole('region', { name: 'Workflow' })
+    await workflow.getByLabel('Move to').selectOption('RESOLVED')
+
+    // While this screen sits open, a colleague cancels the Ticket.
+    const cancelled = await request.patch(`${API}/api/staff/tickets/${second.id}/status`, {
+      headers: { Cookie: colleague },
+      data: { currentStatus: 'CANCELLED' },
+    })
+    expect(cancelled.status()).toBe(200)
+
+    await workflow.getByRole('button', { name: 'Change status' }).click()
+    await expect(workflow.getByRole('alert')).toContainText('Cannot move a Ticket from Cancelled to Resolved')
+    // The screen has caught up with what the Ticket really is.
+    await expect(workflow.getByText(/Cancelled is final/)).toBeVisible()
+    await workflow.screenshot({ path: shot('staff-ticket-detail', 'conflict') })
+  })
+
+  test('a Requester is shown Forbidden on the staff Ticket screen', async ({ page }) => {
+    await loginAs(page, 'requester')
+    await page.goto(`/staff/tickets/${ticket.id}`)
+    await expect(page.getByRole('alert')).toContainText('do not have permission')
+    await expect(page.getByRole('heading', { name: ticket.ticketNumber })).toHaveCount(0)
+    await capture(page, 'staff-ticket-detail', 'forbidden-ui', false)
   })
 
   test('direct API calls are refused by role, whatever the screen offers', async ({ page, playwright }) => {
@@ -330,11 +461,16 @@ test.describe('Part 8: Administrator User Management', () => {
     await capture(page, 'user-management', 'mobile')
   })
 
-  test('creating a user, and a duplicate address refused', async ({ page }) => {
+  test('creating a user, and a duplicate address refused', async ({ page, browser }) => {
     const email = fixtureEmail('evidence-created')
     const dialog = page.getByRole('dialog')
 
     await page.getByRole('button', { name: 'New user' }).click()
+    // Nothing filled in: every field says what it needs, and nothing is sent.
+    await dialog.getByRole('button', { name: 'Create user' }).click()
+    await expect(dialog.getByText('Enter a name')).toBeVisible()
+    await expect(dialog.getByText('Choose a role')).toBeVisible()
+    await capture(page, 'user-management', 'invalid-input', false)
     await dialog.getByLabel(/^Name/).fill('Morgan Fairweather')
     await dialog.getByLabel(/^Email/).fill(email)
     await dialog.getByRole('radio', { name: 'IT Staff' }).check()
@@ -365,6 +501,31 @@ test.describe('Part 8: Administrator User Management', () => {
     await capture(page, 'user-management', 'initial-password', false)
     await dialog.getByRole('button', { name: 'Confirm new password' }).click()
     await expect(page.locator('.ttk-users__message')).toContainText('A new initial password was set')
+
+    // That user's next sign-in, in a browser of their own: the new password
+    // works, and it has to be replaced before anything else opens.
+    const theirContext = await browser.newContext({ viewport: VIEWPORTS.desktop })
+    const theirs = await theirContext.newPage()
+    await signInThroughForm(theirs, email, 'Second456!')
+    await expect(theirs).toHaveURL(/\/change-password$/)
+    await expect(theirs.getByRole('heading', { name: 'Choose a new password' })).toBeVisible()
+    await theirs.screenshot({ path: shot('user-management', 'initial-password-next-login') })
+    await theirContext.close()
+  })
+
+  test('IT Staff are shown Forbidden, and a failed load is safe', async ({ page }) => {
+    await page.route('**/api/users*', (route) => route.abort())
+    await page.reload()
+    await expect(page.getByRole('alert')).toContainText('Unable to load the users')
+    await capture(page, 'user-management', 'failure', false)
+    await page.unroute('**/api/users*')
+
+    await page.context().clearCookies()
+    await loginAs(page, 'staff')
+    await page.goto('/admin/users')
+    await expect(page.getByRole('alert')).toContainText('do not have permission')
+    await expect(page.getByRole('heading', { name: 'User Management' })).toHaveCount(0)
+    await capture(page, 'user-management', 'forbidden', false)
   })
 
   test('the guard-rails on the last Administrator', async ({ page }) => {

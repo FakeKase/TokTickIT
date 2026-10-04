@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { ApiError, postComment } from '../api'
-import type { TicketComment } from '../api'
+import type { CommentVisibility, TicketComment } from '../api'
 import { Button } from './Button'
 import { Card } from './Card'
 import { ErrorState } from './ErrorState'
@@ -23,12 +23,42 @@ const formatWhen = (iso: string) =>
   })
 
 /**
- * Public Comments on a Ticket (ui-spec.md §6, handout §4.6).
+ * How one stream presents itself. The Requester's screen takes the defaults;
+ * the staff screen renders two of these, one per visibility, each naming its
+ * own audience (ui-spec.md §5).
+ */
+export interface CommentStream {
+  /** Sent with every post from this stream. Left undefined on the Requester's
+   *  screen, where the server's default of PUBLIC is the only possibility. */
+  visibility?: CommentVisibility
+  title: string
+  /** Who reads what is posted here, said before anyone types. */
+  audience: string
+  empty: string
+  fieldId: string
+  fieldLabel: string
+  submitLabel: string
+  /** The surface internal notes sit on, so the two streams cannot be mistaken
+   *  for one another at a glance. */
+  internal?: boolean
+}
+
+const REQUESTER_STREAM: CommentStream = {
+  title: 'Comments',
+  audience: 'Visible to you and to IT Staff.',
+  empty: 'No comments yet. Add one if you have more to tell IT Staff.',
+  fieldId: 'comment-body',
+  fieldLabel: 'Add a comment',
+  submitLabel: 'Post comment',
+}
+
+/**
+ * One stream of a Ticket's conversation (ui-spec.md §5, §6; handout §4.6).
  *
- * Only public entries ever arrive here: the server filters by role, so there
- * is no internal note in this list to accidentally render. The heading says
- * "visible to IT Staff" rather than leaving it implied — somebody about to
- * type should know who reads it before they do.
+ * On the Requester's screen only public entries ever arrive: the server
+ * filters by role, so there is no internal note in the list to accidentally
+ * render. The audience line is said outright rather than left implied —
+ * somebody about to type should know who reads it before they do.
  *
  * Append-only, matching BR-26: no edit, no delete, and no control hinting at
  * either.
@@ -39,12 +69,14 @@ export function CommentThread({
   failed,
   onRetry,
   onPosted,
+  stream = REQUESTER_STREAM,
 }: {
   ticketId: number
   comments: TicketComment[]
   failed: boolean
   onRetry: () => void
   onPosted: (comment: TicketComment) => void
+  stream?: CommentStream
 }) {
   const [body, setBody] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -56,7 +88,7 @@ export function CommentThread({
 
     const trimmed = body.trim()
     if (!trimmed) {
-      setError('Enter a comment')
+      setError(stream.internal ? 'Enter a note' : 'Enter a comment')
       return
     }
     if (trimmed.length > MAX) {
@@ -67,7 +99,7 @@ export function CommentThread({
     setPosting(true)
     setError(null)
     try {
-      onPosted(await postComment(ticketId, trimmed))
+      onPosted(await postComment(ticketId, trimmed, stream.visibility))
       // Cleared only on success: a failed post that wiped what somebody typed
       // would be the worst possible response to a network blip.
       setBody('')
@@ -75,7 +107,7 @@ export function CommentThread({
       setError(
         caught instanceof ApiError && caught.fields.body
           ? caught.fields.body
-          : 'Unable to post your comment right now. Please try again.',
+          : `Unable to post your ${stream.internal ? 'note' : 'comment'} right now. Please try again.`,
       )
     } finally {
       setPosting(false)
@@ -83,10 +115,10 @@ export function CommentThread({
   }
 
   return (
-    <Card className="ttk-thread">
+    <Card className={`ttk-thread${stream.internal ? ' ttk-thread--internal' : ''}`}>
       <div className="ttk-thread__head">
-        <h2 className="ttk-thread__title">Comments</h2>
-        <p className="ttk-thread__note">Visible to you and to IT Staff.</p>
+        <h2 className="ttk-thread__title">{stream.title}</h2>
+        <p className="ttk-thread__note">{stream.audience}</p>
       </div>
 
       {failed ? (
@@ -99,9 +131,7 @@ export function CommentThread({
           onRetry={onRetry}
         />
       ) : comments.length === 0 ? (
-        <p className="ttk-thread__empty">
-          No comments yet. Add one if you have more to tell IT Staff.
-        </p>
+        <p className="ttk-thread__empty">{stream.empty}</p>
       ) : (
         <ol className="ttk-thread__list">
           {comments.map((comment) => (
@@ -122,7 +152,7 @@ export function CommentThread({
       )}
 
       <form className="ttk-thread__form" onSubmit={handleSubmit} noValidate>
-        <Field id="comment-body" label="Add a comment" error={error ?? undefined}>
+        <Field id={stream.fieldId} label={stream.fieldLabel} error={error ?? undefined}>
           {(attrs) => (
             <textarea
               {...attrs}
@@ -133,8 +163,15 @@ export function CommentThread({
             />
           )}
         </Field>
-        <Button type="submit" busy={posting} busyLabel="Posting…">
-          Post comment
+        {/* Said again at the button, where the decision is actually made. */}
+        {stream.internal && <p className="ttk-thread__note">{stream.audience}</p>}
+        <Button
+          type="submit"
+          variant={stream.internal ? 'secondary' : 'primary'}
+          busy={posting}
+          busyLabel="Posting…"
+        >
+          {stream.submitLabel}
         </Button>
       </form>
     </Card>

@@ -152,9 +152,9 @@ read-only ticket information above it is unmistakably read-only:
 
 | Control | Behaviour |
 | :-- | :-- |
-| Ticket Owner | Shows current owner or "Unassigned". `Claim` primary button when unassigned or owned by someone else; a `Reassign` select listing active IT Staff and Administrators; `Unassign` as a tertiary action |
-| IT Priority | Select of the four values; saves on change with an inline saving indicator, and reverts visibly on failure |
-| Status | Select offering **only the transitions permitted from the current status** (§5.2 of `specification.md`). A transition to Resolved or Closed with no owner is disabled with an adjacent reason, and the backend rejects it regardless |
+| Ticket Owner | Shows current owner or "Unassigned", marked "(you)" when it is the person looking. `Claim` primary button when unassigned or owned by someone else; a `Reassign to` select listing active IT Staff and Administrators other than the current owner, which acts on selection; `Unassign` as a tertiary action, shown only when there is an owner |
+| IT Priority | Select of the four values; saves on change with an inline saving indicator. It is bound to the saved value, so a failed save leaves it showing what is true |
+| Status | The current status as a badge, then a `Move to` select offering **only the transitions permitted from the current status**, taken from the Ticket's own `transitions` (api-spec §9). A move to Resolved or Closed with no owner is disabled with an adjacent reason, and the backend rejects it regardless. The move is made by a separate `Change status` button, not on selection: a priority can be put back, a Cancelled Ticket cannot. A final status shows a sentence saying so and no control |
 | Requested Priority | Read-only, shown beside IT Priority so the difference between what was asked for and what was decided is visible |
 | Requester indication | When `requesterResolvedAt` is set, a `--zg-pale` callout: "The Requester reported this appears resolved on <date>." |
 
@@ -169,7 +169,20 @@ read-only ticket information above it is unmistakably read-only:
 
 They are separate sections with separate composers, not one composer with a visibility toggle. A
 toggle is one mis-click away from publishing an internal note to the Requester, and the handout
-names exactly that risk.
+names exactly that risk. Each composer sends its own visibility explicitly, and a draft in one is
+neither sent nor cleared by posting from the other.
+
+**One change at a time.** While any workflow control is saving, the others are disabled. A
+successful change is announced in a `role="status"` region. A refusal (`409`) shows the server's
+reason under the control it came from and reloads the Ticket, because a refusal means the screen
+was behind: a colleague moved it. Any other failure shows a generic message and repeats nothing
+the server said.
+
+**Attachments** are listed read-only (AC-45): name, size, date, a `Download` for an active file, and
+the removal reason for a removed one. No upload control and no `Remove`.
+
+**Back to Ticket Queue** returns to the queue view the Ticket was opened from, filters, sort and
+page included, and to the plain queue when the Ticket was opened directly.
 
 ## 6. Requester Ticket Detail additions
 

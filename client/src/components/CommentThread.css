@@ -85,6 +85,28 @@
   align-items: flex-start;
 }
 
+/* The form aligns its children to the start so the button keeps its own
+   width; the field is the one child that should take the whole row. */
+.ttk-thread__form .ttk-field {
+  align-self: stretch;
+}
+
 .ttk-thread__form textarea {
+  width: 100%;
+  box-sizing: border-box;
   resize: vertical;
+}
+
+
+/* Internal Notes (ui-spec.md §5): warm ivory with an amber rule down the left
+   edge. The difference from the public stream has to be visible without
+   reading the heading, because the cost of confusing them is a note meant
+   for colleagues reaching the Requester. */
+.ttk-thread--internal {
+  background: var(--zg-field-readonly-bg);
+  border-left: 3px solid var(--zg-warning);
+}
+
+.ttk-thread--internal .ttk-thread__item {
+  background: var(--zg-surface);
 }

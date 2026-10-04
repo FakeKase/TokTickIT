@@ -211,12 +211,26 @@ describe("API-18/API-19 Internal Notes stay internal (AC-34, BR-04, BR-29)", () 
     ).toBe(1);
   });
 
-  it("refuses a Requester who asks for internal entries outright", async () => {
+  it("API-08 (AC-04): refuses a Requester who asks for internal entries outright", async () => {
+    // With a note really there, so "nothing leaked" is a statement about a
+    // note that exists rather than about an empty Ticket.
+    const note = await post(staffCookie, {
+      body: "Internal: suspected battery swelling.",
+      visibility: "INTERNAL",
+    });
+    expect(note.status).toBe(201);
+
     const response = await list(ownerCookie, "?visibility=INTERNAL");
 
     // 403 rather than an empty list: an empty collection would read as
     // "there are none", which is a different and false answer.
     expect(response.status).toBe(403);
+    expect(Array.isArray(response.body)).toBe(false);
+    expect(JSON.stringify(response.body)).not.toContain("battery swelling");
+
+    // The same request from IT Staff returns it.
+    const asStaff = await list(staffCookie, "?visibility=INTERNAL");
+    expect(JSON.stringify(asStaff.body)).toContain("battery swelling");
   });
 
   it("refuses a Requester trying to post one", async () => {

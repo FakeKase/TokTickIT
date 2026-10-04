@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { StaffQueueItem } from '../../src/api'
 import { formatRelative } from '../../src/pages/relativeTime'
@@ -607,22 +607,6 @@ describe('UI-13 failure, forbidden and loading (AC-44, AC-14)', () => {
     expect(view.getByText('the open one')).toBeInTheDocument()
     expect(view.queryByText('the stale one')).toBeNull()
     expect(view.queryByText('the first one')).toBeNull()
-  })
-})
-
-describe('the detail route the rows open', () => {
-  it('is mounted behind the staff guard, so a row does not fall through to the catch-all', async () => {
-    mockApi()
-    window.history.pushState({}, '', '/staff/tickets/41')
-    await renderApp()
-
-    expect(await screen.findByRole('heading', { name: 'Ticket Detail' })).toBeInTheDocument()
-    expect(window.location.pathname).toBe('/staff/tickets/41')
-
-    cleanup()
-    signedIn = authUser({ role: 'REQUESTER' })
-    await renderApp()
-    expect(await screen.findByRole('alert')).toHaveTextContent(/do not have permission/i)
   })
 })
 

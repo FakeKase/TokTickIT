@@ -6,6 +6,7 @@ import { ComingSoonPage } from './pages/ComingSoonPage'
 import { CreateTicketPage } from './pages/CreateTicketPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyTicketsPage } from './pages/MyTicketsPage'
+import { StaffTicketDetailPage } from './pages/StaffTicketDetailPage'
 import { StaffTicketQueuePage } from './pages/StaffTicketQueuePage'
 import { TicketDetailPage } from './pages/TicketDetailPage'
 import { AuthProvider } from './auth/AuthProvider'
@@ -37,16 +38,12 @@ function App() {
 
                 <Route element={<RequireRole allow={['IT_STAFF', 'ADMINISTRATOR']} />}>
                   <Route path="staff/tickets" element={<StaffTicketQueuePage />} />
-                  {/* Issue #44 builds this. Mounted now so every row in the
-                      queue opens onto its real route, behind its real guard,
-                      rather than falling through to the catch-all. */}
-                  <Route
-                    path="staff/tickets/:id"
-                    element={<ComingSoonPage title="Ticket Detail" issue="Issue #44" />}
-                  />
+                  <Route path="staff/tickets/:id" element={<StaffTicketDetailPage />} />
                 </Route>
 
-                {/* Issue #45 builds this; mounted for the same reason. */}
+                {/* Issue #45 builds this. Mounted now behind its real route
+                    and guard so the Administrator's landing page and nav link
+                    go somewhere. */}
 
                 <Route element={<RequireRole allow={['ADMINISTRATOR']} />}>
                   <Route

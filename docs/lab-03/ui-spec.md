@@ -243,6 +243,13 @@ and `Shift+Tab` wrap inside it, and `Esc` closes it without saving. Both keep wo
 fallen out of the dialog, which is what a browser does when the button holding focus is disabled
 while it saves. Closing returns focus to the control that opened it.
 
+While a save is in flight the dialog cannot be dismissed: `Cancel` is disabled and `Esc` is ignored.
+If it closed and the save then failed, the failure would have nowhere to appear.
+
+**Editing your own account** re-reads the session once the save succeeds, so the header, the
+navigation and the route guard reflect a new name or role at once. An Administrator who demotes
+themselves sees the Forbidden state under their new role, not under an "Administrator" badge.
+
 **States** — Loading, Empty ("No users yet."), No-Results ("No users match this search."),
 Forbidden, saving indicator on the dialog's primary button, success message on the list after the
 dialog closes, and safe Failure with Retry.

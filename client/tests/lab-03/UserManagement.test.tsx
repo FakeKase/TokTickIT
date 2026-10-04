@@ -39,6 +39,8 @@ interface Sent {
 }
 
 let sent: Sent[] = []
+/** How many times the app asked who is signed in. */
+let sessionChecks = 0
 let listQueries: Record<string, string>[] = []
 let server: ManagedUser[]
 
@@ -50,6 +52,7 @@ interface Handlers {
 function mockApi(handlers: Handlers = {}) {
   vi.spyOn(globalThis, 'fetch').mockImplementation(((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    if (url.includes('/api/auth/me')) sessionChecks += 1
     const auth = authRoutes(signedIn)(url)
     if (auth) return auth
 
@@ -124,6 +127,7 @@ beforeEach(() => {
   signedIn = authUser(ADA)
   server = USERS.map((user) => ({ ...user }))
   sent = []
+  sessionChecks = 0
   listQueries = []
 })
 
@@ -475,6 +479,67 @@ describe('editing a user (FR-23)', () => {
   })
 })
 
+describe('editing your own account', () => {
+  it('shows a new name in the header straight away', async () => {
+    mockApi({
+      write: () => {
+        // What the server would now answer for `me`.
+        signedIn = authUser({ ...ADA, name: 'Ada Lovelace' })
+        return undefined
+      },
+    })
+    await openScreen()
+    const user = await openEdit('Ada Admin')
+
+    await user.clear(dialog().getByLabelText(/^Name/))
+    await user.type(dialog().getByLabelText(/^Name/), 'Ada Lovelace')
+    await user.click(dialog().getByRole('button', { name: 'Save changes' }))
+
+    const header = within(screen.getByRole('banner'))
+    expect(await header.findByText('Ada Lovelace')).toBeInTheDocument()
+    expect(header.queryByText('Ada Admin')).toBeNull()
+  })
+
+  it('stops presenting you as an Administrator the moment you demote yourself', async () => {
+    let demoted = false
+    mockApi({
+      // Once demoted, the list is no longer theirs to read.
+      list: () => (demoted ? Response.json({ error: 'Forbidden' }, { status: 403 }) : Response.json(server)),
+      write: () => {
+        demoted = true
+        signedIn = authUser({ ...ADA, role: 'IT_STAFF' })
+        return undefined
+      },
+    })
+    await openScreen()
+    const user = await openEdit('Ada Admin')
+
+    await user.click(dialog().getByRole('radio', { name: 'IT Staff' }))
+    await user.click(dialog().getByRole('button', { name: 'Save changes' }))
+
+    const header = within(screen.getByRole('banner'))
+    // The header, the nav and the page all have to agree about who this is now.
+    expect(await header.findByText('IT Staff')).toBeInTheDocument()
+    expect(header.queryByText('Administrator')).toBeNull()
+    expect(header.queryByRole('link', { name: 'User Management' })).toBeNull()
+    expect(await screen.findByRole('alert')).toHaveTextContent(/do not have permission/i)
+  })
+
+  it('does not re-read the session after editing somebody else', async () => {
+    mockApi()
+    await openScreen()
+    const before = sessionChecks
+    const user = await openEdit('Sarah Chen')
+
+    await user.click(dialog().getByRole('radio', { name: 'Administrator' }))
+    await user.click(dialog().getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    await table()
+    expect(sessionChecks).toBe(before)
+  })
+})
+
 describe('UI-21 the guard-rails (AC-39, AC-40)', () => {
   it('disables Active on your own account, with the reason beside it', async () => {
     mockApi()
@@ -638,6 +703,45 @@ describe('the dialog itself (ui-spec §7, §9)', () => {
     ;(document.activeElement as HTMLElement).blur()
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('stays open on Escape while a save is in flight, so a failure still has somewhere to show', async () => {
+    let fail: (response: Response) => void = () => {}
+    mockApi({ write: () => new Promise<Response>((resolve) => (fail = resolve)) })
+    await openScreen()
+    const user = await openEdit('Sarah Chen')
+    await user.click(dialog().getByRole('radio', { name: 'Administrator' }))
+    await user.click(dialog().getByRole('button', { name: 'Save changes' }))
+    expect(await dialog().findByText('Saving…')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+
+    // Cancel is disabled during a save; Escape must not be a way round that.
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    fail(Response.json({ error: 'boom' }, { status: 500 }))
+    expect(await dialog().findByText('The user could not be saved. Please try again.')).toBeInTheDocument()
+
+    // And once it has settled, Escape closes it again.
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('stays open on Escape while a new initial password is being set', async () => {
+    let finish: (response: Response) => void = () => {}
+    mockApi({ write: () => new Promise<Response>((resolve) => (finish = resolve)) })
+    await openScreen()
+    const user = await openEdit('Sarah Chen')
+    await user.click(dialog().getByRole('button', { name: 'Set new initial password' }))
+    await user.type(dialog().getByLabelText('New initial password for Sarah Chen'), 'Temporary99!')
+    await user.click(dialog().getByRole('button', { name: 'Confirm new password' }))
+    expect(await dialog().findByText('Setting…')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    finish(Response.json({ error: 'boom' }, { status: 500 }))
+    expect(await dialog().findByText('The password could not be set. Please try again.')).toBeInTheDocument()
   })
 
   it('keeps Tab inside the dialog in both directions', async () => {

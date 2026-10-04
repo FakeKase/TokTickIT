@@ -160,7 +160,15 @@ function UserDialog({
   }
 
   return (
-    <Dialog title={creating ? 'New user' : `Edit ${target.name}`} onClose={onClose}>
+    <Dialog
+      title={creating ? 'New user' : `Edit ${target.name}`}
+      // Not while a request is out. Cancel is disabled then, and Esc must not
+      // be a way round it: if the dialog closed and the save then failed, the
+      // failure would have nowhere to appear and the change would look made.
+      onClose={() => {
+        if (!saving) onClose()
+      }}
+    >
       <form className="ttk-user-form" onSubmit={handleSubmit} noValidate>
         {conflict && (
           <p className="ttk-field__error" role="alert">
@@ -340,7 +348,7 @@ function UserDialog({
  * (BR-35, BR-38).
  */
 export function UserManagementPage() {
-  const { user } = useAuth()
+  const { user, refresh } = useAuth()
 
   const [users, setUsers] = useState<ManagedUser[]>([])
   const [load, setLoad] = useState<Load>('loading')
@@ -576,6 +584,13 @@ export function UserManagementPage() {
           currentUserId={user.id}
           onClose={() => setEditing(null)}
           onSaved={(saved) => {
+            // An Administrator who edited their own account is, to the rest
+            // of the app, still who they were when they signed in. Re-read
+            // the session so the header, the nav and the route guard catch
+            // up: after a self-demotion that is the difference between a
+            // Forbidden page under an "Administrator" badge and one that
+            // makes sense.
+            if (editing.mode === 'edit' && editing.user.id === user.id) void refresh()
             setEditing(null)
             setMessage(saved)
             // Reloaded rather than patched: who the last Administrator is can

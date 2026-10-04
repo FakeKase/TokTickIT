@@ -1321,11 +1321,19 @@ export function createApp(prisma = createPrismaClient()) {
         //
         // And one statement in a fixed order, so two edits can never each
         // hold a row the other is waiting for.
+        //
+        // FOR NO KEY UPDATE rather than FOR UPDATE. Postgres checks a foreign
+        // key by taking FOR KEY SHARE on the row it points at, which FOR
+        // UPDATE blocks: every comment, Ticket or session written for a
+        // locked user would wait for this edit, and a route that locked a
+        // Ticket before inserting such a row could deadlock against it. This
+        // strength says "the key is not changing", which is true, and still
+        // conflicts with itself and with the owner route's FOR SHARE.
         const locked = await tx.$queryRaw<
           { id: number; role: string; isActive: boolean }[]
         >`SELECT "id", "role"::text AS "role", "isActive" FROM "User"
           WHERE "id" = ${id} OR ("role" = 'ADMINISTRATOR' AND "isActive")
-          ORDER BY "id" FOR UPDATE`;
+          ORDER BY "id" FOR NO KEY UPDATE`;
 
         const target = locked.find((user) => user.id === id);
         if (!target) return { status: 404, body: USER_NOT_FOUND };

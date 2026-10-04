@@ -716,6 +716,68 @@ describe("API-41 the last active Administrator (AC-40, BR-33)", () => {
   });
 });
 
+describe("a user edit does not hold up unrelated writes", () => {
+  it("lets a row that references a locked user be written while the edit is open", async () => {
+    // The edit locks every active Administrator. Postgres checks a foreign key
+    // by taking a lock of its own on the referenced row, and that lock
+    // conflicts with FOR UPDATE: a comment posted by any Administrator would
+    // wait for every user edit in the system to finish. FOR NO KEY UPDATE
+    // leaves the key alone, so the insert goes straight through.
+    const subject = await makeUser("IT_STAFF");
+    const requester = await makeUser();
+    const category = await prisma.category.findFirstOrThrow();
+    const relatedSystem = await prisma.relatedSystem.findFirstOrThrow();
+    const ticket = await prisma.ticket.create({
+      data: {
+        ticketNumber: `LK-${TAG}-${subject.id}`,
+        requesterId: requester.id,
+        categoryId: category.id,
+        relatedSystemId: relatedSystem.id,
+        summary: `Lock fixture ${TAG}`,
+        description: "A fixture for the lock strength test.",
+        requestedPriority: "LOW",
+        itPriority: "LOW",
+      },
+    });
+
+    const holding = createPrismaClient();
+    const realTransaction = holding.$transaction.bind(holding);
+    let insert: "finished" | "blocked" | "not tried" = "not tried";
+
+    vi.spyOn(holding, "$transaction").mockImplementation(((fn: unknown, ...rest: unknown[]) =>
+      (realTransaction as never as (...a: unknown[]) => unknown)(async (tx: object) => {
+        const watched = new Proxy(tx, {
+          get(target, property) {
+            const value = Reflect.get(target, property, target) as unknown;
+            if (property !== "$queryRaw") return value;
+            return async (...args: unknown[]) => {
+              const rows = await (value as (...a: unknown[]) => Promise<unknown>).apply(target, args);
+              // The locks are held now, and the transaction is still open.
+              // From a separate connection, write a comment authored by the
+              // Administrator whose row is locked.
+              const write = prisma.ticketComment
+                .create({ data: { ticketId: ticket.id, authorId: adminId, visibility: "PUBLIC", body: "Written during a user edit." } })
+                .then(() => "finished" as const);
+              const giveUp = new Promise<"blocked">((resolve) => setTimeout(() => resolve("blocked"), 1500));
+              insert = await Promise.race([write, giveUp]);
+              // If it was blocked it completes once the edit commits; wait for
+              // it then, so the cleanup below does not race it.
+              void write.catch(() => {});
+              return rows;
+            };
+          },
+        });
+        return (fn as (t: unknown) => unknown)(watched);
+      }, ...rest)) as never);
+
+    const response = await edit(subject.id, { name: `Lock Subject ${TAG}` }, adminCookie, createApp(holding));
+    await holding.$disconnect();
+
+    expect(response.status).toBe(200);
+    expect(insert).toBe("finished");
+  });
+});
+
 describe("API-42 setting a new initial password (AC-41, BR-36)", () => {
   it("replaces the password, signs the user out, and makes them change it", async () => {
     const subject = await makeUser("IT_STAFF");

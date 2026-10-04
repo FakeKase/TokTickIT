@@ -357,6 +357,11 @@ rows that cannot change underneath it, so two Administrators demoting each other
 leave one. It also pairs with the owner check in §10: an assignment and a deactivation of the same
 user are ordered by that lock, and whichever runs second sees the other.
 
+The lock is `FOR NO KEY UPDATE`, not `FOR UPDATE`. Postgres checks a foreign key by taking
+`FOR KEY SHARE` on the referenced row, and `FOR UPDATE` blocks that: a comment, Ticket or session
+written for any locked user would wait for the edit to finish. The weaker lock still conflicts with
+itself and with §10's `FOR SHARE`, so both guarantees hold, and unrelated writes go through.
+
 ## 17. `POST /api/users/:id/initial-password`
 
 **Request body**: `{ "initialPassword": "..." }`

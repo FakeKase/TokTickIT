@@ -56,8 +56,12 @@ async function expectNothingClipped(page: Page) {
 
 /** The boxes of two visible elements do not intersect. */
 async function expectNoOverlap(first: Locator, second: Locator, what: string) {
+  // Both must be there to be compared. Returning quietly when one is missing
+  // would let this pass on a header that had lost the element entirely.
+  await expect(first, `${what}: first element`).toBeVisible()
+  await expect(second, `${what}: second element`).toBeVisible()
   const [a, b] = [await first.boundingBox(), await second.boundingBox()]
-  if (!a || !b) return
+  if (!a || !b) throw new Error(`${what}: no box to measure`)
   const apart = a.x + a.width <= b.x + 0.5 || b.x + b.width <= a.x + 0.5 || a.y + a.height <= b.y + 0.5 || b.y + b.height <= a.y + 0.5
   expect(apart, `${what} overlap`).toBe(true)
 }

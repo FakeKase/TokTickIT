@@ -137,12 +137,12 @@ is under test.
 | RESP-03 | Style | ui-spec §3, §5 | Public vs internal streams | Computed background colours differ, not only the headings | `e2e/lab-03/visual-regression.spec.ts` | Planned |
 | RESP-04 | Style | ui-spec §3 | Badge families | Status, IT Priority, and Role badges are mutually distinct by computed colour, and each carries a text label | `e2e/lab-03/visual-regression.spec.ts` | Planned |
 | RESP-05 | Style | AC-43 | Focus visibility and dialog focus trap | Every interactive control shows a focus ring; the user dialog traps focus and restores it on close | `e2e/lab-03/visual-regression.spec.ts` | Planned |
-| E2E-01 | E2E | AC-01, AC-06, AC-08 | Login, wrong password, logout, direct access blocked | Valid login enters the app; a wrong password shows the generic message; after logout a protected URL returns to Login | `e2e/lab-03/authentication.spec.ts` | Planned |
-| E2E-02 | E2E | AC-02 | Initial password login and change | Normal app opens only after a valid change; the old password then fails | `e2e/lab-03/authentication.spec.ts` | Planned |
-| E2E-03 | E2E | AC-27, AC-30, AC-32, AC-34 | IT Staff workflow | Sign in, find a Ticket in the queue, open it, claim it, set IT Priority, move the status, post a public comment and an internal note | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
-| E2E-04 | E2E | AC-18, AC-20, AC-34 | Requester regression and visibility | The Requester sees their Lab 2 Tickets, posts a comment, indicates the problem appears resolved, and never sees the internal note left in E2E-03 | `e2e/lab-03/staff-ticket-flow.spec.ts` | Planned |
-| E2E-05 | E2E | AC-35, AC-37, AC-41 | User administration | Administrator creates a user, that user signs in with the initial password, is forced to change it, and lands on the right screen for their role | `e2e/lab-03/user-administration.spec.ts` | Planned |
-| E2E-06 | E2E | AC-39, AC-40 | Administrator guard-rails | Self-deactivation and last-Administrator deactivation are both refused, in the UI and through the API | `e2e/lab-03/user-administration.spec.ts` | Planned |
+| E2E-01 | E2E | AC-01, AC-05, AC-06, AC-08, AC-13 | Login, wrong password, logout, direct access blocked | A protected URL with no session goes to Login; a wrong password, an unknown address and an inactive account all show the same message; a valid login enters the app; after logout a protected URL returns to Login and the old cookie is `401`. Each role lands on its own screen with its own navigation, and is shown Forbidden on a route that is not theirs | `e2e/lab-03/authentication.spec.ts` | Pass |
+| E2E-02 | E2E | AC-02 | Initial password login and change | An account created by the Administrator signs in and is held on Change Password, in the browser and at the API; a mismatched confirmation changes nothing; a valid change opens the screen for their role; the initial password then fails and the new one works | `e2e/lab-03/authentication.spec.ts` | Pass |
+| E2E-03 | E2E | AC-27, AC-30, AC-31, AC-33, AC-34 | IT Staff workflow | Sign in, find a Ticket through the queue search, open it, see Resolved unavailable while unowned, claim it, set IT Priority with Requested Priority unchanged, move the status, be refused an illegal move by the API, post a public comment and an internal note, and return to the same search with the queue showing the new owner | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
+| E2E-04 | E2E | AC-18, AC-20, AC-32, AC-34 | Requester regression and visibility | The Requester sees their Tickets, opens the one from E2E-03, sees the public comment and neither the note nor any trace of it in what the API sent, has no status control, posts a comment, and indicates the problem appears resolved with the status unchanged. IT Staff then see the signal and the reply and resolve it, and the Requester sees it Resolved with nothing left to signal | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
+| E2E-05 | E2E | AC-35, AC-36, AC-37, AC-38, AC-41, AC-10 | User administration | The Administrator creates a user, finds them by search and role filter, and is refused a duplicate address on the Email field. That user signs in with the initial password and is held on Change Password; a new initial password ends their session and the old one stops working; after changing it they land on the screen for their role; deactivation refuses their next request and their next login | `e2e/lab-03/user-administration.spec.ts` | Pass |
+| E2E-06 | E2E | AC-39, AC-40, AC-14 | Administrator guard-rails | The dialog disables Active and Role on the sole Administrator with both reasons shown; the API refuses self-deactivation and demotion of the last Administrator, and the account is unchanged; a Requester, IT Staff and an anonymous caller are refused the user list | `e2e/lab-03/user-administration.spec.ts` | Pass |
 
 ## 3. Acceptance-Criterion Traceability
 
@@ -250,6 +250,10 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 | 45 — Administrator user management | `cd server && npm test` | 21 files, 353 tests passed |
 | 45 — Administrator user management | `cd client && npm test` | 17 files, 255 tests passed |
 | 45 — Administrator user management | `npm run e2e` | 27 specs passed |
+| 46 — E2E suite and evidence | `cd server && npm test` | 21 files, 353 tests passed, on a freshly seeded database |
+| 46 — E2E suite and evidence | `cd client && npm test` | 17 files, 255 tests passed |
+| 46 — E2E suite and evidence | `npm run e2e:fresh` | 60 specs passed, on a database built for the run; 33 screenshots and `api-authorization.json` written |
+| 46 — E2E suite and evidence | `npm run e2e` | 44 specs passed, 16 evidence captures skipped, on the development database |
 
 ## 7. Known Limitations or Deferred Tests
 
@@ -283,20 +287,11 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
   checked by eye at 1440, 820 and 390px in both themes, with no horizontal overflow at any of them;
   the captures and the overflow assertion become RESP-01 in Issue #46. jsdom applies no media
   queries, so the client tests cannot see which of the table and the cards is showing.
-- **The staff workflow has no end-to-end test yet** (Issue #44). It was driven once against the
-  real API and database by a throwaway Playwright script, covering claim, IT Priority, a status
-  move, both composers, Back to the filtered queue, and the Requester's view of the result; that
-  becomes E2E-03 and E2E-04 in Issue #46. The client tests mock the API.
 - **An assignment racing a deactivation is not tested as a race.** The two are ordered by a row
   lock on the user: the owner route reads it `FOR SHARE`, the edit takes it `FOR UPDATE`. Each
   outcome is tested on its own, a deactivated user is refused as an owner and a deactivation hands
   back what they owned, but no test forces the two to overlap. The last-Administrator lock, by
   contrast, is tested with two real simultaneous requests.
-- **User Management has no end-to-end test yet** (Issue #45). It was driven once against the real
-  API by a throwaway Playwright script: create, a duplicate email, the new account's forced
-  password change, the guard-rails, a password reset ending the user's session, and deactivation
-  signing them out. That run found a bug the unit tests had not: `Esc` stopped closing the dialog
-  once focus had fallen out of it. It becomes E2E-05 in Issue #46.
 - **My Tickets overflows horizontally by 28px at 820px wide** for a Requester whose Tickets have a
   long status. Found while measuring the header for this Issue, and present before it: the table
   grew when the status labels became words in Issue #43. Left for Issue #47. The header itself no
@@ -307,3 +302,28 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
   unrelated files, and the suite took 77 to 90 s instead of about 13. The next three runs, on the
   same code, passed 255 of 255. It is the 5 s default meeting a starved CPU, not a failing
   assertion, but it does mean a red run on a busy machine needs rerunning before it is believed.
+- **The submission screenshots are captured only by `npm run e2e:fresh`** (Issue #46), on a
+  database created, migrated and seeded for that run. On a development database the evidence spec
+  is skipped: it would photograph whatever was left there and overwrite the committed images with
+  it. The queue and user-list captures assert that they show seed rows only, and the suite cleans
+  its own fixtures before the user-list capture, because an earlier test in the same file creates a
+  user.
+- **The "empty queue" screenshot is produced by answering the queue request with no Tickets.** The
+  seed always has Tickets, so that state cannot be reached with real data. The screen in the
+  capture is the real one; only that one response is supplied. Every other capture is of real data
+  from the real API.
+- **Direct API authorization evidence** is `artifacts/lab-03/api-authorization.json`, and the same
+  thirteen requests rendered as `staff-ticket-detail/forbidden-api.png`. Each identity has a request
+  context of its own. An earlier version shared one, and its "no session" row was really the last
+  account signed in: Playwright's shared context keeps a cookie jar.
+- **RESP-01 to RESP-05 are still planned.** They are Issue #47. The Lab 3 screens were captured at
+  three widths here as evidence, but nothing in this Issue asserts on overflow, colour or focus.
+- **The User Management flow that surfaced the `Esc` bug** (Issue #45) is now E2E-05, which presses
+  `Esc` after a refused duplicate address and expects the dialog to close.
+- **The server suite depends on the seeded accounts being as the README describes them.**
+  `seed-credentials.api.test.ts` signs in as each one. During Issue #46 it failed on the development
+  database because `daniel.okafor`, one of the two accounts seeded with an initial password, had
+  been signed in and had its password changed by hand. Reseeding does not undo that: the seed
+  never rewrites a password. Against a freshly seeded database the suite passed 353 of 353 three
+  times running. The intermittent single failure recorded above also appeared once in those runs,
+  in `auth.api.test.ts`, and did not repeat.

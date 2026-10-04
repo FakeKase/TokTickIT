@@ -298,7 +298,7 @@ a capture passes just as happily when the layout is broken.
 
 ```text
 artifacts/lab-03/screenshots/
-├── authentication/      (login, login-invalid, login-busy, change-password, change-password-invalid, shell-by-role, logged-out)
+├── authentication/      (login, login-invalid, login-busy, change-password, change-password-invalid, shell-by-role-requester, shell-by-role-staff, shell-by-role-admin, logged-out)
 ├── staff-queue/         (desktop, tablet, mobile, filters-applied, no-results, empty, unassigned)
 ├── staff-ticket-detail/ (desktop, mobile, ownership, it-priority, status-transition, comments, internal-notes, forbidden-api)
 └── user-management/     (list, search, role-filter, create, duplicate-email, edit, initial-password, guard-rails, mobile)

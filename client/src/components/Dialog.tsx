@@ -71,9 +71,17 @@ export function Dialog({
       }
     }
 
+    // The page behind must not scroll while the dialog is open. On a phone the
+    // dialog is a full-screen sheet, and a page that scrolls underneath it
+    // moves the list the person will return to, and can scroll the sheet's
+    // own controls out of reach.
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
     document.addEventListener('keydown', handleKeyDown)
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
       // Back to the control that opened the dialog, so a keyboard user is not
       // dropped at the top of the page.
       opener?.focus?.()

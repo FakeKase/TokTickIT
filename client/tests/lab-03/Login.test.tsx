@@ -42,6 +42,9 @@ function mockApi(respond: (body: { email: string; password: string }) => Respons
     }
     // The resume test lands on a Ticket Detail route, which throws on an
     // answer it cannot read — leaving an unhandled error behind a passing test.
+    // The thread sits under the same prefix, so it is matched first: the detail
+    // object handed to fetchComments throws inside the thread instead.
+    if (/\/api\/tickets\/\d+\/comments/.test(url)) return Promise.resolve(Response.json([]))
     if (/\/api\/tickets\/\d+/.test(url)) return Promise.resolve(Response.json(TICKET_DETAIL))
     return Promise.resolve(Response.json([]))
   }) as typeof fetch)

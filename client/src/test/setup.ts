@@ -34,6 +34,16 @@ if (typeof window !== 'undefined' && !window.localStorage) {
   })
 }
 
+// No test here talks to a server, so the fetch underneath every mock is one
+// that fails instead of the real one. A test's own afterEach runs before the
+// cleanup below, which leaves the app mounted for a moment after its fetch
+// mock has been restored; a request made in that moment used to reach whatever
+// was listening on the API port. With a development API running it answered
+// 401, the 401 reached the unauthorized handler (a module-level hook in
+// api.ts), and the next test's app was signed out before it had rendered.
+globalThis.fetch = (() =>
+  Promise.reject(new TypeError('fetch is not mocked in this test'))) as typeof fetch
+
 // Each test starts with no stored selection, so one test's selected Requester
 // can never leak into the next.
 beforeEach(() => {

@@ -263,6 +263,54 @@ describe('UI-12 filters, sorting and paging (AC-24, AC-26, BR-30)', () => {
     expect(window.location.search).toBe('?search=printer')
   })
 
+  it('applies search text that was typed but not submitted when another filter changes', async () => {
+    mockApi()
+    await openQueue()
+    await table()
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Search'), 'printer')
+    await user.selectOptions(screen.getByLabelText('Status'), 'OPEN')
+
+    // The box says "printer", so the queue must be showing "printer". Leaving
+    // it out would put text on screen that the results do not reflect.
+    await waitFor(() => expect(lastRequest()).toMatchObject({ search: 'printer', status: 'OPEN' }))
+  })
+
+  it('returns to page 1 when paging would otherwise carry unsubmitted search text', async () => {
+    mockApi((query) =>
+      Response.json(
+        page([ticket(1)], {
+          pagination: { page: Number(query.get('page') ?? 1), pageSize: 1, totalItems: 3, totalPages: 3 },
+        }),
+      ),
+    )
+    await openQueue()
+    await table()
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Search'), 'vpn')
+    await user.click(screen.getByRole('button', { name: 'Next' }))
+
+    // A different search is a different set, so "page 2" of the old one
+    // means nothing in it.
+    await waitFor(() => expect(lastRequest()).toMatchObject({ search: 'vpn', page: '1' }))
+  })
+
+  it('empties the search box on Clear filters even when that text was never applied', async () => {
+    mockApi()
+    await openQueue('/staff/tickets?status=NEW')
+    await table()
+
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText('Search'), 'never submitted')
+    await user.click(screen.getByRole('button', { name: /clear filters/i }))
+
+    await waitFor(() => expect(lastRequest().status).toBeUndefined())
+    expect(lastRequest().search).toBeUndefined()
+    expect(screen.getByLabelText('Search')).toHaveValue('')
+  })
+
   it('offers Clear filters only while a filter is active', async () => {
     mockApi()
     await openQueue()
@@ -307,6 +355,21 @@ describe('UI-12 filters, sorting and paging (AC-24, AC-26, BR-30)', () => {
     ).toHaveAttribute('aria-sort', 'ascending')
   })
 
+  it('starts a newly chosen sort key descending, from the select as from a header', async () => {
+    mockApi()
+    await openQueue('/staff/tickets?sortBy=ticketNumber&sortDir=asc')
+    await table()
+
+    const user = userEvent.setup()
+    await user.selectOptions(screen.getByLabelText('Sort by'), 'itPriority')
+
+    // Carrying "ascending" over from Ticket Number would open IT Priority on
+    // Low, which is the wrong end of a triage list.
+    await waitFor(() =>
+      expect(lastRequest()).toMatchObject({ sortBy: 'itPriority', sortDir: 'desc' }),
+    )
+  })
+
   it('offers Created Date as a sort although it has no column', async () => {
     mockApi()
     await openQueue()
@@ -344,7 +407,13 @@ describe('UI-12 filters, sorting and paging (AC-24, AC-26, BR-30)', () => {
   })
 
   it('goes back to page 1 when a filter changes', async () => {
-    mockApi()
+    mockApi((query) =>
+      Response.json(
+        page([ticket(1)], {
+          pagination: { page: Number(query.get('page') ?? 1), pageSize: 1, totalItems: 5, totalPages: 5 },
+        }),
+      ),
+    )
     await openQueue('/staff/tickets?page=3')
     await table()
     expect(lastRequest().page).toBe('3')
@@ -355,29 +424,51 @@ describe('UI-12 filters, sorting and paging (AC-24, AC-26, BR-30)', () => {
     await waitFor(() => expect(lastRequest()).toMatchObject({ status: 'OPEN', page: '1' }))
   })
 
-  it('pages from where the server put it when the page asked for was clamped', async () => {
-    // Asked for page 9 of 2. The server serves page 2 and says so (AC-26).
-    mockApi(() =>
-      Response.json(
-        page([ticket(1)], { pagination: { page: 2, pageSize: 1, totalItems: 2, totalPages: 2 } }),
-      ),
-    )
+  it('corrects the address bar when the page asked for was clamped', async () => {
+    // Two pages exist. Whatever is asked for past the end, the server serves
+    // page 2 and says so (AC-26).
+    mockApi((query) => {
+      const served = Math.min(Number(query.get('page') ?? 1), 2)
+      return Response.json(
+        page([ticket(served)], {
+          pagination: { page: served, pageSize: 1, totalItems: 2, totalPages: 2 },
+        }),
+      )
+    })
     await openQueue('/staff/tickets?page=9')
     await table()
 
     expect(screen.getByText('Showing 2–2 of 2')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled()
+    // A link copied from here must not carry a page that does not exist.
+    expect(window.location.search).toBe('?page=2')
 
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Previous' }))
-    // One back from the page being shown, not from the 9 in the address bar.
     await waitFor(() => expect(lastRequest().page).toBe('1'))
+    await waitFor(() => expect(window.location.search).toBe(''))
+  })
+
+  it('corrects the address bar to the plain queue when a paged view turns out empty', async () => {
+    mockApi(() => Response.json(page([])))
+    await openQueue('/staff/tickets?page=7')
+
+    expect(await screen.findByText('No Tickets in the queue yet.')).toBeInTheDocument()
+    expect(window.location.search).toBe('')
   })
 })
 
 describe('the view lives in the address bar', () => {
   it('restores filters, sort and page from the URL', async () => {
-    mockApi()
+    // A server that really has a page 2, so the view is not corrected back.
+    mockApi(() =>
+      Response.json(
+        page([ticket(1)], {
+          filtered: true,
+          pagination: { page: 2, pageSize: 1, totalItems: 2, totalPages: 2 },
+        }),
+      ),
+    )
     await openQueue(
       '/staff/tickets?search=vpn&status=OPEN&itPriority=URGENT&owner=me&sortBy=itPriority&sortDir=asc&page=2',
     )

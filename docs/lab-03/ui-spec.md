@@ -88,14 +88,22 @@ The four selects apply as they change. Search applies on submit, not per keystro
 every character typed would race itself and flicker the list. Changing any of them returns to
 page 1.
 
+Text typed into the search box but not yet submitted is applied along with whatever changes next,
+whether a filter, the sort or the page, so the box never shows a term the list does not reflect.
+`Clear filters` empties the box too, including text that was never applied.
+
 A **Sort by** select and a direction button sit in the same row at every width. The table's
 headers sort too, but only four of the five keys have a column — Created Date does not — so the
 select is the one place all five are offered, and the only one on mobile, where the table is gone.
+Choosing a new key starts it descending, from the select as from a header; only choosing the same
+key again, or the direction button, reverses it.
 
 **The view is in the address bar.** Filters, sort and page are query parameters on
 `/staff/tickets`, with defaults left out, so the plain queue has a plain URL. Staff open a Ticket
 and come back, and Back has to mean the view they left; state held only in the component would be
 gone. A value in the URL that is not recognised is ignored, the same posture the API takes.
+When the API clamps a page past the end (AC-26), the URL is corrected to the page that was served,
+so a copied or bookmarked link does not carry a page that does not exist.
 
 **Desktop table (≥992px)** — columns, in order:
 

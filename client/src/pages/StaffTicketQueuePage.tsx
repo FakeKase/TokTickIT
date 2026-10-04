@@ -157,13 +157,25 @@ export function StaffTicketQueuePage() {
     setSearchText(view.search)
   }, [view.search])
 
-  /** Any change to what is being looked at goes back to page 1; only paging
-   *  itself keeps the page. */
+  /**
+   * Any change to what is being looked at goes back to page 1; only paging
+   * itself keeps the page.
+   *
+   * Whatever is in the search box goes along with every change. The box is the
+   * one control that waits for a submit, so without this it could say
+   * "printer" above a list that was never searched for it - text on screen
+   * that the results do not reflect. And if that text differs from the search
+   * in force, the set is a different one, so even a page change starts over.
+   */
   const change = useCallback(
     (patch: Partial<View>) => {
-      setParams(writeView({ ...view, page: 1, ...patch }), { replace: true })
+      const search = patch.search ?? searchText.trim()
+      const next = { ...view, page: 1, ...patch, search }
+      if (search !== view.search) next.page = 1
+
+      setParams(writeView(next), { replace: true })
     },
-    [view, setParams],
+    [view, searchText, setParams],
   )
 
   const fetchQueue = useCallback(
@@ -171,7 +183,20 @@ export function StaffTicketQueuePage() {
       setLoad({ state: 'loading' })
       try {
         const response = await fetchStaffTickets(toRequest(view))
-        if (isCurrent()) setLoad({ state: 'ready', response })
+        if (!isCurrent()) return
+
+        // The server clamps a page past the end to the last real one (AC-26).
+        // The address bar is corrected to match rather than left holding a
+        // page that does not exist, where a copied or bookmarked link would
+        // carry it on. That changes the view, which asks again for the page
+        // now named; this response is dropped so the list is drawn once.
+        // Clamping only ever lowers the page, so this cannot go round twice.
+        if (response.pagination.page < view.page) {
+          setParams(writeView({ ...view, page: response.pagination.page }), { replace: true })
+          return
+        }
+
+        setLoad({ state: 'ready', response })
       } catch (failure) {
         if (!isCurrent()) return
         // 403 is not a bad minute. Asking again gets the same answer, so it
@@ -181,7 +206,7 @@ export function StaffTicketQueuePage() {
         })
       }
     },
-    [view],
+    [view, setParams],
   )
 
   useEffect(() => {
@@ -218,8 +243,12 @@ export function StaffTicketQueuePage() {
     )
   }
 
-  const clearFilters = () =>
+  function clearFilters() {
+    // Emptied here as well as through the URL: text that was typed but never
+    // submitted is not in the URL, so nothing there would change to clear it.
+    setSearchText('')
     change({ search: '', status: '', itPriority: '', categoryId: '', owner: '' })
+  }
 
   const sortHeader = (field: StaffQueueSortField, label: string) => (
     <th
@@ -357,8 +386,14 @@ export function StaffTicketQueuePage() {
                   <select
                     {...attrs}
                     value={view.sortBy}
+                    // Descending, as a header click on a new column is: a key
+                    // chosen here must not inherit the last key's direction
+                    // and open IT Priority on Low.
                     onChange={(event) =>
-                      change({ sortBy: event.target.value as StaffQueueSortField })
+                      change({
+                        sortBy: event.target.value as StaffQueueSortField,
+                        sortDir: 'desc',
+                      })
                     }
                   >
                     {SORTS.map((sort) => (

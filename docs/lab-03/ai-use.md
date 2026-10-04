@@ -76,15 +76,7 @@ were caught by looking at the output rather than trusting that it had been produ
 
 ## My Reflection
 
-<!--
-  TODO: write 3 to 5 sentences in your own voice. The handout (Part 4) asks for "a very
-  brief My Reflection on your AI use experience". Worth touching on:
-    - what "review yourself before open PR" did and did not achieve before #43, and
-      what changed after
-    - drafting reviews with the agent but posting them yourself: did reading every
-      draft change any of them, and would you do it the same way again
-    - the moment in prompt 6, when you asked why your partner was approved easily
-    - whether one agent for the whole sprint worked better or worse than Lab 2's
-      sub-agents
-  Leave nothing here that you did not actually think. This section has to be yours.
--->
+In this lab I mainly focused on having the agent to review itself before opening a PR to
+correctness. Apply subagents the same as lab02, but in this lab I found my PR got changes
+requested more often than in the other lab, which I found the problem is having too much
+context in the session after I used /compact, they appeared to work well again.

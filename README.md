@@ -4,8 +4,10 @@ An IT service desk application for Account and Access, Hardware, Software, and N
 
 Built for **CPE 334 — Introduction to Software Engineering in the Age of AI Agents**, Semester 1/2026.
 This repository holds the individual sprints. Lab 1 delivered the first full-stack vertical
-slice; Lab 2 adds the Requester-facing ticketing MVP — a temporary Development Requester
-selector, Create Ticket with attachments, My Tickets, and read-only Ticket Detail.
+slice. Lab 2 added the Requester-facing ticketing MVP: Create Ticket with attachments, My
+Tickets, and Ticket Detail. Lab 3 replaces Lab 2's temporary Requester selector with real
+sign-in and three roles, and adds the IT Staff Ticket Queue and Ticket Detail, Public
+Comments and Internal Notes, and Administrator User Management.
 
 ## Tech stack
 
@@ -15,7 +17,8 @@ selector, Create Ticket with attachments, My Tickets, and read-only Ticket Detai
 | Backend | Node.js + Express + TypeScript |
 | Database | PostgreSQL + Prisma |
 | Architecture | REST-style APIs |
-| Testing | Vitest (UI) + Supertest (API) |
+| Authentication | Server-side sessions in an httpOnly cookie, bcrypt password hashes |
+| Testing | Vitest (UI) + Supertest (API) + Playwright (end to end) |
 
 ## Repository structure
 
@@ -25,20 +28,28 @@ toktickit/
 │   ├── src/
 │   └── tests/
 │       ├── lab-01/         Vitest UI tests
-│       └── lab-02/         Vitest UI tests
+│       ├── lab-02/         Vitest UI tests
+│       └── lab-03/         Vitest UI tests
 ├── server/                 Express + TypeScript API
 │   ├── prisma/             Prisma schema and migrations
 │   ├── src/
 │   ├── uploads/            Attachment storage (gitignored)
 │   └── tests/
 │       ├── lab-01/         Supertest API tests
-│       └── lab-02/         Supertest API tests
+│       ├── lab-02/         Supertest API tests
+│       └── lab-03/         Supertest API and unit tests
 ├── docs/
 │   ├── lab-01/             Lab 1 submission evidence
 │   ├── lab-02/             Lab 2 specification, API/UI spec, tests, review record
+│   ├── lab-03/             Lab 3 specification, API/UI spec, tests, review record, AI use
 │   └── labSheet/           Course-issued lab sheet
-├── e2e/lab-02/             Playwright visual and end-to-end specs
-├── artifacts/lab-02/       Captured screenshots
+├── e2e/
+│   ├── lab-02/             Playwright visual and end-to-end specs
+│   ├── lab-03/             Playwright flows, visual checks and submission evidence
+│   └── run-fresh.mjs       Runs the suite on a database built for the run
+├── artifacts/
+│   ├── lab-02/             Lab 2 screenshots
+│   └── lab-03/             Lab 3 screenshots and API authorization evidence
 ├── playwright.config.ts
 ├── docker-compose.yaml     Optional PostgreSQL container
 ├── .gitignore
@@ -184,20 +195,29 @@ cd client && npm test       # Vitest UI tests
 npm run e2e                 # Playwright, from the repository root
 ```
 
-Expected output:
+Expected output, on a freshly seeded database:
 
 ```
 $ cd server && npm test
- Test Files  10 passed (10)
-      Tests  115 passed (115)
+ Test Files  21 passed (21)
+      Tests  353 passed (353)
 
 $ cd client && npm test
- Test Files  12 passed (12)
-      Tests  111 passed (111)
+ Test Files  17 passed (17)
+      Tests  256 passed (256)
+
+$ npm run e2e:fresh
+  84 passed
 
 $ npm run e2e
-  22 passed
+  16 skipped
+  68 passed
 ```
+
+The server suite signs in as every seeded account, so it expects them as the table above
+describes them. If you have changed a seeded account's password by hand, one test in
+`seed-credentials.api.test.ts` fails until an Administrator sets it back; reseeding does not
+undo it, because the seed never rewrites a password.
 
 `npm run e2e` starts the API and the Vite dev server itself, so nothing needs to be
 running first. It writes screenshots to `artifacts/lab-02/screenshots/` and removes the
@@ -211,9 +231,10 @@ they are only captured in this mode, so that they show the seed and nothing left
 development database. Anything after `--` is passed to Playwright, for example
 `npm run e2e:fresh -- e2e/lab-03`.
 
-Test files live in `server/tests/lab-0{1,2}/`, `client/tests/lab-0{1,2}/` and `e2e/lab-02/`.
-See [`docs/lab-01/tests.md`](docs/lab-01/tests.md) and
-[`docs/lab-02/tests.md`](docs/lab-02/tests.md) for the full test lists and their
+Test files live in `server/tests/lab-0{1,2,3}/`, `client/tests/lab-0{1,2,3}/` and
+`e2e/lab-0{2,3}/`. See [`docs/lab-01/tests.md`](docs/lab-01/tests.md),
+[`docs/lab-02/tests.md`](docs/lab-02/tests.md) and
+[`docs/lab-03/tests.md`](docs/lab-03/tests.md) for the full test lists and their
 traceability to acceptance criteria.
 
 ## Available scripts
@@ -231,6 +252,14 @@ traceability to acceptance criteria.
 | `npm run db:migration-check` | Rebuild the Lab 2 schema on a throwaway database, apply the Lab 3 migration, and assert no Ticket, Attachment or owner was lost |
 | `npm run prisma:generate` | Regenerate the Prisma client |
 
+### Repository root
+
+| Script | Purpose |
+| --- | --- |
+| `npm run e2e` | Run the Playwright suite against the development database |
+| `npm run e2e:fresh` | Build a database for the run, then run the suite on its own ports; captures the Lab 3 evidence |
+| `npm run typecheck` | Type-check the Playwright specs |
+
 ### `client/`
 
 | Script | Purpose |
@@ -243,9 +272,27 @@ traceability to acceptance criteria.
 
 ## Git workflow
 
-`main` is the stable release branch. Each lab has its own integration branch —
-`lab1-staging`, then `lab2-staging`. All work happens on feature branches and reaches
-`main` through the staging branch for that lab.
+`main` is the stable release branch. Each lab has its own integration branch:
+`lab1-staging`, then `lab2-staging`, then `lab3-staging`. All work happens on feature
+branches and reaches `main` through the staging branch for that lab, one pull request at a
+time.
+
+### Lab 3 branches
+
+| Issue | Feature branch | PR target |
+| :-- | :-- | :-: |
+| 37. Sprint 3 engineering contract | `feature/lab3-specification` | `lab3-staging` |
+| 38. User model, session store, migration, seed | `feature/lab3-user-model` | `lab3-staging` |
+| 39. Authentication API | `feature/lab3-auth-api` | `lab3-staging` |
+| 40. Login, password change, app shell | `feature/lab3-auth-ui` | `lab3-staging` |
+| 41. Requester regression on the authenticated identity | `feature/lab3-requester-regression` | `lab3-staging` |
+| 42. Public Comments and Problem Appears Resolved | `feature/lab3-comments` | `lab3-staging` |
+| 43. IT Staff Ticket Queue | `feature/lab3-staff-queue` | `lab3-staging` |
+| 44. IT Staff Ticket Detail | `feature/lab3-staff-detail` | `lab3-staging` |
+| 45. Administrator user management | `feature/lab3-admin-users` | `lab3-staging` |
+| 46. End-to-end suite and submission evidence | `feature/lab3-e2e` | `lab3-staging` |
+| 47. Responsive and visual QA | `feature/lab3-visual-qa` | `lab3-staging` |
+| 48. Documentation and release | `feature/lab3-docs-release` | `lab3-staging` |
 
 ### Lab 2 branches
 
@@ -263,5 +310,5 @@ traceability to acceptance criteria.
 | 20. End-to-end requester flow | `feature/lab2-e2e` | `lab2-staging` |
 | 21. Documentation and release | `feature/lab2-docs-release` | `lab2-staging` |
 
-Every pull request requires peer review before merging. The review record for both labs
-is in `docs/lab-0{1,2}/reviewer.md`.
+Every pull request requires peer review before merging. The review record for each lab
+is in `docs/lab-0{1,2,3}/reviewer.md`.

@@ -219,8 +219,34 @@ deactivated and removed by the same teardown, so repeated runs do not silently g
 
 ## 6. Final Results
 
-Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded here once
-`lab3-staging` merges to `main`.
+Updated as each Issue's PR lands in `lab3-staging`. Every planned test in §2 is now Pass.
+
+### Final run
+
+Every suite, run together on the release candidate: the head of `lab3-staging` with Issue #48's
+branch applied, which is the tree the release PR merges to `main`. Recorded on 4 October 2026.
+
+| Suite | Command | Result |
+| --- | --- | --- |
+| Server: API, unit and integration | `cd server && npm test` | 21 files, 353 tests passed, on a freshly seeded database |
+| Migration: Lab 2 data through the Lab 3 migration | `cd server && npm run db:migration-check` | All checks passed |
+| Client: UI | `cd client && npm test` | 17 files, 256 tests passed |
+| End to end, flows and visual checks, Labs 2 and 3 | `npm run e2e:fresh` | 84 specs passed, on a database built for the run |
+| End to end, on a development database | `npm run e2e` | 68 specs passed, 16 evidence captures skipped |
+| Type checks | `npm run typecheck` in `server/`, `client/` and the root | Clean |
+| Lint | `cd client && npm run lint` | Clean |
+| Production build | `cd client && npm run build` | Built |
+
+The handout asks for this output to come from `main`. It cannot be captured from `main` inside
+the PR that has to merge before `main` contains it, so the table above is from the release
+candidate. The same commands are run again on `main` once the release PR has merged, and the
+result is recorded below.
+
+### Run on `main` after release
+
+_To be filled in after the release PR merges._
+
+### Per Issue
 
 | Issue | Suite | Result |
 | --- | --- | --- |

@@ -50,7 +50,8 @@ export interface PermittedTransition {
   requiresOwner: boolean;
 }
 
-/** Every status reachable from `from`, in the enum's own order. */
+/** Every status reachable from `from`, in the order its row of §5.2 lists
+ *  them. */
 export function permittedTransitions(
   from: TicketStatusValue,
 ): PermittedTransition[] {

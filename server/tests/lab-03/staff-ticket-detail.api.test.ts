@@ -235,7 +235,20 @@ describe("opening a Ticket as staff (FR-14)", () => {
         { to: "RESOLVED", requiresOwner: true },
         { to: "CANCELLED", requiresOwner: false },
       ],
+      ownerRequired: false,
     });
+  });
+
+  it("says when the Ticket must keep its owner, in step with what unassign will do", async () => {
+    for (const currentStatus of ["NEW", "IN_PROGRESS", "RESOLVED", "CLOSED", "CANCELLED"]) {
+      await reset({ currentStatus, ownerId: staffId });
+
+      const flagged = (await detail()).body.ownerRequired;
+      const unassign = await patch("owner", { ownerId: null });
+
+      // The flag and the refusal are the same rule, so they must agree.
+      expect([currentStatus, flagged]).toEqual([currentStatus, unassign.status === 409]);
+    }
   });
 
   it("carries no email address and no hash", async () => {

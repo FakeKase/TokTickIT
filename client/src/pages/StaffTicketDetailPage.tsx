@@ -325,7 +325,8 @@ export function StaffTicketDetailPage() {
                   {ticket.owner && (
                     <Button
                       variant="tertiary"
-                      disabled={saving !== null}
+                      disabled={saving !== null || ticket.ownerRequired}
+                      aria-describedby={ticket.ownerRequired ? 'unassign-reason' : undefined}
                       onClick={() =>
                         void change(
                           'owner',
@@ -338,6 +339,15 @@ export function StaffTicketDetailPage() {
                     </Button>
                   )}
                 </div>
+
+                {/* Disabled with the reason beside it, not hidden: a missing
+                    button says nothing, and the server would refuse anyway. */}
+                {ticket.owner && ticket.ownerRequired && (
+                  <p id="unassign-reason" className="ttk-workflow__hint">
+                    A {STATUS_LABEL[ticket.currentStatus]} Ticket must keep its Ticket Owner. It
+                    can still be reassigned.
+                  </p>
+                )}
 
                 <Field id="reassign" label="Reassign to">
                   {(attrs) => (

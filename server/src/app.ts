@@ -40,7 +40,6 @@ import {
   parseStaffQueueQuery,
   parseTicketQuery,
 } from "./lib/ticket-query.js";
-import { serializable } from "./lib/serializable.js";
 import {
   isTicketStatus,
   permittedTransitions,
@@ -901,6 +900,11 @@ export function createApp(prisma = createPrismaClient()) {
     transitions: isTicketStatus(ticket.currentStatus)
       ? permittedTransitions(ticket.currentStatus)
       : [],
+    // True while the Ticket's status is one that must keep its owner
+    // (BR-23), so the screen can explain a disabled Unassign instead of
+    // offering one the owner route will always refuse.
+    ownerRequired:
+      isTicketStatus(ticket.currentStatus) && requiresOwner(ticket.currentStatus),
   });
 
   /** A positive integer id from a route param, or null. */
@@ -981,11 +985,12 @@ export function createApp(prisma = createPrismaClient()) {
       const nextOwnerId = ownerId as number | null;
 
       try {
-        // Serializable, because the rule spans two tables: the Ticket being
-        // written and the User who must still be active staff when it is
-        // (BR-19). A check followed by a write at the default level would let
-        // an account be deactivated in between and still receive the Ticket.
-        const outcome = await serializable(prisma, async (tx) => {
+        // The rule spans two tables: the Ticket being written and the User
+        // who must still be active staff when it is (BR-19). A plain check
+        // followed by a write would let the account be deactivated in between
+        // and still receive the Ticket. So the check takes a lock on the
+        // User's row (see below) and holds it until this transaction ends.
+        const outcome = await prisma.$transaction(async (tx) => {
           const ticket = await tx.ticket.findUnique({
             where: { id },
             select: { ownerId: true, currentStatus: true },
@@ -1008,10 +1013,15 @@ export function createApp(prisma = createPrismaClient()) {
               };
             }
           } else {
-            const target = await tx.user.findUnique({
-              where: { id: nextOwnerId },
-              select: { isActive: true, role: true },
-            });
+            // FOR SHARE: this row cannot be changed until we commit, and if
+            // somebody is changing it right now we wait and then read what
+            // they wrote. Deactivation updates this same row before it hands
+            // the user's Tickets back, so whichever of the two comes second
+            // sees the other's result. It works at the default isolation
+            // level, so no other route has to remember anything for it to hold.
+            const [target] = await tx.$queryRaw<
+              { isActive: boolean; role: string }[]
+            >`SELECT "isActive", "role"::text AS "role" FROM "User" WHERE "id" = ${nextOwnerId} FOR SHARE`;
             // One message for all three failures. Telling them apart would
             // let the caller probe which ids are accounts and which of those
             // are inactive.

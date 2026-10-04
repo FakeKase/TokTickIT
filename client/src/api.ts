@@ -527,6 +527,9 @@ export interface StaffTicketDetail extends StaffQueueItem {
   /** Where this Ticket may go next, read from the server's own matrix. The
    *  client keeps no copy of that matrix to fall out of step with it. */
   transitions: StatusTransition[]
+  /** The Ticket's status is one that must keep its owner (BR-23), so it
+   *  cannot be unassigned, only handed to someone else. */
+  ownerRequired: boolean
 }
 
 export interface AssignableUser {

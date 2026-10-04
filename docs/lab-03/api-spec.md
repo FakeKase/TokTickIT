@@ -116,6 +116,8 @@ One endpoint family serves Public Comments and Internal Notes, filtered by role 
 - **`400`**: empty, whitespace-only, or longer than 2000 characters after trimming (BR-25).
 - **`403`**: a Requester posting `INTERNAL`.
 - **`404`**: a Requester posting on a Ticket they do not own.
+- Posting does **not** advance the Ticket's `updatedAt`. Last Updated records a change to the
+  Ticket itself: its owner, priority or status. The thread carries its own timestamps.
 - There is deliberately **no 409 for a Resolved, Closed or Cancelled Ticket**, unlike §7. A
   comment is a sentence about a Ticket and stays useful after it closes — "this came back" is
   worth being able to say. The resolved signal is different: it asks IT Staff to act, and asking
@@ -212,6 +214,9 @@ above; `status=new` is not `NEW`.
   of the matrix. `requiresOwner` marks a move that is in the matrix but also needs a Ticket Owner
   (BR-23), so the screen can disable it with a reason rather than hide it.
 
+  `ownerRequired` is `true` while the Ticket's status is one that must keep its owner (§10), so the
+  screen can disable Unassign with a reason instead of offering a request that will be refused.
+
   Every `PATCH` in §10 to §12 returns this same shape.
 - **`403`**: a Requester. Note the deliberate difference from §5: a Requester is told "forbidden" here because the staff namespace itself is off-limits, and no per-ticket existence is revealed either way.
 - **`404`**: no such Ticket.
@@ -231,9 +236,11 @@ Claim or reassign (BR-19, BR-20).
 - **`409`**: the target user does not exist, is inactive, or is a Requester — `{ "error": "Ticket Owner must be an active IT Staff or Administrator" }` (AC-29). One message for all three, so the endpoint cannot be used to learn which ids are accounts.
 - **`409`**: `ownerId` is `null` and the Ticket is Resolved or Closed — `{ "error": "A Resolved or Closed Ticket must keep its Ticket Owner" }`. BR-23 would otherwise be one unassign away from meaning nothing. Such a Ticket may still be reassigned.
 
-The check on the target user and the write run in one `SERIALIZABLE` transaction, retried on a
-serialization failure, because the rule spans two tables: the Ticket being written and the User
-who must still be active staff when it is.
+The rule spans two tables: the Ticket being written and the User who must still be active staff
+when it is. The check reads the User's row `FOR SHARE` inside the transaction that writes the
+Ticket, so the row cannot change until that transaction ends. Deactivation (§16) updates the same
+row before returning that user's Tickets to the queue, so whichever of the two runs second sees the
+other's result. This holds at the default isolation level.
 
 ## 11. `PATCH /api/staff/tickets/:id/it-priority`
 

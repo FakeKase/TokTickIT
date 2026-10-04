@@ -152,7 +152,7 @@ read-only ticket information above it is unmistakably read-only:
 
 | Control | Behaviour |
 | :-- | :-- |
-| Ticket Owner | Shows current owner or "Unassigned", marked "(you)" when it is the person looking. `Claim` primary button when unassigned or owned by someone else; a `Reassign to` select listing active IT Staff and Administrators other than the current owner, which acts on selection; `Unassign` as a tertiary action, shown only when there is an owner |
+| Ticket Owner | Shows current owner or "Unassigned", marked "(you)" when it is the person looking. `Claim` primary button when unassigned or owned by someone else; a `Reassign to` select listing active IT Staff and Administrators other than the current owner, which acts on selection; `Unassign` as a tertiary action, shown only when there is an owner, and disabled with the reason beside it on a Resolved or Closed Ticket, which must keep its owner |
 | IT Priority | Select of the four values; saves on change with an inline saving indicator. It is bound to the saved value, so a failed save leaves it showing what is true |
 | Status | The current status as a badge, then a `Move to` select offering **only the transitions permitted from the current status**, taken from the Ticket's own `transitions` (api-spec §9). A move to Resolved or Closed with no owner is disabled with an adjacent reason, and the backend rejects it regardless. The move is made by a separate `Change status` button, not on selection: a priority can be put back, a Cancelled Ticket cannot. A final status shows a sentence saying so and no control |
 | Requested Priority | Read-only, shown beside IT Priority so the difference between what was asked for and what was decided is visible |

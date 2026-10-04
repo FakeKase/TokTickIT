@@ -324,8 +324,13 @@ artifacts/lab-03/screenshots/
 ├── responsive/          (<screen>-<viewport>[-dark]: login, change-password, staff-queue, staff-queue-filters,
 │                         staff-ticket-detail, my-tickets, ticket-detail, user-management, user-dialog;
 │                         desktop, tablet and mobile; light and dark)
-├── authentication/      (login, login-invalid, login-busy, change-password, change-password-invalid, shell-by-role-requester, shell-by-role-staff, shell-by-role-admin, logged-out)
-├── staff-queue/         (desktop, tablet, mobile, filters-applied, no-results, empty, unassigned)
-├── staff-ticket-detail/ (desktop, mobile, ownership, it-priority, status-transition, comments, internal-notes, forbidden-api)
-└── user-management/     (list, search, role-filter, create, duplicate-email, edit, initial-password, guard-rails, mobile)
+├── authentication/      (login, login-invalid, login-inactive, login-busy, login-failure, change-password,
+│                         change-password-invalid, shell-by-role-requester, shell-by-role-staff, shell-by-role-admin, logged-out)
+├── staff-queue/         (desktop, tablet, mobile, search, filters-applied, sorting, pagination, unassigned,
+│                         no-results, empty, failure)
+├── staff-ticket-detail/ (desktop, mobile, ownership, reassign, it-priority, status-transition, comments,
+│                         internal-notes, attachment-continuity, requester-indication, validation, conflict,
+│                         forbidden-ui, forbidden-api)
+└── user-management/     (list, search, role-filter, create, invalid-input, duplicate-email, edit, initial-password,
+                          initial-password-next-login, guard-rails, forbidden, failure, mobile)
 ```

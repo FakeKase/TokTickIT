@@ -231,8 +231,8 @@ branch applied, which is the tree the release PR merges to `main`. Recorded on 4
 | Server: API, unit and integration | `cd server && npm test` | 21 files, 353 tests passed, on a freshly seeded database |
 | Migration: Lab 2 data through the Lab 3 migration | `cd server && npm run db:migration-check` | All checks passed |
 | Client: UI | `cd client && npm test` | 17 files, 256 tests passed |
-| End to end, flows and visual checks, Labs 2 and 3 | `npm run e2e:fresh` | 84 specs passed, on a database built for the run |
-| End to end, on a development database | `npm run e2e` | 68 specs passed, 16 evidence captures skipped |
+| End to end, flows and visual checks, Labs 2 and 3 | `npm run e2e:fresh` | 91 specs passed, on a database built for the run |
+| End to end, on a development database | `npm run e2e` | 68 specs passed, 23 evidence captures skipped |
 | Type checks | `npm run typecheck` in `server/`, `client/` and the root | Clean |
 | Lint | `cd client && npm run lint` | Clean |
 | Production build | `cd client && npm run build` | Built |
@@ -283,6 +283,7 @@ _To be filled in after the release PR merges._
 | 47 — Responsive and visual QA | `cd client && npm test` | 17 files, 256 tests passed |
 | 47 — Responsive and visual QA | `npm run e2e:fresh` | 84 specs passed, on a database built for the run; 50 responsive captures written |
 | 47 — Responsive and visual QA | `npm run e2e` | 68 specs passed, 16 evidence captures skipped, on the development database |
+| 48 — Documentation and release | `npm run e2e:fresh` | 91 specs passed; the evidence spec grew from 16 to 23 tests, and 99 screenshots are written |
 
 ## 7. Known Limitations or Deferred Tests
 

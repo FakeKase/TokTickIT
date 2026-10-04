@@ -7,6 +7,7 @@ export {
   DEV_PASSWORD,
   FIXTURE_MARKER,
   VIEWPORTS,
+  attachFile,
   createTicket,
   expectNoHorizontalScroll,
   firstRequester,

@@ -204,7 +204,15 @@ above; `status=new` is not `NEW`.
 
 ## 9. `GET /api/staff/tickets/:id`
 
-- **`200`**: the full Ticket for IT Staff operations — every field above plus `description`, `relatedSystem`, `attachments`, and the assignable-user list is **not** included (see §13).
+- **`200`**: the full Ticket for IT Staff operations — every field above plus `description`, `relatedSystem`, `attachments` and `transitions`. The assignable-user list is **not** included (see §13).
+
+  `transitions` is where this Ticket may go next: the §5.2 matrix read for its current status, as
+  `[{ "to": "RESOLVED", "requiresOwner": true }, ...]`, empty for a Cancelled Ticket. It is sent
+  with the Ticket so the screen offers exactly what §12 will accept without keeping a second copy
+  of the matrix. `requiresOwner` marks a move that is in the matrix but also needs a Ticket Owner
+  (BR-23), so the screen can disable it with a reason rather than hide it.
+
+  Every `PATCH` in §10 to §12 returns this same shape.
 - **`403`**: a Requester. Note the deliberate difference from §5: a Requester is told "forbidden" here because the staff namespace itself is off-limits, and no per-ticket existence is revealed either way.
 - **`404`**: no such Ticket.
 
@@ -214,18 +222,26 @@ Claim or reassign (BR-19, BR-20).
 
 **Request body**: `{ "ownerId": 9 }`, or `{ "ownerId": null }` to unassign.
 
-- **`200`**: the updated Ticket; `updatedAt` advances.
-- **`400`**: `ownerId` is not an integer or `null`.
+- **`200`**: the updated Ticket; `updatedAt` advances. Naming the owner the Ticket already has is
+  also `200` but writes nothing, so `updatedAt` does not move: the queue sorts by it, and a no-op
+  must not float a Ticket to the top.
+- **`400`**: `ownerId` is missing, or is not a positive integer or `null`.
 - **`403`**: a Requester.
 - **`404`**: no such Ticket.
-- **`409`**: the target user does not exist, is inactive, or is a Requester — `{ "error": "Ticket Owner must be an active IT Staff or Administrator" }` (AC-29).
+- **`409`**: the target user does not exist, is inactive, or is a Requester — `{ "error": "Ticket Owner must be an active IT Staff or Administrator" }` (AC-29). One message for all three, so the endpoint cannot be used to learn which ids are accounts.
+- **`409`**: `ownerId` is `null` and the Ticket is Resolved or Closed — `{ "error": "A Resolved or Closed Ticket must keep its Ticket Owner" }`. BR-23 would otherwise be one unassign away from meaning nothing. Such a Ticket may still be reassigned.
+
+The check on the target user and the write run in one `SERIALIZABLE` transaction, retried on a
+serialization failure, because the rule spans two tables: the Ticket being written and the User
+who must still be active staff when it is.
 
 ## 11. `PATCH /api/staff/tickets/:id/it-priority`
 
 **Request body**: `{ "itPriority": "URGENT" }`
 
-- **`200`**: the updated Ticket. `requestedPriority` is untouched (BR-21, AC-30).
-- **`400`**: not one of the four permitted values.
+- **`200`**: the updated Ticket. `requestedPriority` is untouched (BR-21, AC-30), including when
+  the body carries one. Setting the priority the Ticket already has writes nothing.
+- **`400`**: missing, or not one of the four permitted values as spelled.
 - **`403`** / **`404`**: as above.
 
 ## 12. `PATCH /api/staff/tickets/:id/status`
@@ -235,8 +251,26 @@ Claim or reassign (BR-19, BR-20).
 - **`200`**: the updated Ticket.
 - **`400`**: not a `TicketStatus` value.
 - **`403`**: a Requester attempting any status change (BR-05, AC-21).
-- **`409`**: the transition is outside the §5.2 matrix, or Resolved/Closed was requested for a Ticket with no owner (BR-23) —
-  `{ "error": "Cannot move a Ticket from In Progress to Closed" }`. Nothing is written.
+- **`404`**: no such Ticket.
+- **`409`**: the transition is outside the §5.2 matrix, including a move to the status the Ticket
+  already has — `{ "error": "Cannot move a Ticket from In Progress to Closed" }` — or Resolved or
+  Closed was requested for a Ticket with no owner (BR-23). The matrix is reported first when a move
+  fails both. Nothing is written.
+- **`409`**: the Ticket changed between this request reading it and writing it —
+  `{ "error": "This Ticket was changed by someone else. Reload it and try again." }`.
+
+The body carries only the target. The move is judged from the status the database holds, never
+from one the client believes, and the write is conditional on the row still being what was judged:
+its status, and for Resolved or Closed its having an owner, are both in the `WHERE`. A colleague
+moving the status or unassigning the Ticket in between therefore matches zero rows rather than
+producing a state the matrix forbids.
+
+**Reopening clears `requesterResolvedAt`.** The Requester's signal is once per Ticket (§7), so
+without this a reopened Ticket could never be signalled again. The first signal is not lost: the
+Public Comment posted with it stays in the thread.
+
+A client that receives either `409` should reload the Ticket, since both mean its copy is out of
+date.
 
 ## 13. `GET /api/staff/assignable-users`
 

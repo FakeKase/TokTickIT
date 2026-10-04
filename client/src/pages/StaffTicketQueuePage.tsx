@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { ApiError, fetchCategories, fetchStaffTickets } from '../api'
 import type {
   Category,
@@ -144,6 +144,10 @@ function Updated({ iso }: { iso: string }) {
 export function StaffTicketQueuePage() {
   const { user } = useAuth()
   const [params, setParams] = useSearchParams()
+  const location = useLocation()
+  // Handed to each Ticket link, so its Back returns to this view, filters and
+  // page included, rather than to the plain queue.
+  const returnTo = { from: `${location.pathname}${location.search}` }
   const view = useMemo(() => readView(params), [params])
 
   const [categories, setCategories] = useState<Category[]>([])
@@ -496,7 +500,8 @@ export function StaffTicketQueuePage() {
                 {rows.map((ticket) => (
                   <tr key={ticket.id}>
                     <td>
-                      <Link to={`/staff/tickets/${ticket.id}`} className="ttk-queue__number">
+                      <Link to={`/staff/tickets/${ticket.id}`}
+                        state={returnTo} className="ttk-queue__number">
                         {ticket.ticketNumber}
                       </Link>
                     </td>
@@ -538,7 +543,8 @@ export function StaffTicketQueuePage() {
               <li key={ticket.id}>
                 {/* The whole card is the link, so the tap target is the card
                     and not a line of text inside it. */}
-                <Link to={`/staff/tickets/${ticket.id}`} className="ttk-queue__card">
+                <Link to={`/staff/tickets/${ticket.id}`}
+                        state={returnTo} className="ttk-queue__card">
                   <span className="ttk-queue__card-row">
                     <span className="ttk-queue__number">{ticket.ticketNumber}</span>
                     <StatusBadge status={ticket.currentStatus} />

@@ -36,9 +36,17 @@ import {
 } from "./lib/ticket-number.js";
 import { validateTicketInput } from "./lib/ticket-validation.js";
 import {
+  IT_PRIORITIES,
   parseStaffQueueQuery,
   parseTicketQuery,
 } from "./lib/ticket-query.js";
+import { serializable } from "./lib/serializable.js";
+import {
+  isTicketStatus,
+  permittedTransitions,
+  requiresOwner,
+  transitionRefusal,
+} from "./lib/status-transitions.js";
 import { validateComment } from "./lib/comment-validation.js";
 import {
   ALLOWED_TYPES_LABEL,
@@ -849,6 +857,313 @@ export function createApp(prisma = createPrismaClient()) {
     },
   );
 
+  /** Everything the IT Staff Ticket Detail screen shows (api-spec.md §9). */
+  const staffTicketSelect = {
+    id: true,
+    ticketNumber: true,
+    summary: true,
+    description: true,
+    requestedPriority: true,
+    itPriority: true,
+    currentStatus: true,
+    requesterResolvedAt: true,
+    createdAt: true,
+    updatedAt: true,
+    category: { select: { id: true, name: true } },
+    relatedSystem: { select: { id: true, name: true } },
+    requester: { select: { id: true, name: true } },
+    owner: { select: { id: true, name: true } },
+    attachments: {
+      orderBy: { id: "asc" as const },
+      select: {
+        id: true,
+        originalFilename: true,
+        mimeType: true,
+        sizeBytes: true,
+        isRemoved: true,
+        removedAt: true,
+        removedReason: true,
+        createdAt: true,
+      },
+    },
+  };
+
+  /**
+   * The staff view of a Ticket, plus where it may go next.
+   *
+   * `transitions` is the §5.2 matrix read for this Ticket's current status.
+   * It travels with the Ticket so the screen offers what the server will
+   * accept without keeping a second copy of the matrix that could fall out of
+   * step with this one.
+   */
+  const toStaffTicket = <T extends { currentStatus: string }>(ticket: T) => ({
+    ...ticket,
+    transitions: isTicketStatus(ticket.currentStatus)
+      ? permittedTransitions(ticket.currentStatus)
+      : [],
+  });
+
+  /** A positive integer id from a route param, or null. */
+  const parseId = (raw: unknown): number | null => {
+    const id = Number(raw);
+    return Number.isInteger(id) && id > 0 ? id : null;
+  };
+
+  const TICKET_NOT_FOUND = { error: "Ticket not found" };
+  /** Somebody else changed the Ticket between this request reading it and
+   *  writing to it. Not a validation problem and not a server fault: the
+   *  screen is out of date, and reloading is the fix. */
+  const TICKET_MOVED = {
+    error: "This Ticket was changed by someone else. Reload it and try again.",
+  };
+
+  // api-spec.md §9 (FR-14).
+  app.get(
+    "/api/staff/tickets/:id",
+    ...asStaff,
+    async (req: AuthenticatedRequest, res) => {
+      const id = parseId(req.params.id);
+      if (!id) return res.status(404).json(TICKET_NOT_FOUND);
+
+      try {
+        const ticket = await prisma.ticket.findUnique({
+          where: { id },
+          select: staffTicketSelect,
+        });
+        if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
+
+        res.json(toStaffTicket(ticket));
+      } catch {
+        res.status(500).json({ error: "Unable to load the Ticket" });
+      }
+    },
+  );
+
+  // api-spec.md §13 (FR-15, BR-19). Who the reassign control may offer.
+  app.get(
+    "/api/staff/assignable-users",
+    ...asStaff,
+    async (_req: AuthenticatedRequest, res) => {
+      try {
+        const users = await prisma.user.findMany({
+          where: {
+            isActive: true,
+            role: { in: ["IT_STAFF", "ADMINISTRATOR"] },
+          },
+          orderBy: [{ name: "asc" }, { id: "asc" }],
+          select: { id: true, name: true, role: true },
+        });
+        res.json(users);
+      } catch {
+        res.status(500).json({ error: "Unable to load the assignable users" });
+      }
+    },
+  );
+
+  // api-spec.md §10 (FR-15, BR-19, BR-20). Claim, reassign, or unassign.
+  app.patch(
+    "/api/staff/tickets/:id/owner",
+    ...asStaff,
+    async (req: AuthenticatedRequest, res) => {
+      const id = parseId(req.params.id);
+      if (!id) return res.status(404).json(TICKET_NOT_FOUND);
+
+      const ownerId: unknown = (req.body ?? {}).ownerId;
+      const valid =
+        ownerId === null ||
+        (typeof ownerId === "number" && Number.isInteger(ownerId) && ownerId > 0);
+      if (!valid) {
+        return res.status(400).json({
+          error: "Validation failed",
+          fields: { ownerId: "Ticket Owner must be a user id, or null to unassign" },
+        });
+      }
+      const nextOwnerId = ownerId as number | null;
+
+      try {
+        // Serializable, because the rule spans two tables: the Ticket being
+        // written and the User who must still be active staff when it is
+        // (BR-19). A check followed by a write at the default level would let
+        // an account be deactivated in between and still receive the Ticket.
+        const outcome = await serializable(prisma, async (tx) => {
+          const ticket = await tx.ticket.findUnique({
+            where: { id },
+            select: { ownerId: true, currentStatus: true },
+          });
+          if (!ticket) return { status: 404, body: TICKET_NOT_FOUND };
+
+          if (nextOwnerId === null) {
+            // BR-23 read forwards: a Ticket may not become Resolved or Closed
+            // without an owner, so it may not be left without one after.
+            // Otherwise the rule is one unassign away from meaning nothing.
+            if (
+              isTicketStatus(ticket.currentStatus) &&
+              requiresOwner(ticket.currentStatus)
+            ) {
+              return {
+                status: 409,
+                body: {
+                  error: "A Resolved or Closed Ticket must keep its Ticket Owner",
+                },
+              };
+            }
+          } else {
+            const target = await tx.user.findUnique({
+              where: { id: nextOwnerId },
+              select: { isActive: true, role: true },
+            });
+            // One message for all three failures. Telling them apart would
+            // let the caller probe which ids are accounts and which of those
+            // are inactive.
+            if (!target || !target.isActive || target.role === "REQUESTER") {
+              return {
+                status: 409,
+                body: {
+                  error: "Ticket Owner must be an active IT Staff or Administrator",
+                },
+              };
+            }
+          }
+
+          // Assigning the owner a Ticket already has changes nothing, so it
+          // writes nothing. An update would still advance `updatedAt`, and the
+          // queue sorts by it: a no-op would float the Ticket to the top as
+          // though something had happened to it.
+          if (ticket.ownerId === nextOwnerId) {
+            return {
+              status: 200,
+              body: toStaffTicket(
+                await tx.ticket.findUniqueOrThrow({
+                  where: { id },
+                  select: staffTicketSelect,
+                }),
+              ),
+            };
+          }
+
+          const updated = await tx.ticket.update({
+            where: { id },
+            data: { ownerId: nextOwnerId },
+            select: staffTicketSelect,
+          });
+          return { status: 200, body: toStaffTicket(updated) };
+        });
+
+        res.status(outcome.status).json(outcome.body);
+      } catch {
+        res.status(500).json({ error: "Unable to change the Ticket Owner" });
+      }
+    },
+  );
+
+  // api-spec.md §11 (FR-16, BR-21).
+  app.patch(
+    "/api/staff/tickets/:id/it-priority",
+    ...asStaff,
+    async (req: AuthenticatedRequest, res) => {
+      const id = parseId(req.params.id);
+      if (!id) return res.status(404).json(TICKET_NOT_FOUND);
+
+      const itPriority: unknown = (req.body ?? {}).itPriority;
+      const known = IT_PRIORITIES.find((value) => value === itPriority);
+      if (!known) {
+        return res.status(400).json({
+          error: "Validation failed",
+          fields: { itPriority: "IT Priority must be Low, Medium, High or Urgent" },
+        });
+      }
+
+      try {
+        const ticket = await prisma.ticket.findUnique({
+          where: { id },
+          select: { itPriority: true },
+        });
+        if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
+
+        // Only `itPriority` is ever written here. `requestedPriority` is what
+        // the Requester asked for and stays as they left it (BR-21).
+        const updated =
+          ticket.itPriority === known
+            ? await prisma.ticket.findUniqueOrThrow({
+                where: { id },
+                select: staffTicketSelect,
+              })
+            : await prisma.ticket.update({
+                where: { id },
+                data: { itPriority: known },
+                select: staffTicketSelect,
+              });
+
+        res.json(toStaffTicket(updated));
+      } catch {
+        res.status(500).json({ error: "Unable to change the IT Priority" });
+      }
+    },
+  );
+
+  // api-spec.md §12 (FR-17, BR-22, BR-23).
+  app.patch(
+    "/api/staff/tickets/:id/status",
+    ...asStaff,
+    async (req: AuthenticatedRequest, res) => {
+      const id = parseId(req.params.id);
+      if (!id) return res.status(404).json(TICKET_NOT_FOUND);
+
+      const target: unknown = (req.body ?? {}).currentStatus;
+      if (!isTicketStatus(target)) {
+        return res.status(400).json({
+          error: "Validation failed",
+          fields: { currentStatus: "Status is not one this system knows" },
+        });
+      }
+
+      try {
+        const ticket = await prisma.ticket.findUnique({
+          where: { id },
+          select: { currentStatus: true, ownerId: true },
+        });
+        if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
+
+        // Judged from the status the database holds, never from what the
+        // screen believed: the body carries only where to go, not where from.
+        const from = ticket.currentStatus;
+        const refusal = isTicketStatus(from)
+          ? transitionRefusal(from, target, ticket.ownerId !== null)
+          : "This Ticket's status cannot be changed";
+        if (refusal) return res.status(409).json({ error: refusal });
+
+        // The check above read the row; this writes it only if it is still
+        // what was read. Both conditions the decision rested on are in the
+        // WHERE, so a colleague moving the status, or unassigning the Ticket,
+        // in between leaves zero rows matched instead of an illegal state.
+        const moved = await prisma.ticket.updateMany({
+          where: {
+            id,
+            currentStatus: from,
+            ...(requiresOwner(target) ? { ownerId: { not: null } } : {}),
+          },
+          data: {
+            currentStatus: target,
+            // A reopened Ticket is live again, so the Requester's "this looks
+            // fixed" no longer describes it. Cleared, they can say it again
+            // when it is true again; the first time stays in the thread as
+            // the comment that was posted with it.
+            ...(target === "REOPENED" ? { requesterResolvedAt: null } : {}),
+          },
+        });
+        if (moved.count === 0) return res.status(409).json(TICKET_MOVED);
+
+        const updated = await prisma.ticket.findUniqueOrThrow({
+          where: { id },
+          select: staffTicketSelect,
+        });
+        res.json(toStaffTicket(updated));
+      } catch {
+        res.status(500).json({ error: "Unable to change the status" });
+      }
+    },
+  );
+
   // api-spec.md §7. The auth chain runs first, so an anonymous or wrong-role
   // caller is turned away before multer writes anything; multer then parses the
   // multipart body, and every rejection path after it discards the file it
@@ -983,6 +1298,39 @@ export function createApp(prisma = createPrismaClient()) {
     return attachment;
   }
 
+  /**
+   * An Attachment the caller may read (specification.md §5.1, AC-45).
+   *
+   * A Requester reads their own Ticket's; IT Staff and Administrators read
+   * any Ticket's. Reading is the only thing that widens: upload and removal
+   * stay with the owning Requester and go through `findOwnedAttachment`.
+   */
+  async function findReadableAttachment(
+    rawId: unknown,
+    user: { id: number; role: string },
+  ) {
+    if (user.role === "REQUESTER") return findOwnedAttachment(rawId, user.id);
+
+    const id = parseId(rawId);
+    if (!id) return null;
+    return prisma.attachment.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        ticketId: true,
+        originalFilename: true,
+        storedFilename: true,
+        mimeType: true,
+        sizeBytes: true,
+        isRemoved: true,
+        removedAt: true,
+        removedReason: true,
+        createdAt: true,
+        ticket: { select: { requesterId: true } },
+      },
+    });
+  }
+
   /** The metadata shape api-spec.md §8 documents — never the stored filename. */
   function attachmentPayload(
     attachment: Awaited<ReturnType<typeof findOwnedAttachment>>,
@@ -994,10 +1342,10 @@ export function createApp(prisma = createPrismaClient()) {
 
 
   // api-spec.md §8: one Attachment's metadata, active or removed.
-  app.get("/api/attachments/:id", ...asRequester, async (req: AuthenticatedRequest, res) => {
-    const attachment = await findOwnedAttachment(
+  app.get("/api/attachments/:id", ...asAnyUser, async (req: AuthenticatedRequest, res) => {
+    const attachment = await findReadableAttachment(
       req.params.id,
-      req.auth!.user.id,
+      req.auth!.user,
     );
     if (!attachment) {
       return res.status(404).json({ error: "Attachment not found" });
@@ -1007,10 +1355,10 @@ export function createApp(prisma = createPrismaClient()) {
   });
 
   // api-spec.md §9: the file itself.
-  app.get("/api/attachments/:id/download", ...asRequester, async (req: AuthenticatedRequest, res) => {
-    const attachment = await findOwnedAttachment(
+  app.get("/api/attachments/:id/download", ...asAnyUser, async (req: AuthenticatedRequest, res) => {
+    const attachment = await findReadableAttachment(
       req.params.id,
-      req.auth!.user.id,
+      req.auth!.user,
     );
 
     // BR-26/AC-21: a removed Attachment answers exactly as a nonexistent one

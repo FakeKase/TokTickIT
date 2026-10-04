@@ -485,14 +485,24 @@ export async function fetchComments(ticketId: number): Promise<TicketComment[]> 
   return (await response.json()) as TicketComment[]
 }
 
-/** `visibility` is deliberately not a parameter: this is the Requester's
- *  composer, and the server refuses INTERNAL from them anyway (BR-04). Issue
- *  #44 adds the IT Staff composer that needs the choice. */
-export async function postComment(ticketId: number, body: string): Promise<TicketComment> {
+/**
+ * Posts a Public Comment or an Internal Note (api-spec.md §6).
+ *
+ * The Requester's composer passes no `visibility` and the field is left out of
+ * the request, so the server's default of PUBLIC applies and nothing on that
+ * screen can ask for anything else. A staff composer always names its own,
+ * because the two staff composers differ in nothing but this value: leaving it
+ * to a default is how an internal note would end up public.
+ */
+export async function postComment(
+  ticketId: number,
+  body: string,
+  visibility?: CommentVisibility,
+): Promise<TicketComment> {
   const response = await apiFetch(`/api/tickets/${ticketId}/comments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body }),
+    body: JSON.stringify(visibility ? { body, visibility } : { body }),
   })
 
   if (!response.ok) {
@@ -501,6 +511,85 @@ export async function postComment(ticketId: number, body: string): Promise<Ticke
 
   return (await response.json()) as TicketComment
 }
+
+/** One move the Ticket may make from where it is (specification.md §5.2). */
+export interface StatusTransition {
+  to: TicketStatus
+  /** The move also needs a Ticket Owner (BR-23). */
+  requiresOwner: boolean
+}
+
+/** A Ticket as IT Staff see it (api-spec.md §9). */
+export interface StaffTicketDetail extends StaffQueueItem {
+  description: string
+  relatedSystem: { id: number; name: string }
+  attachments: TicketAttachment[]
+  /** Where this Ticket may go next, read from the server's own matrix. The
+   *  client keeps no copy of that matrix to fall out of step with it. */
+  transitions: StatusTransition[]
+}
+
+export interface AssignableUser {
+  id: number
+  name: string
+  role: Role
+}
+
+export async function fetchStaffTicket(id: number): Promise<StaffTicketDetail> {
+  const response = await apiFetch(`/api/staff/tickets/${id}`)
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to load the Ticket')
+  }
+
+  return (await response.json()) as StaffTicketDetail
+}
+
+/** Active IT Staff and Administrators: who a Ticket may be given to (§13). */
+export async function fetchAssignableUsers(): Promise<AssignableUser[]> {
+  const response = await apiFetch('/api/staff/assignable-users')
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to load the assignable users')
+  }
+
+  return (await response.json()) as AssignableUser[]
+}
+
+/** One PATCH to a staff Ticket. Each returns the whole updated Ticket, so the
+ *  screen replaces what it holds rather than patching a field and hoping the
+ *  rest still matches. */
+async function patchStaffTicket(
+  id: number,
+  what: 'owner' | 'it-priority' | 'status',
+  body: Record<string, unknown>,
+  fallback: string,
+): Promise<StaffTicketDetail> {
+  const response = await apiFetch(`/api/staff/tickets/${id}/${what}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, fallback)
+  }
+
+  return (await response.json()) as StaffTicketDetail
+}
+
+/** Claim, reassign, or (with `null`) unassign (api-spec.md §10). */
+export const setTicketOwner = (id: number, ownerId: number | null) =>
+  patchStaffTicket(id, 'owner', { ownerId }, 'Unable to change the Ticket Owner')
+
+/** api-spec.md §11. Requested Priority is not touched (BR-21). */
+export const setItPriority = (id: number, itPriority: ItPriority) =>
+  patchStaffTicket(id, 'it-priority', { itPriority }, 'Unable to change the IT Priority')
+
+/** api-spec.md §12. Only the target is sent; the server judges the move from
+ *  the status it holds, not from one this screen believes. */
+export const setTicketStatus = (id: number, currentStatus: TicketStatus) =>
+  patchStaffTicket(id, 'status', { currentStatus }, 'Unable to change the status')
 
 export interface ResolvedSignal {
   id: number

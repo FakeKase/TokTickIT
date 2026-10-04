@@ -1,0 +1,107 @@
+/* IT Staff Ticket Detail (ui-spec.md §5). The Requester's read-only header
+   card, with the workflow panel beside it on desktop and under it below. */
+
+.ttk-staff-detail {
+  max-width: 1200px;
+}
+
+.ttk-staff-detail__columns {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
+  align-items: start;
+  gap: var(--zg-space-4);
+}
+
+/* Two columns here even on desktop: the card is narrower than the
+   Requester's, which has the full width to itself. */
+.ttk-staff-detail .ttk-detail__grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.ttk-staff-detail__attachments,
+.ttk-staff-detail .ttk-thread {
+  margin-top: var(--zg-space-4);
+}
+
+/* ---------- Workflow panel ---------- */
+
+/* The one region on the screen that acts. Pale green and bordered, so the
+   read-only facts beside it are unmistakably not this. */
+.ttk-workflow {
+  padding: var(--zg-space-4);
+  background: var(--zg-pale);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+}
+
+.ttk-workflow__title {
+  margin: 0 0 var(--zg-space-3);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.ttk-workflow__signal {
+  margin: 0 0 var(--zg-space-3);
+  padding: var(--zg-space-3);
+  background: var(--zg-surface);
+  border-left: 3px solid var(--zg-secondary);
+  border-radius: var(--zg-radius);
+}
+
+.ttk-workflow__group {
+  padding: var(--zg-space-3) 0;
+  border-top: 1px solid var(--zg-border);
+}
+
+.ttk-workflow__group h3 {
+  margin: 0;
+}
+
+.ttk-workflow__current {
+  margin: var(--zg-space-1) 0 var(--zg-space-2);
+  font-weight: 600;
+}
+
+.ttk-workflow__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zg-space-2);
+  margin-bottom: var(--zg-space-3);
+}
+
+.ttk-workflow__pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--zg-space-3);
+  align-items: start;
+}
+
+.ttk-workflow__readonly {
+  margin: var(--zg-space-2) 0 0;
+}
+
+.ttk-workflow__hint {
+  margin: var(--zg-space-2) 0;
+  font-size: 13px;
+}
+
+.ttk-workflow select {
+  width: 100%;
+}
+
+/* Tablet and below: the panel moves directly under the header card. */
+@media (max-width: 991px) {
+  .ttk-staff-detail__columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .ttk-staff-detail .ttk-detail__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ttk-workflow__actions .ttk-btn {
+    flex: 1;
+  }
+}

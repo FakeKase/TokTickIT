@@ -744,6 +744,18 @@ describe('the dialog itself (ui-spec §7, §9)', () => {
     expect(await dialog().findByText('The password could not be set. Please try again.')).toBeInTheDocument()
   })
 
+  it('stops the page behind from scrolling while it is open, and lets it scroll again after', async () => {
+    mockApi()
+    await openScreen()
+    expect(document.body.style.overflow).toBe('')
+
+    const user = await openCreate()
+    expect(document.body.style.overflow).toBe('hidden')
+
+    await user.keyboard('{Escape}')
+    expect(document.body.style.overflow).toBe('')
+  })
+
   it('keeps Tab inside the dialog in both directions', async () => {
     mockApi()
     await openScreen()

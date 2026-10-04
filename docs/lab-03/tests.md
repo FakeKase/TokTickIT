@@ -132,11 +132,11 @@ is under test.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| RESP-01 | Style | AC-42, ui-spec §10 | No horizontal overflow | Login, Change Password, Queue, Staff Detail, and User Management at 375/820/1280px, with the offending element named on failure | `e2e/lab-03/visual-regression.spec.ts` | Planned |
-| RESP-02 | Style | ui-spec §3 | Editable vs read-only on Staff Detail | Computed background colours of the workflow panel and the ticket header differ | `e2e/lab-03/visual-regression.spec.ts` | Planned |
-| RESP-03 | Style | ui-spec §3, §5 | Public vs internal streams | Computed background colours differ, not only the headings | `e2e/lab-03/visual-regression.spec.ts` | Planned |
-| RESP-04 | Style | ui-spec §3 | Badge families | Status, IT Priority, and Role badges are mutually distinct by computed colour, and each carries a text label | `e2e/lab-03/visual-regression.spec.ts` | Planned |
-| RESP-05 | Style | AC-43 | Focus visibility and dialog focus trap | Every interactive control shows a focus ring; the user dialog traps focus and restores it on close | `e2e/lab-03/visual-regression.spec.ts` | Planned |
+| RESP-01 | Style | AC-42, ui-spec §10 | No horizontal overflow | Login, Change Password, Queue and its mobile filter panel, Staff Detail, User Management and its dialog, and the Requester's My Tickets and Ticket Detail, at 375/820/1280px in both themes, with the offending element named on failure and no label, badge or button clipped. The fixtures hold text that cannot wrap. The header's name, role badge and Log out never overlap, for any role | `e2e/lab-03/visual-regression.spec.ts` | Pass |
+| RESP-02 | Style | ui-spec §3 | Editable vs read-only on Staff Detail | Computed background colours of the workflow panel and the ticket header differ, an editable control differs from a read-only value, and the read-only card contains no control | `e2e/lab-03/visual-regression.spec.ts` | Pass |
+| RESP-03 | Style | ui-spec §3, §5 | Public vs internal streams | Computed background colours differ, not only the headings; the internal stream has a left rule of at least 3px in a different colour; each states its audience | `e2e/lab-03/visual-regression.spec.ts` | Pass |
+| RESP-04 | Style | ui-spec §3 | Badge families | Status, IT Priority, and Role badges are mutually distinct by computed colour, and each carries a text label; Requested and IT Priority differ; every badge label has at least 4.5:1 contrast on its fill in both themes; Urgent is the only filled badge. Role navigation shows only permitted destinations, on desktop and in the mobile menu | `e2e/lab-03/visual-regression.spec.ts` | Pass |
+| RESP-05 | Style | AC-43 | Focus visibility and dialog focus trap | Every control reached by Tab on Login, Change Password, User Management, the queue and the staff Ticket shows a focus ring; the user dialog traps focus and restores it on close. Validation messages sit directly below their own field on Login, Change Password and the user dialog; a disabled guard-rail control has its reason beside it; the new screens' buttons and fields have the same computed style as Lab 2's | `e2e/lab-03/visual-regression.spec.ts` | Pass |
 | E2E-01 | E2E | AC-01, AC-05, AC-06, AC-08, AC-13 | Login, wrong password, logout, direct access blocked | A protected URL with no session goes to Login; a wrong password, an unknown address and an inactive account all show the same message; a valid login enters the app; after logout a protected URL returns to Login and the old cookie is `401`. Each role lands on its own screen with its own navigation, and is shown Forbidden on a route that is not theirs | `e2e/lab-03/authentication.spec.ts` | Pass |
 | E2E-02 | E2E | AC-02 | Initial password login and change | An account created by the Administrator signs in and is held on Change Password, in the browser and at the API; a mismatched confirmation changes nothing; a valid change opens the screen for their role; the initial password then fails and the new one works | `e2e/lab-03/authentication.spec.ts` | Pass |
 | E2E-03 | E2E | AC-27, AC-30, AC-31, AC-33, AC-34 | IT Staff workflow | Sign in, find a Ticket through the queue search, open it, see Resolved unavailable while unowned, claim it, set IT Priority with Requested Priority unchanged, move the status, be refused an illegal move by the API, post a public comment and an internal note, and return to the same search with the queue showing the new owner | `e2e/lab-03/staff-ticket-flow.spec.ts` | Pass |
@@ -254,6 +254,9 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 | 46 — E2E suite and evidence | `cd client && npm test` | 17 files, 255 tests passed |
 | 46 — E2E suite and evidence | `npm run e2e:fresh` | 60 specs passed, on a database built for the run; 33 screenshots and `api-authorization.json` written |
 | 46 — E2E suite and evidence | `npm run e2e` | 44 specs passed, 16 evidence captures skipped, on the development database |
+| 47 — Responsive and visual QA | `cd client && npm test` | 17 files, 256 tests passed |
+| 47 — Responsive and visual QA | `npm run e2e:fresh` | 84 specs passed, on a database built for the run; 50 responsive captures written |
+| 47 — Responsive and visual QA | `npm run e2e` | 68 specs passed, 16 evidence captures skipped, on the development database |
 
 ## 7. Known Limitations or Deferred Tests
 
@@ -283,20 +286,11 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
   Updated are asserted to come back newest id first, and removing the key does fail that test here.
   But without the key the database's order is unspecified rather than reliably wrong, so the test
   is certain to pass with the key and only likely to fail without it.
-- **The queue's responsive layout is not covered by an automated test yet** (Issue #43). It was
-  checked by eye at 1440, 820 and 390px in both themes, with no horizontal overflow at any of them;
-  the captures and the overflow assertion become RESP-01 in Issue #46. jsdom applies no media
-  queries, so the client tests cannot see which of the table and the cards is showing.
 - **An assignment racing a deactivation is not tested as a race.** The two are ordered by a row
   lock on the user: the owner route reads it `FOR SHARE`, the edit takes it `FOR UPDATE`. Each
   outcome is tested on its own, a deactivated user is refused as an owner and a deactivation hands
   back what they owned, but no test forces the two to overlap. The last-Administrator lock, by
   contrast, is tested with two real simultaneous requests.
-- **My Tickets overflows horizontally by 28px at 820px wide** for a Requester whose Tickets have a
-  long status. Found while measuring the header for this Issue, and present before it: the table
-  grew when the status labels became words in Issue #43. Left for Issue #47. The header itself no
-  longer overflows for any role at 375px and wider, which the Administrator's longer role label
-  had caused.
 - **The client suite times out when the machine is heavily loaded.** With the load average above
   20, two consecutive runs failed 14 and 17 tests, every one a 5 s timeout and spread across
   unrelated files, and the suite took 77 to 90 s instead of about 13. The next three runs, on the
@@ -316,8 +310,6 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
   thirteen requests rendered as `staff-ticket-detail/forbidden-api.png`. Each identity has a request
   context of its own. An earlier version shared one, and its "no session" row was really the last
   account signed in: Playwright's shared context keeps a cookie jar.
-- **RESP-01 to RESP-05 are still planned.** They are Issue #47. The Lab 3 screens were captured at
-  three widths here as evidence, but nothing in this Issue asserts on overflow, colour or focus.
 - **The User Management flow that surfaced the `Esc` bug** (Issue #45) is now E2E-05, which presses
   `Esc` after a refused duplicate address and expects the dialog to close.
 - **The server suite depends on the seeded accounts being as the README describes them.**
@@ -327,3 +319,16 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
   never rewrites a password. Against a freshly seeded database the suite passed 353 of 353 three
   times running. The intermittent single failure recorded above also appeared once in those runs,
   in `auth.api.test.ts`, and did not repeat.
+- **The My Tickets overflow recorded during Issue #45 was misdiagnosed there.** It was put down to
+  the longer status labels from Issue #43. The cause was one Ticket whose Summary was a single
+  unbroken word: a table cell cannot be narrower than its longest word, so the table grew wider
+  than the page, at desktop width as well. It was found in Issue #47 only once the fixtures were
+  given text that cannot wrap; the same checks passed on the seed, whose every Summary is a tidy
+  sentence. Fixed, and the visual spec's fixtures stay awkward on purpose.
+- **Visual checks are computed, not looked at, and that has limits.** Overflow, clipping, overlap,
+  contrast, focus rings and placement are measured from the rendered page. Whether a screen is
+  pleasant is not something these assert. Every capture was also looked at once by eye during
+  Issue #47, which is how the page scrolling behind the mobile dialog was noticed.
+- **One client test failed once and did not repeat** (Issue #47): `AppShellNav.test.tsx`, "keeps My
+  Tickets active on a Ticket Detail route". It passed three times alone and twice in the full suite
+  immediately afterwards, at a normal machine load. Not explained.

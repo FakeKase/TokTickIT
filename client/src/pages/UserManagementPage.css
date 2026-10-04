@@ -69,7 +69,12 @@
   border-bottom: none;
 }
 
-.ttk-users__email {
+/* Both can hold text with nowhere to break. Without this on the name as well,
+   one long unbroken name claims the width and the addresses beside it are
+   broken mid-word to make room. */
+.ttk-users__email,
+.ttk-users__table td:first-child,
+.ttk-users__card-name {
   overflow-wrap: anywhere;
 }
 

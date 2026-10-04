@@ -28,6 +28,13 @@
    * fail contrast; white on this is 9.4:1 here and 7:1 on the dark value. */
   --zg-error-solid: #8a1f1f;
   --zg-active-tint: #d5ecdf;
+  /* Text colours for the two badges whose base colour is too light to read on
+   * its own tint. --zg-warning on --zg-warning-tint is 3.2:1 and
+   * --zg-secondary on --zg-active-tint is 4.3:1; these are 5.3:1 and 5.9:1.
+   * The base colours stay as they are for borders and rules, where 3:1 is the
+   * bar and they clear it. */
+  --zg-warning-text: #8a5a12;
+  --zg-active-text: #086338;
   --zg-border: #cbd5ce;
 
   /*
@@ -94,6 +101,9 @@
   --zg-neutral-tint: #303a34; /* body text 10.1:1 */
   --zg-error-solid: #a52a2a;
   --zg-active-tint: #1d4530;
+  /* The base colours already clear 4.5:1 on the dark tints (6.8 and 5.2). */
+  --zg-warning-text: #e0a94a;
+  --zg-active-text: #4cc98a;
   --zg-border: #5c7169; /* 3.2:1 on --zg-surface */
 
   color-scheme: dark;

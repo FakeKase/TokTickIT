@@ -155,7 +155,7 @@
 
 .ttk-badge--warning {
   background: var(--zg-warning-tint);
-  color: var(--zg-warning);
+  color: var(--zg-warning-text);
 }
 
 .ttk-badge--danger {
@@ -167,7 +167,7 @@
 
 .ttk-badge--active {
   background: var(--zg-active-tint);
-  color: var(--zg-secondary);
+  color: var(--zg-active-text);
 }
 
 /* Urgent: the only filled badge in the system, so it is the one thing that

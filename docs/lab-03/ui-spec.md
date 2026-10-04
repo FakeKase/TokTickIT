@@ -69,12 +69,17 @@ signal.
 | Badge | Values | Colour mapping |
 | :-- | :-- | :-- |
 | Requested Priority | Low / Medium / High | Unchanged from Lab 2 §7 |
-| IT Priority | Low / Medium / High / Urgent | Low → neutral tint; Medium → `--zg-warning` tint; High → `--zg-error` tint; Urgent → solid `--zg-error`, white text — the only filled badge in the system, and the only one that should catch the eye across a full queue |
+| IT Priority | Low / Medium / High / Urgent | Low → neutral tint; Medium → `--zg-warning` tint with `--zg-warning-text`; High → `--zg-error` tint; Urgent → solid `--zg-error-solid`, white text — the only filled badge in the system, and the only one that should catch the eye across a full queue |
 | Current Status | New, Open, In Progress, Waiting for Requester, Resolved, Closed, Reopened, Cancelled | Open family (New/Open/Reopened) → `--zg-pale` with `--zg-secondary` text; active (In Progress) → `--zg-secondary` tint; blocked (Waiting for Requester) → `--zg-warning` tint; finished (Resolved/Closed) → neutral tint with a check glyph; Cancelled → neutral tint, strikethrough label |
 | Role | Requester / IT Staff / Administrator | Outlined, `--zg-text` on `--zg-surface`; distinguished by label, not colour, because a role badge sits next to a name and must not compete with workflow signals |
 
 The two priority badges appear side by side in the queue and on Ticket Detail, each under its own
 column or label. Where space forces one away, IT Priority wins — it is the operational number.
+
+Badge text is held to 4.5:1 against its own fill in both themes. Two base colours are too light
+for that on their tint in the light theme, so those two badges take their text from tokens of their
+own: `--zg-warning-text` on the warning tint and `--zg-active-text` on the active tint. The base
+colours `--zg-warning` and `--zg-secondary` are unchanged and still used for rules and borders.
 
 ## 4. IT Staff Ticket Queue (`/staff/tickets`)
 
@@ -284,20 +289,41 @@ Completed during Issue #47 (Responsive and visual QA). As in Lab 2, every box is
 assertion in `e2e/lab-03/visual-regression.spec.ts` rather than by having looked at a screenshot —
 a capture passes just as happily when the layout is broken.
 
-- [ ] No clipping, overlap, or unintended horizontal scroll at 375px, 820px, 1280px on Login, Change Password, Ticket Queue, IT Staff Ticket Detail, and User Management
-- [ ] Role navigation renders only permitted destinations for each of the three roles
-- [ ] The three badge families are mutually distinguishable by computed colour, and each carries its text label
-- [ ] Editable workflow controls are visually distinct from the read-only ticket header on IT Staff Ticket Detail
-- [ ] Public Comments and Internal Notes are distinguishable by computed background colour, not only by heading text
-- [ ] Validation messages sit directly below their field on Login, Change Password, and the user dialog
-- [ ] Focus is visible on every interactive control, and the user dialog traps and restores it
-- [ ] Disabled guard-rail controls in User Management carry a visible reason
-- [ ] Screens are consistent with `docs/lab-02/ui-spec.md` §1–§4 — same tokens, same button hierarchy, same field states
+- [x] No clipping, overlap, or unintended horizontal scroll at 375px, 820px, 1280px on Login, Change Password, Ticket Queue, IT Staff Ticket Detail, and User Management. Also checked on the user dialog, the mobile filter panel, and the Requester's My Tickets and Ticket Detail, in both themes, with text that cannot wrap in a Summary, a comment, a note and a user's name.
+- [x] Role navigation renders only permitted destinations for each of the three roles, on desktop and behind the mobile menu
+- [x] The three badge families are mutually distinguishable by computed colour, and each carries its text label. Every badge label has at least 4.5:1 contrast on its own fill, in both themes, and Urgent is the only filled badge.
+- [x] Editable workflow controls are visually distinct from the read-only ticket header on IT Staff Ticket Detail, and the read-only card holds no control at all
+- [x] Public Comments and Internal Notes are distinguishable by computed background colour, not only by heading text, and the internal stream carries its rule down the left edge
+- [x] Validation messages sit directly below their field on Login, Change Password, and the user dialog
+- [x] Focus is visible on every interactive control, and the user dialog traps and restores it. Tabbed through on Login, Change Password, User Management, the queue and the staff Ticket.
+- [x] Disabled guard-rail controls in User Management carry a visible reason, placed directly beside the control
+- [x] Screens are consistent with `docs/lab-02/ui-spec.md` §1–§4 — same tokens, same button hierarchy, same field states. The computed style of a primary button, a secondary button and a text field on the new screens equals that of the Lab 2 Create Ticket screen.
+
+**What the checklist found.** Four things were wrong, and were fixed rather than excused. The first
+two failed an assertion. The last two passed every assertion and were seen in the captures, which
+is why each capture was also looked at; the dialog one has an assertion now.
+
+1. My Tickets overflowed the page at every width, desktop included, when a Summary held a word
+   that could not wrap, such as a file name. A table cell cannot be narrower than its longest
+   word. The Summary cell now breaks anywhere; the Ticket Number, the dates and the badges stay
+   whole. This was a Lab 2 screen and a Lab 2 defect, not seen then because every fixture was a
+   tidy sentence.
+2. The amber badge (Medium priority, Waiting for Requester, Unassigned) had 3.2:1 contrast and the
+   In Progress badge 4.3:1. Each now has a text token of its own, at 5.3:1 and 5.9:1. See §3.
+3. In User Management one long unbroken name took the width and broke the email addresses beside
+   it mid-word. Names now wrap too.
+4. The page behind the user dialog could be scrolled while the dialog was open. It is held still.
+
+The fixtures for this spec are deliberately awkward for that reason: a file name with no spaces in
+a Summary, a long URL in a comment and in a note, and a user whose name is one unbroken word.
 
 ## 11. Screenshot Paths
 
 ```text
 artifacts/lab-03/screenshots/
+├── responsive/          (<screen>-<viewport>[-dark]: login, change-password, staff-queue, staff-queue-filters,
+│                         staff-ticket-detail, my-tickets, ticket-detail, user-management, user-dialog;
+│                         desktop, tablet and mobile; light and dark)
 ├── authentication/      (login, login-invalid, login-busy, change-password, change-password-invalid, shell-by-role-requester, shell-by-role-staff, shell-by-role-admin, logged-out)
 ├── staff-queue/         (desktop, tablet, mobile, filters-applied, no-results, empty, unassigned)
 ├── staff-ticket-detail/ (desktop, mobile, ownership, it-priority, status-transition, comments, internal-notes, forbidden-api)

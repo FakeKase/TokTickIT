@@ -244,7 +244,25 @@ result is recorded below.
 
 ### Run on `main` after release
 
-_To be filled in after the release PR merges._
+The release PR (#62) merged on 4 October 2026. The same commands, run on `main` at `f1c5c41`:
+
+| Suite | Command | Result |
+| --- | --- | --- |
+| Server: API, unit and integration | `cd server && npm test` | 21 files, 353 tests passed, on a freshly seeded database |
+| Migration: Lab 2 data through the Lab 3 migration | `cd server && npm run db:migration-check` | All checks passed |
+| Client: UI | `cd client && npm test` | 17 files, 256 tests passed. Six of nine runs were clean; see below |
+| End to end, flows and visual checks, Labs 2 and 3 | `npm run e2e:fresh` | 91 specs passed, on a database built for the run |
+| Type checks | `npm run typecheck` in `server/`, `client/` and the root | Clean |
+| Lint | `cd client && npm run lint` | Clean |
+| Production build | `cd client && npm run build` | Built |
+
+`npm run e2e` on the development database was not run again. It is the same suite as
+`e2e:fresh` without the evidence captures.
+
+The client suite was run nine times on `main`. Six runs were clean. Two passed all 256 tests and
+then reported an unhandled error, and one failed a single test. Both faults were in the tests, not
+in the application, and both are fixed in the follow-up to the release; §7 has the causes. With
+the fixes the suite was clean 20 times out of 20.
 
 ### Per Issue
 
@@ -356,6 +374,16 @@ _To be filled in after the release PR merges._
   contrast, focus rings and placement are measured from the rendered page. Whether a screen is
   pleasant is not something these assert. Every capture was also looked at once by eye during
   Issue #47, which is how the page scrolling behind the mobile dialog was noticed.
-- **One client test failed once and did not repeat** (Issue #47): `AppShellNav.test.tsx`, "keeps My
-  Tickets active on a Ticket Detail route". It passed three times alone and twice in the full suite
-  immediately afterwards, at a normal machine load. Not explained.
+- **A client test could be signed out by the test before it** (found in Issue #47, explained on
+  the run on `main`). `AppShellNav.test.tsx`, "keeps My Tickets active on a Ticket Detail route",
+  failed once during Issue #47 and again on `main`, with an empty page or the Login screen where
+  the shell should be. A test's own `afterEach` restores `fetch` before the
+  shared cleanup unmounts the app, so a request made in between went to the real network. With a
+  development API listening on port 3001 it came back 401, which reached the unauthorized handler
+  and signed out the app the next test had just rendered. Logging what reached the network showed
+  14 such requests in four runs. `src/test/setup.ts` now puts a `fetch` that always fails under
+  every mock, so nothing in the client suite can reach a server.
+- **A passing Login test left an unhandled error behind** (run on `main`). "resumes a path the new
+  user can open" lands on Ticket Detail, and the test's mock answered the comments request with
+  the Ticket object, so the thread threw after the assertion had passed. Two of nine runs on
+  `main` reported it. The mock now answers that request with a list.

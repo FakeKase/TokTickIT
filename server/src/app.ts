@@ -41,6 +41,11 @@ import {
   parseTicketQuery,
 } from "./lib/ticket-query.js";
 import {
+  ROLES,
+  initialPasswordProblem,
+  validateUser,
+} from "./lib/user-validation.js";
+import {
   isTicketStatus,
   permittedTransitions,
   requiresOwner,
@@ -1170,6 +1175,256 @@ export function createApp(prisma = createPrismaClient()) {
         res.json(toStaffTicket(updated));
       } catch {
         res.status(500).json({ error: "Unable to change the status" });
+      }
+    },
+  );
+
+  // ---------------------------------------------------------------------
+  // Administrator user management (api-spec.md §14 to §17).
+
+  /** Administrators only. Unlike `asStaff`, IT Staff are refused here: nothing
+   *  outside this block lists people or changes what they may do (BR-16). */
+  const asAdmin = [
+    requireAuth(prisma),
+    requirePasswordChanged,
+    requireRole("ADMINISTRATOR"),
+  ];
+
+  const USER_NOT_FOUND = { error: "User not found" };
+  const EMAIL_TAKEN = { error: "That email address is already in use" };
+  const LAST_ADMINISTRATOR = {
+    error: "The system must keep at least one active Administrator",
+  };
+
+  /** Prisma's code for a unique-constraint violation. The unique index on
+   *  `User.email` is the rule that actually holds (BR-34); catching this is
+   *  how it becomes a 409 instead of a 500. */
+  const isUniqueViolation = (error: unknown) =>
+    (error as { code?: unknown } | null)?.code === "P2002";
+
+  /** Statuses where a Ticket is still somebody's work in progress. A user who
+   *  stops being eligible to own Tickets hands these back; the ones they
+   *  finished stay theirs, as the record of who finished them. */
+  const LIVE_STATUSES = [
+    "NEW",
+    "OPEN",
+    "IN_PROGRESS",
+    "WAITING_FOR_REQUESTER",
+    "REOPENED",
+  ] as const;
+
+  // api-spec.md §14 (FR-20, FR-21, BR-38).
+  app.get("/api/users", ...asAdmin, async (req: AuthenticatedRequest, res) => {
+    const rawSearch = req.query.search;
+    const search = typeof rawSearch === "string" ? rawSearch.trim() : "";
+    const role = ROLES.find((candidate) => candidate === req.query.role);
+
+    try {
+      const [users, activeAdministrators] = await Promise.all([
+        prisma.user.findMany({
+          where: {
+            ...(role ? { role } : {}),
+            ...(search
+              ? {
+                  OR: [
+                    { name: { contains: search, mode: "insensitive" as const } },
+                    { email: { contains: search, mode: "insensitive" as const } },
+                  ],
+                }
+              : {}),
+          },
+          orderBy: [{ name: "asc" }, { id: "asc" }],
+        }),
+        // Counted over every user, not over the filtered list: whether
+        // someone is the last Administrator does not depend on what the
+        // caller happened to search for.
+        prisma.user.count({ where: { role: "ADMINISTRATOR", isActive: true } }),
+      ]);
+
+      res.json(
+        users.map((user) => ({
+          ...toIdentity(user),
+          // So the screen can disable the controls BR-33 would refuse and say
+          // why, without counting Administrators in a list that may be
+          // filtered. The PATCH below is what actually enforces the rule.
+          isLastActiveAdministrator:
+            user.role === "ADMINISTRATOR" && user.isActive && activeAdministrators <= 1,
+        })),
+      );
+    } catch {
+      res.status(500).json({ error: "Unable to load the users" });
+    }
+  });
+
+  // api-spec.md §15 (FR-22, BR-06, BR-13, BR-34, BR-37).
+  app.post("/api/users", ...asAdmin, async (req: AuthenticatedRequest, res) => {
+    const body = req.body ?? {};
+    const parsed = validateUser(body, false);
+    const passwordProblem = initialPasswordProblem(body.initialPassword);
+
+    if (!parsed.ok || passwordProblem) {
+      return res.status(400).json({
+        error: "Validation failed",
+        fields: {
+          ...(parsed.ok ? {} : parsed.fields),
+          ...(passwordProblem ? { initialPassword: passwordProblem } : {}),
+        },
+      });
+    }
+
+    try {
+      const created = await prisma.user.create({
+        data: {
+          name: parsed.value.name!,
+          email: parsed.value.email!,
+          role: parsed.value.role!,
+          isActive: parsed.value.isActive ?? true,
+          passwordHash: await hashPassword(body.initialPassword as string),
+          // Always true, whatever the body says: the password was chosen by
+          // an Administrator, so the account's owner has not chosen one yet.
+          mustChangePassword: true,
+        },
+      });
+
+      res.status(201).json(toIdentity(created));
+    } catch (error) {
+      if (isUniqueViolation(error)) return res.status(409).json(EMAIL_TAKEN);
+      res.status(500).json({ error: "Unable to create the user" });
+    }
+  });
+
+  // api-spec.md §16 (FR-23, BR-32 to BR-35).
+  app.patch("/api/users/:id", ...asAdmin, async (req: AuthenticatedRequest, res) => {
+    const id = parseId(req.params.id);
+    if (!id) return res.status(404).json(USER_NOT_FOUND);
+
+    const parsed = validateUser(req.body ?? {}, true);
+    if (!parsed.ok) {
+      return res.status(400).json({ error: "Validation failed", fields: parsed.fields });
+    }
+    const changes = parsed.value;
+    const actingUserId = req.auth!.user.id;
+
+    try {
+      const outcome = await prisma.$transaction(async (tx) => {
+        // One statement locks the user being edited and every active
+        // Administrator, in id order.
+        //
+        // The target is locked so that a Ticket being assigned to them at
+        // this moment either finishes first, and is handed back below, or
+        // waits and then sees them deactivated (see the owner route).
+        //
+        // The Administrators are locked so that "is this the last one?" is
+        // answered about rows that cannot change underneath the answer. Two
+        // Administrators demoting each other at once would otherwise each
+        // count two, each be allowed, and leave none.
+        //
+        // And one statement in a fixed order, so two edits can never each
+        // hold a row the other is waiting for.
+        const locked = await tx.$queryRaw<
+          { id: number; role: string; isActive: boolean }[]
+        >`SELECT "id", "role"::text AS "role", "isActive" FROM "User"
+          WHERE "id" = ${id} OR ("role" = 'ADMINISTRATOR' AND "isActive")
+          ORDER BY "id" FOR UPDATE`;
+
+        const target = locked.find((user) => user.id === id);
+        if (!target) return { status: 404, body: USER_NOT_FOUND };
+
+        const nextActive = changes.isActive ?? target.isActive;
+        const nextRole = changes.role ?? target.role;
+
+        // Decided from the session, never from the body (BR-32). Checked
+        // before the last-Administrator rule so that the clearer of the two
+        // messages wins when both apply.
+        if (target.id === actingUserId && target.isActive && !nextActive) {
+          return {
+            status: 409,
+            body: { error: "You cannot deactivate your own account" },
+          };
+        }
+
+        const isActiveAdmin = target.isActive && target.role === "ADMINISTRATOR";
+        const staysActiveAdmin = nextActive && nextRole === "ADMINISTRATOR";
+        if (isActiveAdmin && !staysActiveAdmin) {
+          const activeAdministrators = locked.filter(
+            (user) => user.isActive && user.role === "ADMINISTRATOR",
+          ).length;
+          if (activeAdministrators <= 1) {
+            return { status: 409, body: LAST_ADMINISTRATOR };
+          }
+        }
+
+        const updated =
+          Object.keys(changes).length === 0
+            ? await tx.user.findUniqueOrThrow({ where: { id } })
+            : await tx.user.update({ where: { id }, data: changes });
+
+        // BR-12: deactivation ends access now, not at the session's expiry.
+        if (target.isActive && !updated.isActive) {
+          await deleteUserSessions(tx, id);
+        }
+
+        // BR-19 as something that stays true, not only a check at the moment
+        // of assignment: a user who can no longer own Tickets does not go on
+        // owning live ones. They return to the queue unassigned.
+        if (!updated.isActive || updated.role === "REQUESTER") {
+          await tx.ticket.updateMany({
+            where: { ownerId: id, currentStatus: { in: [...LIVE_STATUSES] } },
+            data: { ownerId: null },
+          });
+        }
+
+        return { status: 200, body: toIdentity(updated) };
+      });
+
+      res.status(outcome.status).json(outcome.body);
+    } catch (error) {
+      if (isUniqueViolation(error)) return res.status(409).json(EMAIL_TAKEN);
+      res.status(500).json({ error: "Unable to update the user" });
+    }
+  });
+
+  // api-spec.md §17 (FR-24, BR-13, BR-36).
+  app.post(
+    "/api/users/:id/initial-password",
+    ...asAdmin,
+    async (req: AuthenticatedRequest, res) => {
+      const id = parseId(req.params.id);
+      if (!id) return res.status(404).json(USER_NOT_FOUND);
+
+      const initialPassword: unknown = (req.body ?? {}).initialPassword;
+      const problem = initialPasswordProblem(initialPassword);
+      if (problem) {
+        return res.status(400).json({
+          error: "Validation failed",
+          fields: { initialPassword: problem },
+        });
+      }
+
+      try {
+        const exists = await prisma.user.count({ where: { id } });
+        if (!exists) return res.status(404).json(USER_NOT_FOUND);
+
+        // Hashed before the transaction opens: bcrypt takes tens of
+        // milliseconds, and there is no reason to hold a transaction open
+        // across it.
+        const passwordHash = await hashPassword(initialPassword as string);
+
+        const user = await prisma.$transaction(async (tx) => {
+          const updated = await tx.user.update({
+            where: { id },
+            data: { passwordHash, mustChangePassword: true },
+          });
+          // BR-36: anyone signed in with the old password is signed out, in
+          // the same transaction, so there is no moment where the password
+          // has changed and an old session still works.
+          await deleteUserSessions(tx, id);
+          return updated;
+        });
+
+        res.json({ user: toIdentity(user) });
+      } catch {
+        res.status(500).json({ error: "Unable to set the initial password" });
       }
     },
   );

@@ -64,6 +64,30 @@
   white-space: nowrap;
 }
 
+/* Name and role badge as one unit that can give way. The longest role label,
+   "Administrator", does not fit beside the other header controls on a phone,
+   so the badge truncates rather than pushing the header wider than the screen
+   (ui-spec.md §9). The gap also keeps the name from running into the badge. */
+.ttk-shell__identity,
+.ttk-shell__user {
+  min-width: 0;
+}
+
+.ttk-shell__user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zg-space-2);
+  flex-shrink: 1;
+}
+
+.ttk-shell__role {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ttk-shell__user-name {
   color: #ffffff;
   font-size: 14px;
@@ -189,6 +213,7 @@
   .ttk-shell__identity {
     order: 2;
     margin-left: 0;
+    gap: var(--zg-space-2);
   }
 
   .ttk-shell__user-name {

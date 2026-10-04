@@ -196,10 +196,13 @@ The Lab 2 screen keeps its read-only header and attachment management, and gains
 
 One screen. Intentionally the plainest surface in the application.
 
-**Controls row** — search box (name or email), Role filter, and a `New user` primary button.
+**Controls row** — search box (name or email), Role filter, and a `New user` primary button. Search
+applies on submit; the role filter applies on change and takes whatever is in the search box with
+it. `Clear filters` appears only while a filter is active.
 
 **Table** — Name, Email, Role badge, Status (`Active` / `Inactive` chip), Edit action. Unpaginated
-(BR-38). Below 768px each row becomes a card with the same five fields stacked.
+(BR-38). Below 768px each row becomes a card with the same five fields stacked. The row belonging
+to the person looking is marked "(you)". Inactive users stay in the list.
 
 **Create / Edit panel** — a modal dialog on desktop, a full-screen sheet on mobile, with a focus
 trap and `Esc` to dismiss:
@@ -212,12 +215,33 @@ trap and `Esc` to dismiss:
 | Active | Checkbox, default on | Editable; disabled with a reason when editing yourself or the last active Administrator |
 | Initial password | Required, at least 8 characters and at most 72 bytes (BR-13) | Not shown; replaced by a `Set new initial password` secondary action with its own confirmation |
 
+On an edit only the fields that changed are sent, and nothing is sent if nothing changed.
+
+`Set new initial password` opens a password field inside the dialog with the consequence stated
+("This signs them out everywhere"), a `Confirm new password` button and a `Keep current password`
+way back. Nothing is sent until it is confirmed. On your own account the action is replaced by a
+link to Change Password, since using it would sign you out and then make you change the password
+you had just chosen.
+
+A duplicate email (`409`) is shown on the Email field. Either safety-rule refusal from the server is
+shown at the top of the dialog in the server's words. A `400` puts each message on its field. Any
+other failure shows a generic message, repeats nothing the server said, and keeps what was typed.
+
 **Guard-rail feedback** — the two safety rules (BR-32, BR-33) are shown as disabled controls *with
 a visible reason beside them*, never as a silent absence, and are enforced by the backend
 regardless of what the dialog allows:
 
 - "You cannot deactivate your own account."
 - "This is the last active Administrator. Promote another Administrator first."
+
+For the last active Administrator both the Active checkbox and the Role radios are disabled, since
+either change would remove them. Which account that is comes from the server (`api-spec.md` §14),
+not from counting rows in a list that may be filtered.
+
+**The dialog** is labelled by its heading and takes focus on its first field when it opens. `Tab`
+and `Shift+Tab` wrap inside it, and `Esc` closes it without saving. Both keep working if focus has
+fallen out of the dialog, which is what a browser does when the button holding focus is disabled
+while it saves. Closing returns focus to the control that opened it.
 
 **States** — Loading, Empty ("No users yet."), No-Results ("No users match this search."),
 Forbidden, saving indicator on the dialog's primary button, success message on the list after the

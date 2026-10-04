@@ -2,13 +2,13 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './layout/AppShell'
 import { CheckSystemPage } from './pages/CheckSystemPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
-import { ComingSoonPage } from './pages/ComingSoonPage'
 import { CreateTicketPage } from './pages/CreateTicketPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyTicketsPage } from './pages/MyTicketsPage'
 import { StaffTicketDetailPage } from './pages/StaffTicketDetailPage'
 import { StaffTicketQueuePage } from './pages/StaffTicketQueuePage'
 import { TicketDetailPage } from './pages/TicketDetailPage'
+import { UserManagementPage } from './pages/UserManagementPage'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth } from './auth/RequireAuth'
 import { RequireRole } from './auth/RequireRole'
@@ -41,15 +41,8 @@ function App() {
                   <Route path="staff/tickets/:id" element={<StaffTicketDetailPage />} />
                 </Route>
 
-                {/* Issue #45 builds this. Mounted now behind its real route
-                    and guard so the Administrator's landing page and nav link
-                    go somewhere. */}
-
                 <Route element={<RequireRole allow={['ADMINISTRATOR']} />}>
-                  <Route
-                    path="admin/users"
-                    element={<ComingSoonPage title="User Management" issue="Issue #45" />}
-                  />
+                  <Route path="admin/users" element={<UserManagementPage />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

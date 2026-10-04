@@ -1,0 +1,46 @@
+/* Modal dialog (ui-spec.md §7): centred on desktop, a full-screen sheet on
+   mobile. */
+
+.ttk-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--zg-space-8) var(--zg-space-4);
+  background: rgb(0 0 0 / 0.5);
+  overflow-y: auto;
+}
+
+.ttk-dialog {
+  width: 100%;
+  max-width: 520px;
+  padding: var(--zg-space-6);
+  background: var(--zg-surface);
+  color: var(--zg-text);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+}
+
+.ttk-dialog:focus {
+  outline: none;
+}
+
+.ttk-dialog__title {
+  margin: 0 0 var(--zg-space-4);
+  font-size: var(--zg-font-size-heading-sm);
+}
+
+@media (max-width: 767px) {
+  .ttk-dialog__backdrop {
+    padding: 0;
+  }
+
+  .ttk-dialog {
+    max-width: none;
+    min-height: 100%;
+    border: none;
+    border-radius: 0;
+  }
+}

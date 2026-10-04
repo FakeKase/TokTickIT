@@ -236,6 +236,92 @@ export async function changePassword(input: {
   return ((await response.json()) as { user: AuthenticatedUser }).user
 }
 
+/** A user as User Management lists them (api-spec.md §14). */
+export interface ManagedUser extends AuthenticatedUser {
+  /** True for the one Administrator the system cannot lose (BR-33). Sent by
+   *  the server so the screen need not count Administrators in a list that
+   *  may be filtered. */
+  isLastActiveAdministrator: boolean
+}
+
+export interface UserListParams {
+  search?: string
+  role?: Role
+}
+
+export async function fetchUsers(params: UserListParams = {}): Promise<ManagedUser[]> {
+  const query = new URLSearchParams()
+  if (params.search) query.set('search', params.search)
+  if (params.role) query.set('role', params.role)
+
+  const search = query.toString()
+  const response = await apiFetch(search ? `/api/users?${search}` : '/api/users')
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to load the users')
+  }
+
+  return (await response.json()) as ManagedUser[]
+}
+
+export interface NewUser {
+  name: string
+  email: string
+  role: Role
+  isActive: boolean
+  initialPassword: string
+}
+
+/** api-spec.md §15. The account is always created needing a password change. */
+export async function createUser(input: NewUser): Promise<AuthenticatedUser> {
+  const response = await apiFetch('/api/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to create the user')
+  }
+
+  return (await response.json()) as AuthenticatedUser
+}
+
+export type UserChanges = Partial<Pick<NewUser, 'name' | 'email' | 'role' | 'isActive'>>
+
+/** api-spec.md §16. Send only what changed. */
+export async function updateUser(id: number, changes: UserChanges): Promise<AuthenticatedUser> {
+  const response = await apiFetch(`/api/users/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(changes),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to update the user')
+  }
+
+  return (await response.json()) as AuthenticatedUser
+}
+
+/** api-spec.md §17. Signs that user out everywhere (BR-36). */
+export async function setInitialPassword(
+  id: number,
+  initialPassword: string,
+): Promise<AuthenticatedUser> {
+  const response = await apiFetch(`/api/users/${id}/initial-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initialPassword }),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to set the initial password')
+  }
+
+  return ((await response.json()) as { user: AuthenticatedUser }).user
+}
+
 /** Active Related Systems for the classification row (api-spec.md §3). */
 export async function fetchRelatedSystems(): Promise<RelatedSystem[]> {
   const response = await apiFetch(`/api/related-systems`)

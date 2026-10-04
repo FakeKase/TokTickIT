@@ -8,6 +8,7 @@ import { AttachmentSection } from '../components/AttachmentSection'
 import { CommentThread } from '../components/CommentThread'
 import { ResolvedSignal } from '../components/ResolvedSignal'
 import { Card } from '../components/Card'
+import { StatusBadge } from '../components/TicketBadges'
 import { ErrorState } from '../components/ErrorState'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { useAuth } from '../auth/useAuth'
@@ -33,10 +34,6 @@ function formatDateTime(iso: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function statusLabel(status: string) {
-  return status.charAt(0) + status.slice(1).toLowerCase()
 }
 
 /**
@@ -205,7 +202,7 @@ export function TicketDetailPage() {
               </Badge>
             </ReadOnlyField>
             <ReadOnlyField label="Current Status">
-              <Badge tone="pale">{statusLabel(ticket.currentStatus)}</Badge>
+              <StatusBadge status={ticket.currentStatus} />
             </ReadOnlyField>
           </dl>
 

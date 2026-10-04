@@ -23,6 +23,11 @@
   --zg-warning-tint: #fbf1de;
   --zg-error-tint: #f6e6e6;
   --zg-neutral-tint: #e6e8e6;
+  /* The one filled badge (ui-spec.md §3, Urgent). Its own token because
+   * --zg-error turns light in the dark theme, where white text on it would
+   * fail contrast; white on this is 9.4:1 here and 7:1 on the dark value. */
+  --zg-error-solid: #8a1f1f;
+  --zg-active-tint: #d5ecdf;
   --zg-border: #cbd5ce;
 
   /*
@@ -87,6 +92,8 @@
   --zg-warning-tint: #33291a;
   --zg-error-tint: #3a1e1e;
   --zg-neutral-tint: #303a34; /* body text 10.1:1 */
+  --zg-error-solid: #a52a2a;
+  --zg-active-tint: #1d4530;
   --zg-border: #5c7169; /* 3.2:1 on --zg-surface */
 
   color-scheme: dark;

@@ -78,6 +78,20 @@ export interface RelatedSystem {
 
 export type RequestedPriority = 'LOW' | 'MEDIUM' | 'HIGH'
 
+/** Set by IT Staff, independently of what the Requester asked for (BR-21). */
+export type ItPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+
+/** Every value a Ticket's status can hold (specification.md §5.2). */
+export type TicketStatus =
+  | 'NEW'
+  | 'OPEN'
+  | 'IN_PROGRESS'
+  | 'WAITING_FOR_REQUESTER'
+  | 'RESOLVED'
+  | 'CLOSED'
+  | 'REOPENED'
+  | 'CANCELLED'
+
 export interface Ticket {
   id: number
   ticketNumber: string
@@ -87,7 +101,7 @@ export interface Ticket {
   summary: string
   description: string
   requestedPriority: RequestedPriority
-  currentStatus: string
+  currentStatus: TicketStatus
   createdAt: string
 }
 
@@ -276,7 +290,7 @@ export interface TicketListItem {
   summary: string
   categoryName: string
   requestedPriority: RequestedPriority
-  currentStatus: string
+  currentStatus: TicketStatus
   createdAt: string
   updatedAt: string
 }
@@ -328,6 +342,82 @@ export async function fetchTickets(
   return (await response.json()) as TicketListResponse
 }
 
+export interface StaffQueueItem {
+  id: number
+  ticketNumber: string
+  summary: string
+  category: { id: number; name: string }
+  requester: { id: number; name: string }
+  /** `null` for an unassigned Ticket. */
+  owner: { id: number; name: string } | null
+  requestedPriority: RequestedPriority
+  itPriority: ItPriority
+  currentStatus: TicketStatus
+  requesterResolvedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface StaffQueueResponse {
+  data: StaffQueueItem[]
+  pagination: {
+    /** The page actually served, which is not always the one asked for: a
+     *  page past the end is clamped to the last real one (AC-26). */
+    page: number
+    pageSize: number
+    totalItems: number
+    totalPages: number
+  }
+  /** True when a narrowing parameter was applied — separates the Empty state
+   *  from No-Results (AC-23). */
+  filtered: boolean
+}
+
+export type StaffQueueSortField =
+  | 'createdAt'
+  | 'updatedAt'
+  | 'ticketNumber'
+  | 'itPriority'
+  | 'currentStatus'
+
+export interface StaffQueueParams {
+  search?: string
+  status?: TicketStatus
+  itPriority?: ItPriority
+  categoryId?: number
+  owner?: 'me' | 'unassigned'
+  sortBy?: StaffQueueSortField
+  sortDir?: 'asc' | 'desc'
+  page?: number
+  pageSize?: number
+}
+
+/**
+ * The IT Staff Ticket Queue: every Requester's Tickets (api-spec.md §8).
+ *
+ * Throws ApiError with the status, so the screen can tell "you may not see
+ * this" (403) from "it did not load" and not offer a Retry for the former.
+ */
+export async function fetchStaffTickets(
+  params: StaffQueueParams = {},
+): Promise<StaffQueueResponse> {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') query.set(key, String(value))
+  }
+
+  const search = query.toString()
+  const response = await apiFetch(
+    search ? `/api/staff/tickets?${search}` : '/api/staff/tickets',
+  )
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to load the Ticket Queue')
+  }
+
+  return (await response.json()) as StaffQueueResponse
+}
+
 export interface TicketAttachment {
   id: number
   originalFilename: string
@@ -349,7 +439,7 @@ export interface TicketDetail {
   summary: string
   description: string
   requestedPriority: RequestedPriority
-  currentStatus: string
+  currentStatus: TicketStatus
   createdAt: string
   updatedAt: string
   attachments: TicketAttachment[]
@@ -414,7 +504,7 @@ export async function postComment(ticketId: number, body: string): Promise<Ticke
 
 export interface ResolvedSignal {
   id: number
-  currentStatus: string
+  currentStatus: TicketStatus
   requesterResolvedAt: string
 }
 

@@ -33,7 +33,7 @@ is under test.
 | UNIT-03 | Unit | BR-22, BR-23 | Status transition matrix helper | Every cell of §5.2 permitted; every other pair rejected; Resolved/Closed rejected without an owner | `server/tests/lab-03/status-transitions.unit.test.ts` | Planned |
 | UNIT-04 | Unit | BR-13, BR-37 | Password validation | At least 8 characters and at most 72 UTF-8 bytes, both bounds inclusive, with Thai and emoji inputs that `.length` would wave through; new ≠ current; confirmation mismatch reported on the confirmation field | `server/tests/lab-03/password.unit.test.ts` | Pass |
 | UNIT-06 | Unit | BR-37 | User field validation | Name 2–80, email ≤120 and syntactically valid | `server/tests/lab-03/user-validation.unit.test.ts` | Planned (Issue #45) |
-| UNIT-05 | Unit | BR-30, BR-31, AC-26 | Queue query parser | Defaults `updatedAt` desc, page 1, size 10; out-of-range and non-numeric values clamped, not rejected; unknown sort key falls back to the default | `server/tests/lab-03/staff-queue.unit.test.ts` | Planned |
+| UNIT-05 | Unit | BR-30, BR-31, AC-26 | Queue query parser | Defaults `updatedAt` desc, page 1, size 10; out-of-range values clamped and non-numeric ones defaulted, never rejected; unknown sort key, status, priority or owner dropped; `requestedPriority` is not a queue sort key although the two parsers share a file; `filtered` is true only for a filter that survived parsing | `server/tests/lab-03/staff-queue.unit.test.ts` | Pass |
 
 ### API — authentication
 
@@ -55,7 +55,7 @@ is under test.
 | API-08 | API | AC-04, BR-29 | Requester requests Internal Notes | Forbidden; no note data returned; the same call as IT Staff returns the notes, proving they exist | `server/tests/lab-03/comments-notes.api.test.ts` | Planned |
 | API-09 | API | AC-02, BR-14 | Password-change gate | With `mustChangePassword` set, every endpoint except me/change-password/logout returns `403 PASSWORD_CHANGE_REQUIRED` | `server/tests/lab-03/authorization.api.test.ts` | Pass |
 | API-10 | API | AC-03, BR-03 | Spoofed `requesterId` | Supplying another user's id in the body or query changes nothing; the session's identity is used | `server/tests/lab-03/authorization.api.test.ts` | Pass |
-| API-11 | API | AC-14, BR-16 | Role refusal across the Requester boundary | IT Staff are refused a Requester route with `403` and no data. The mirror case — a Requester refused the staff and admin namespaces — lands with those endpoints in Issues #43 and #45; the guard itself is covered by the probe router | `server/tests/lab-03/authorization.api.test.ts` | Partial |
+| API-11 | API | AC-14, BR-16 | Role refusal across the Requester boundary | IT Staff are refused a Requester route with `403` and no data, and a Requester is refused the staff queue the same way (`staff-queue.api.test.ts`, Issue #43). The Administrator namespace lands with its endpoints in Issue #45; the guard itself is covered by the probe router | `server/tests/lab-03/authorization.api.test.ts` | Partial |
 | API-12 | API | AC-17, BR-18 | Another Requester's Ticket, Attachment, download and removal | All four `404`, and the Attachment's body byte-identical to a nonexistent id. Lab 2's `attachments.api.test.ts` covers the same rules from the owner's side | `server/tests/lab-03/authorization.api.test.ts` | Pass |
 | API-13 | API | AC-10, BR-12 | Session of a deactivated user | The next request after deactivation is `401`, on a converted Lab 2 endpoint as well as the probe | `server/tests/lab-03/authorization.api.test.ts` | Pass |
 | API-14 | API | AC-15, BR-40 | Migration regression, API half | An account carried through the rename signs in with the documented password, lists its Ticket, opens it, and downloads an Attachment the test uploads itself. It does **not** distinguish a migrated row from a seeded one — the seed upserts these accounts on every run — so the migration itself is proved by `npm run db:migration-check`, on a throwaway database, and this row covers only that the authenticated API serves a carried-over account | `server/tests/lab-03/authorization.api.test.ts` | Pass |
@@ -70,12 +70,12 @@ is under test.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| API-21 | API | AC-22, FR-13 | Queue lists every Requester's Tickets | Tickets from at least two Requesters, each with owner, status, and both priorities | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-22 | API | AC-23, BR-30 | Search with no match | `200`; empty `data`, `totalItems: 0` — distinct from an unfiltered empty queue | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-23 | API | AC-24, BR-30 | Status and IT Priority filters combined | Only Tickets matching both are returned | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-24 | API | AC-25, BR-31 | Sort by IT Priority descending | Urgent → High → Medium → Low, tie-broken by Last Updated descending | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-25 | API | AC-26, BR-30 | Invalid pagination parameters | Clamped to the nearest valid bound; `pagination` block correct | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
-| API-26 | API | BR-30 | `owner=me` and `owner=unassigned` | Each returns exactly the matching set | `server/tests/lab-03/staff-queue.api.test.ts` | Planned |
+| API-21 | API | AC-22, FR-13, AC-14 | Queue lists every Requester's Tickets | Tickets from two Requesters, each with owner (or `null`), status, and both priorities; names only, no email address or hash in the response. A Requester is refused `403` with no data, an anonymous caller `401`, staff at the first-login gate `403`, and an Administrator is served | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-22 | API | AC-23, BR-30 | Search | Matches Ticket Number and Summary, partially and case-insensitively. No match is `200` with empty `data`, `totalItems: 0` and `filtered: true`; an unfiltered request, and one whose only filters were unrecognised, report `filtered: false` | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-23 | API | AC-24, BR-30 | Status and IT Priority filters combined | Only Tickets matching both are returned, with a fixture that matches each alone to prove it is an AND; each filter also works alone, as does Category; unrecognised values are ignored | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-24 | API | AC-25, BR-31 | Sorting | Default is Last Updated descending. IT Priority descending is Urgent → High → Medium → Low with ties by Last Updated descending, and the tie-break stays descending when the sort ascends. Status sorts in workflow order. Two Tickets updated in the same instant come back by id descending. The fixtures' Last Updated order deliberately differs from their id order, so dropping either tie-break changes the result | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-25 | API | AC-26, BR-30 | Invalid pagination parameters | Paging neither repeats nor drops a Ticket. `page` below 1 or non-numeric becomes 1; a page past the end is served as the last real page with its rows, and `pagination.page` says so; `pageSize` is clamped into 1–50 and defaults when non-numeric | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
+| API-26 | API | BR-30 | The owner filter | `me`, `unassigned` and a user id each return exactly the matching set; `me` is resolved from the session, so the same query returns a different set for a different caller; any other value is ignored | `server/tests/lab-03/staff-queue.api.test.ts` | Pass |
 | API-27 | API | AC-27, BR-20 | Claim an unassigned Ticket | `200`; the acting user is the owner; `updatedAt` advances | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-28 | API | AC-28, BR-20 | Reassign to another active IT Staff user | `200`; ownership moves | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
 | API-29 | API | AC-29, BR-19 | Assign a Requester, and an inactive staff user | `409` for both; ownership unchanged | `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Planned |
@@ -114,10 +114,10 @@ is under test.
 | UI-07 | UI | AC-12 | Password-change success | Success routes into the application and the gate no longer fires | `client/tests/lab-03/ChangePassword.test.tsx` | Pass |
 | UI-08 | UI | AC-13, FR-05 | Role-specific navigation | Requester, IT Staff, and Administrator each see only their permitted destinations; the name and role badge render; Logout is present | `client/tests/lab-03/AppShellAuth.test.tsx` | Pass |
 | UI-09 | UI | AC-08 | Logout from the shell | Logout calls the API and returns to Login; a protected route afterwards shows Login | `client/tests/lab-03/AppShellAuth.test.tsx` | Pass |
-| UI-10 | UI | AC-22, FR-13 | Queue renders rows | Ticket Number, Summary, both priority badges, status badge, owner or "Unassigned" | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
-| UI-11 | UI | AC-23 | Queue empty vs no-results | Different copy and different actions for the two states | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
-| UI-12 | UI | AC-24, AC-26 | Queue filters and paging | Changing a filter refetches with the right query; page controls move the page and clamp at the bounds | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
-| UI-13 | UI | AC-44 | Queue failure state | A failed load renders a safe failure with Retry, which refetches | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Planned |
+| UI-10 | UI | AC-22, FR-13 | Queue renders rows | Ticket Number linking to the detail route, Summary, Category, both priorities each under its own header, status as words, owner or "Unassigned", and Last Updated as a distance with the full time behind it. No Requester column. The default request carries sort and page only | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Pass |
+| UI-11 | UI | AC-23 | Queue empty vs no-results | Different copy and different actions: Empty hides the controls and offers nothing to clear; No-Results keeps them and its Clear filters refetches unfiltered | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Pass |
+| UI-12 | UI | AC-24, AC-26 | Queue filters, sorting and paging | Each filter refetches with the right query, and two together send both; search applies on submit, trimmed; Clear filters appears only while one is active; headers sort and reverse; Created Date is offered as a sort without a column; a filter change returns to page 1; paging stops at both ends. Search text typed but not submitted is applied with the next change, sends paging back to page 1, and is emptied by Clear filters. A new sort key starts descending from the select as from a header. The view is restored from the URL, written back to it, ignores values it does not recognise, and is corrected when the server clamps the page | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Pass |
+| UI-13 | UI | AC-44, AC-14 | Queue failure, forbidden and loading | A failed load renders a safe failure that repeats nothing the server said, with a Retry that refetches; an unreachable API fails the same way; a `403` shows Forbidden with a way onward and no Retry; a Requester never triggers the request at all; loading is announced; and an older response landing late does not overwrite a newer one | `client/tests/lab-03/StaffTicketQueue.test.tsx` | Pass |
 | UI-14 | UI | AC-27, AC-28 | Ownership controls | Claim appears when unassigned; reassign lists only assignable users; both send the documented request | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
 | UI-15 | UI | AC-30, AC-31 | Priority and status controls | The status select offers only permitted transitions; a rejected transition shows the conflict message and reverts the control | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
 | UI-16 | UI | BR-04, ui-spec §5 | Two conversation streams | Public and internal composers are separate controls with distinct labels; posting through one never sends the other's visibility | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Planned |
@@ -241,6 +241,9 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
 | 42 — Public Comments and resolved signal | `cd server && npm test` | 15 files, 185 tests passed |
 | 42 — Public Comments and resolved signal | `cd client && npm test` | 14 files, 137 tests passed |
 | 42 — Public Comments and resolved signal | `npm run e2e` | 27 specs passed |
+| 43 — IT Staff Ticket Queue | `cd server && npm test` | 17 files, 227 tests passed |
+| 43 — IT Staff Ticket Queue | `cd client && npm test` | 15 files, 174 tests passed |
+| 43 — IT Staff Ticket Queue | `npm run e2e` | 27 specs passed |
 
 ## 7. Known Limitations or Deferred Tests
 
@@ -267,3 +270,17 @@ Updated as each Issue's PR lands in `lab3-staging`; a full final run is recorded
   because raising the limit would hide the symptom without establishing the cause. The run recorded
   in §6 is a clean one, and the discrepancy between 185 and the 182 first reported on PR #54 was
   this flake: 182 passed of 185 on that run.
+- **The queue's `id` tie-break is tested as far as it can be.** Two Tickets with the same Last
+  Updated are asserted to come back newest id first, and removing the key does fail that test here.
+  But without the key the database's order is unspecified rather than reliably wrong, so the test
+  is certain to pass with the key and only likely to fail without it.
+- **The queue's responsive layout is not covered by an automated test yet** (Issue #43). It was
+  checked by eye at 1440, 820 and 390px in both themes, with no horizontal overflow at any of them;
+  the captures and the overflow assertion become RESP-01 in Issue #46. jsdom applies no media
+  queries, so the client tests cannot see which of the table and the cards is showing.
+- **Each row in the queue opens `/staff/tickets/:id`, which is a placeholder until Issue #44.** The
+  route and its role guard are real, so the link lands somewhere and a Requester is refused; the
+  screen behind it is not built.
+- **In the header, the user's name runs into the role badge** at desktop and tablet widths. It
+  predates the queue and is visible on every authenticated screen; left for Issue #47 rather than
+  fixed in passing.

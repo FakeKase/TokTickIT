@@ -5,12 +5,11 @@ import './ComingSoonPage.css'
  * A placeholder for a screen a later Issue builds, mounted behind the real
  * route and the real role guard.
  *
- * It exists so the shell is honest now: `landingPathFor` sends IT Staff to
- * /staff/tickets and Administrators to /admin/users, and the nav renders links
- * to both. Without a route behind them, signing in as either role would land
- * on the catch-all redirect and the nav links would go nowhere — a broken app
- * for two of the three roles, caused by screens that simply have not been
- * written yet.
+ * It exists so the shell is honest now: `landingPathFor` sends Administrators
+ * to /admin/users, the nav links there, and every row in the Ticket Queue
+ * links to /staff/tickets/:id. Without a route behind them those would fall
+ * through to the catch-all redirect — an app that looks broken, caused by
+ * screens that simply have not been written yet.
  *
  * Replaced by the real screen in its own Issue; the route and guard around it
  * do not change when that happens.

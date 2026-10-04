@@ -6,6 +6,7 @@ import { ComingSoonPage } from './pages/ComingSoonPage'
 import { CreateTicketPage } from './pages/CreateTicketPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyTicketsPage } from './pages/MyTicketsPage'
+import { StaffTicketQueuePage } from './pages/StaffTicketQueuePage'
 import { TicketDetailPage } from './pages/TicketDetailPage'
 import { AuthProvider } from './auth/AuthProvider'
 import { RequireAuth } from './auth/RequireAuth'
@@ -34,16 +35,18 @@ function App() {
                   <Route path="tickets/:id" element={<TicketDetailPage />} />
                 </Route>
 
-                {/* The screens Issues #43 and #45 build. Mounted now behind
-                    their real routes and role guards so the shell's navigation
-                    and the per-role landing pages work for every role, not just
-                    Requester. */}
                 <Route element={<RequireRole allow={['IT_STAFF', 'ADMINISTRATOR']} />}>
+                  <Route path="staff/tickets" element={<StaffTicketQueuePage />} />
+                  {/* Issue #44 builds this. Mounted now so every row in the
+                      queue opens onto its real route, behind its real guard,
+                      rather than falling through to the catch-all. */}
                   <Route
-                    path="staff/tickets"
-                    element={<ComingSoonPage title="Ticket Queue" issue="Issue #43" />}
+                    path="staff/tickets/:id"
+                    element={<ComingSoonPage title="Ticket Detail" issue="Issue #44" />}
                   />
                 </Route>
+
+                {/* Issue #45 builds this; mounted for the same reason. */}
 
                 <Route element={<RequireRole allow={['ADMINISTRATOR']} />}>
                   <Route

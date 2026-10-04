@@ -35,7 +35,10 @@ import {
   placeholderTicketNumber,
 } from "./lib/ticket-number.js";
 import { validateTicketInput } from "./lib/ticket-validation.js";
-import { parseTicketQuery } from "./lib/ticket-query.js";
+import {
+  parseStaffQueueQuery,
+  parseTicketQuery,
+} from "./lib/ticket-query.js";
 import { validateComment } from "./lib/comment-validation.js";
 import {
   ALLOWED_TYPES_LABEL,
@@ -732,6 +735,116 @@ export function createApp(prisma = createPrismaClient()) {
         res
           .status(500)
           .json({ error: "Unable to record that the problem appears resolved" });
+      }
+    },
+  );
+
+  /**
+   * IT Staff and Administrators, past the first-login gate.
+   *
+   * An Administrator is included on every staff route (specification.md §5.1):
+   * they can do what IT Staff can, plus manage users.
+   */
+  const asStaff = [
+    requireAuth(prisma),
+    requirePasswordChanged,
+    requireRole("IT_STAFF", "ADMINISTRATOR"),
+  ];
+
+  // api-spec.md §8 (FR-13, BR-30, BR-31). Every Ticket in the system: there is
+  // no ownership clause here, which is exactly why the role guard above is the
+  // whole of the access control and a Requester must never reach this handler
+  // (AC-14).
+  app.get(
+    "/api/staff/tickets",
+    ...asStaff,
+    async (req: AuthenticatedRequest, res) => {
+      const query = parseStaffQueueQuery(req.query as Record<string, unknown>);
+
+      const where = {
+        ...(query.status ? { currentStatus: query.status } : {}),
+        ...(query.itPriority ? { itPriority: query.itPriority } : {}),
+        ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+        // `me` is resolved from the session, never from the query string: the
+        // filter means "mine" for whoever is asking.
+        ...(query.owner === "me"
+          ? { ownerId: req.auth!.user.id }
+          : query.owner === "unassigned"
+            ? { ownerId: null }
+            : query.owner !== undefined
+              ? { ownerId: query.owner }
+              : {}),
+        ...(query.search
+          ? {
+              OR: [
+                {
+                  ticketNumber: {
+                    contains: query.search,
+                    mode: "insensitive" as const,
+                  },
+                },
+                {
+                  summary: {
+                    contains: query.search,
+                    mode: "insensitive" as const,
+                  },
+                },
+              ],
+            }
+          : {}),
+      };
+
+      try {
+        // Counted first, not alongside, because the page depends on it. A
+        // queue changes under the reader - Tickets leave a filter as their
+        // status moves - so "page 4" can stop existing between two clicks.
+        // Serving it as zero rows would look like an empty queue; the last
+        // real page is the nearest valid bound (AC-26).
+        const totalItems = await prisma.ticket.count({ where });
+        const totalPages = Math.ceil(totalItems / query.pageSize);
+        const page = Math.min(query.page, Math.max(totalPages, 1));
+
+        const rows = await prisma.ticket.findMany({
+          where,
+          orderBy: [
+            { [query.sortBy]: query.sortDir },
+            // AC-25: ties on the chosen key break by Last Updated descending.
+            // Skipped when that IS the chosen key.
+            ...(query.sortBy === "updatedAt"
+              ? []
+              : [{ updatedAt: "desc" as const }]),
+            // BR-31: id last, so two Tickets touched in the same instant
+            // cannot swap places between requests and appear on two pages or
+            // neither.
+            { id: "desc" as const },
+          ],
+          skip: (page - 1) * query.pageSize,
+          take: query.pageSize,
+          select: {
+            id: true,
+            ticketNumber: true,
+            summary: true,
+            requestedPriority: true,
+            itPriority: true,
+            currentStatus: true,
+            requesterResolvedAt: true,
+            createdAt: true,
+            updatedAt: true,
+            category: { select: { id: true, name: true } },
+            // Name and id only. The queue is read by staff, but an email
+            // address is not something a list needs to carry for every row.
+            requester: { select: { id: true, name: true } },
+            owner: { select: { id: true, name: true } },
+          },
+        });
+
+        res.json({
+          data: rows,
+          pagination: { page, pageSize: query.pageSize, totalItems, totalPages },
+          filtered: query.filtered,
+        });
+      } catch {
+        res.status(500).json({ error: "Unable to load the Ticket Queue" });
       }
     },
   );

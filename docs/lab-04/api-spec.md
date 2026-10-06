@@ -59,7 +59,8 @@ The Actions Taken of one Ticket (FR-01, FR-04).
     "version": 1 }
 ]
 ```
-  `editedBy` and `editedAt` are `null` until the first edit. `performedBy` and `editedBy` carry an
+  `editedBy` and `editedAt` are `null` until the first edit; they are the model's `editedById` and
+  `editedAt` columns (`specification.md` §7.1). `performedBy` and `editedBy` carry an
   id and a name and nothing else. A Requester receives the same shape: every field is theirs to
   see (handout 8.3).
 - **`404`**: no such Ticket, or a Requester who does not own it. The two bodies are identical
@@ -83,7 +84,7 @@ Create an Action Taken (FR-02).
 | Field | Rule |
 | :-- | :-- |
 | `requestKey` | Required. 8 to 64 characters from letters, digits, `-`, `_` and `:` (BR-20) |
-| `actionAt` | Required ISO 8601 timestamp. Not before the Ticket's `createdAt`, not more than 5 minutes after the server clock (BR-05) |
+| `actionAt` | Required ISO 8601 timestamp. Not before the Ticket's `createdAt` with its seconds and milliseconds set to zero, not more than 5 minutes after the server clock (BR-05). A Ticket created at 10:00:30 accepts 10:00:00 and refuses 09:59:59 |
 | `description` | Required, 1 to 2000 characters after trimming (BR-06) |
 | `result` | Required, 1 to 1000 characters after trimming (BR-06) |
 | `followUpRequired` | Required boolean |
@@ -132,7 +133,7 @@ update to reason about. `requestKey` is not accepted here.
 There is no `DELETE`. A `DELETE` to this path is answered by the application's ordinary `404`
 (BR-09, AC-15).
 
-Both writes read the Ticket row `FOR UPDATE` inside their transaction. A move to Resolved takes the
+Both writes read the Ticket row `FOR NO KEY UPDATE` inside their transaction (`specification.md` §11 says why not `FOR UPDATE`). A move to Resolved takes the
 same lock (§5), so the gate never decides while an Action Taken is half written.
 
 ## 4. `GET /api/staff/tickets/:id` (changed)

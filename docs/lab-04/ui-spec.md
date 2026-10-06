@@ -190,7 +190,7 @@ behind does not scroll.
 
 | Field | Control | Notes |
 | :-- | :-- | :-- |
-| Action Date/Time | `datetime-local`, required | Help text: "When the work was done." |
+| Action Date/Time | `datetime-local`, required, minutes only (no `step`) | Help text: "When the work was done." Prefilled in create mode with the current time to the minute. That value is always accepted, including on a Ticket created seconds ago, because BR-05 compares to the minute |
 | Action Description | Textarea, required, 2000 | Character count beneath |
 | Result | Textarea, required, 1000 | Character count beneath |
 | Follow-Up Required? | Checkbox | Unchecked by default |

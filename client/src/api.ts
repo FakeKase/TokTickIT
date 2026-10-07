@@ -138,12 +138,29 @@ export class ApiError extends Error {
    */
   readonly status: number
   readonly fields: Record<string, string>
+  /**
+   * The machine-readable reason, where the API gives one (Lab 4 api-spec.md,
+   * "Conventions"). Several different refusals share the status 409, and a
+   * screen that has to tell a stale edit from a finished Ticket branches on
+   * this, never on the wording of `message`.
+   */
+  readonly code: string | undefined
+  /** The whole error body. A stale edit carries the row as it now stands in
+   *  `current`, and this is how the caller reaches it. */
+  readonly body: Record<string, unknown>
 
-  constructor(status: number, message: string, fields: Record<string, string> = {}) {
+  constructor(
+    status: number,
+    message: string,
+    fields: Record<string, string> = {},
+    body: Record<string, unknown> = {},
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.fields = fields
+    this.code = typeof body.code === 'string' ? body.code : undefined
+    this.body = body
   }
 }
 
@@ -153,7 +170,7 @@ async function readError(response: Response, fallback: string): Promise<ApiError
       error?: string
       fields?: Record<string, string>
     }
-    return new ApiError(response.status, body.error ?? fallback, body.fields ?? {})
+    return new ApiError(response.status, body.error ?? fallback, body.fields ?? {}, body)
   } catch {
     // A non-JSON body (proxy error page, empty 502) must not mask the failure,
     // and the status is still meaningful even when the body is not.
@@ -596,6 +613,103 @@ export async function postComment(
   }
 
   return (await response.json()) as TicketComment
+}
+
+/**
+ * One line of work recorded on a Ticket (Lab 4 api-spec.md §1). Every role
+ * that may read a Ticket's Actions Taken receives this same shape.
+ */
+export interface ActionTaken {
+  id: number
+  ticketId: number
+  /** When the work was done, as entered. `createdAt` is when it was recorded. */
+  actionAt: string
+  description: string
+  result: string
+  followUpRequired: boolean
+  /** Present exactly when `followUpRequired` is true. */
+  followUpNote: string | null
+  attachmentNotes: string | null
+  performedBy: { id: number; name: string }
+  createdAt: string
+  /** Both null until the first edit. */
+  editedBy: { id: number; name: string } | null
+  editedAt: string | null
+  /** Sent back as `expectedVersion` when editing. */
+  version: number
+}
+
+/** The six fields a person enters. Performed by is never among them: the
+ *  server takes it from the session. */
+export interface ActionTakenInput {
+  /** ISO 8601 with a zone, as `Date.prototype.toISOString` gives. */
+  actionAt: string
+  description: string
+  result: string
+  followUpRequired: boolean
+  followUpNote: string | null
+  attachmentNotes: string | null
+}
+
+export async function fetchActions(ticketId: number): Promise<ActionTaken[]> {
+  const response = await apiFetch(`/api/tickets/${ticketId}/actions`)
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to load the Actions Taken')
+  }
+
+  return (await response.json()) as ActionTaken[]
+}
+
+/**
+ * Records an Action Taken (Lab 4 api-spec.md §2).
+ *
+ * `requestKey` is chosen once per form and sent with every attempt. If a
+ * response is lost and the form is submitted again, the server finds the
+ * first attempt by this key and returns it without creating a second row.
+ */
+export async function createAction(
+  ticketId: number,
+  requestKey: string,
+  input: ActionTakenInput,
+): Promise<ActionTaken> {
+  const response = await apiFetch(`/api/tickets/${ticketId}/actions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requestKey, ...input }),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to save the Action Taken')
+  }
+
+  return (await response.json()) as ActionTaken
+}
+
+/**
+ * Edits an Action Taken (Lab 4 api-spec.md §3).
+ *
+ * `expectedVersion` is the version of the copy the edit was made from. If
+ * somebody else has edited it since, the server refuses with the code
+ * `STALE_ACTION` and puts the current row in the error body.
+ */
+export async function updateAction(
+  ticketId: number,
+  actionId: number,
+  expectedVersion: number,
+  input: ActionTakenInput,
+): Promise<ActionTaken> {
+  const response = await apiFetch(`/api/tickets/${ticketId}/actions/${actionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedVersion, ...input }),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to save the Action Taken')
+  }
+
+  return (await response.json()) as ActionTaken
 }
 
 /** One move the Ticket may make from where it is (specification.md §5.2). */

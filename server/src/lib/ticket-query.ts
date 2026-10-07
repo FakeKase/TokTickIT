@@ -196,3 +196,19 @@ export function parseStaffQueueQuery(
     ),
   };
 }
+
+/**
+ * Lab 4 BR-22: a Ticket somebody is still working on. Work can be recorded
+ * against these and no others, and every dashboard count that says "active"
+ * means exactly this set.
+ */
+export const ACTIVE_STATUSES = [
+  "NEW",
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_FOR_REQUESTER",
+  "REOPENED",
+] as const satisfies readonly TicketStatusValue[];
+
+export const isActiveStatus = (status: string): boolean =>
+  (ACTIVE_STATUSES as readonly string[]).includes(status);

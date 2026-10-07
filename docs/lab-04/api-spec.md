@@ -130,6 +130,11 @@ update to reason about. `requestKey` is not accepted here.
   body carries the row as it now stands so the screen can show what changed:
   `{ "error": "This Action Taken was changed by someone else.", "code": "STALE_ACTION", "current": { ...§1 shape... } }`
 
+Checked in this order after authentication and role: Ticket, Action Taken on that Ticket, the
+Ticket's status, the form of `expectedVersion`, the version, the six fields. The version is judged
+before the fields so that an out-of-date copy is always told so, with the current row, whatever
+else is wrong with what was sent.
+
 There is no `DELETE`. A `DELETE` to this path is answered by the application's ordinary `404`
 (BR-09, AC-15).
 

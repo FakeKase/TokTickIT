@@ -36,33 +36,34 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| UNIT-01 | Unit | BR-05, BR-06, BR-07, AC-07, AC-08, AC-09 | Action Taken validation | Description 1 to 2000 and Result 1 to 1000 after trimming, both ends inclusive; Attachment Notes optional, at most 500, empty becomes null; Follow-up Note required only when follow-up is required and null otherwise; Action Date/Time rejected when missing, malformed, before the minute of the Ticket's creation or more than 5 minutes ahead, accepted at both bounds; for a Ticket created at 10:00:30, 10:00:00 is accepted and 09:59:59 refused; every failing field reported together | `server/tests/lab-04/action-validation.unit.test.ts` | Planned |
+| UNIT-01 | Unit | BR-05, BR-06, BR-07, AC-07, AC-08, AC-09 | Action Taken validation | Description 1 to 2000 and Result 1 to 1000 after trimming, both ends inclusive; Attachment Notes optional, at most 500, empty becomes null; Follow-up Note required only when follow-up is required and null otherwise; Action Date/Time rejected when missing, malformed, before the minute of the Ticket's creation or more than 5 minutes ahead, accepted at both bounds; for a Ticket created at 10:00:30, 10:00:00 is accepted and 09:59:59 refused; every failing field reported together | `server/tests/lab-04/action-validation.unit.test.ts` | Pass |
 | UNIT-02 | Unit | BR-12, BR-13, BR-14, AC-18, AC-19, AC-20, AC-22 | Transition matrix and resolution gate helper | Every cell of §5.2 against a table written out by hand; the gate refuses no owner, then no Action Taken, then a latest action requiring follow-up, in that order, with the three documented sentences; Closed needs an owner and not the gate; `blockedReason` is null exactly when the move would be accepted | `server/tests/lab-04/resolution-gate.unit.test.ts` | Planned |
 | UNIT-03 | Unit | BR-25, AC-34, AC-38 | Bangkok day boundaries | At 16:59:59.999Z "today" began at 17:00Z the day before; at 17:00:00.000Z it began at that instant; the 7-day window starts six Bangkok days before today; no dependence on the machine's time zone | `server/tests/lab-04/bangkok-day.unit.test.ts` | Planned |
 | UNIT-04 | Unit | BR-22, AC-39 | List query parsers | `status=ACTIVE` expands to the five active statuses on both lists; a single status still works; an unknown status is dropped and does not mark the list filtered; My Tickets accepts `sortBy=updatedAt`; the Lab 2 and Lab 3 defaults are unchanged | `server/tests/lab-04/ticket-query.unit.test.ts` | Planned |
 | UNIT-05 | Unit | BR-05, BR-06, BR-07, AC-07, AC-09 | Client-side Action Taken form validation | The same limits as UNIT-01, with the message attached to the right field; the prefilled time for a Ticket created earlier in the same minute passes; a hidden Follow-up Note is not validated and not sent | `client/tests/lab-04/actionValidation.test.ts` | Planned |
+| UNIT-06 | Unit | FR-02, FR-03, BR-17, BR-20 | Client calls for Actions Taken | The create call sends the request key and the six entered fields and no performer; the edit call sends `expectedVersion`; a refusal reaches the caller with its field messages, its conflict code and, for a stale edit, the current row; a non-JSON error body still reports the status | `client/tests/lab-04/actionsApi.test.ts` | Pass |
 
 ### API - Actions Taken
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| API-01 | Authorization | AC-06 | No session | `401` from the list, create and edit endpoints; nothing written | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-02 | API | FR-01, BR-10, AC-15 | List shape and order | An empty array for a Ticket with none; otherwise Action Date/Time descending then id descending, the same on repeated reads, including two actions with the same Action Date/Time; each row has the documented fields and no others | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-03 | API | AC-01 | Create a valid Action Taken | `201`; created under the correct Ticket with the authenticated user as Performed by; version 1; `editedBy` null | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-04 | Authorization | BR-01, BR-03, AC-01 | Identity and Ticket cannot be supplied | A body carrying another user's `performedById`, another `ticketId` and a `createdAt` is saved with the session's user, the path's Ticket and the server's time | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-05 | Authorization | BR-04, AC-04 | Requester cannot write | `403` on create and on edit, for a Ticket they own as well as one they do not; the row count is unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-06 | Authorization | BR-04, AC-03, AC-05 | Requester reads own Ticket only | Own Ticket: `200` with every field of every Action Taken. Another Requester's Ticket: `404` with a body byte-identical to a Ticket id that does not exist | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-07 | API | BR-07, AC-07, AC-08 | Follow-up rule | Follow-up required with an empty or whitespace note is `400` on `followUpNote` and nothing is stored; follow-up not required with a note sent is saved with a null note | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-08 | API | BR-05, BR-06, AC-09 | Field validation through the route | Blank and over-long Description and Result, over-long Attachment Notes, and each bad Action Date/Time are `400` with a message per field and nothing stored; a missing or malformed `requestKey` is `400` | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-09 | Workflow | BR-02, AC-10 | Different staff on one Ticket | Two staff users who do not own the Ticket, and an Administrator, each record an action; all three are listed under their own names and the Ticket Owner is unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-10 | API | BR-09, AC-11 | Edit by another staff user | The six fields change; Performed by, Ticket and creation time do not; `editedBy` and `editedAt` are set; version is 2 | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-11 | Workflow | BR-17, AC-12 | Stale edit | An edit naming version 1 after the row reached version 2 is `409 STALE_ACTION` with the current row in `current`; the stored row is unchanged; a missing `expectedVersion` is `400` | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-12 | API | BR-20, AC-13, AC-42 | Retry-safe create | The same body sent twice, and twice at once, yields one row and the same id (`201` then `200`); the same key on another Ticket or from another user is `409 REQUEST_KEY_REUSED` | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-13 | Workflow | BR-08, AC-14 | Frozen once finished | Create and edit are `409 TICKET_NOT_ACTIVE` on a Resolved, a Closed and a Cancelled Ticket, and succeed again once the Ticket is Reopened | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-14 | API | BR-01, BR-09, AC-15 | No delete, no cross-Ticket access | `DELETE` on an Action Taken is `404` and the row remains; editing an action id through another Ticket's path is `404` | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-15 | API | BR-11, AC-16 | Effect on the Ticket | After a create and after an edit the Ticket's `updatedAt` is later and its status, owner, IT Priority and version are the same | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-16 | Authorization | AC-17 | Deactivated while signed in | A staff session whose user has been deactivated gets `401` on create and nothing is written | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
-| API-17 | Integration | BR-07 | Database constraint | A direct database write with follow-up required and no note, and one with a note and no follow-up, are both rejected by the check constraint | `server/tests/lab-04/actions-taken.api.test.ts` | Planned |
+| API-01 | Authorization | AC-06 | No session | `401` from the list, create and edit endpoints; nothing written | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-02 | API | FR-01, BR-10, AC-15 | List shape and order | An empty array for a Ticket with none; otherwise Action Date/Time descending then id descending, the same on repeated reads, including two actions with the same Action Date/Time; each row has the documented fields and no others | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-03 | API | AC-01 | Create a valid Action Taken | `201`; created under the correct Ticket with the authenticated user as Performed by; version 1; `editedBy` null | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-04 | Authorization | BR-01, BR-03, AC-01 | Identity and Ticket cannot be supplied | A body carrying another user's `performedById`, another `ticketId` and a `createdAt` is saved with the session's user, the path's Ticket and the server's time | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-05 | Authorization | BR-04, AC-04 | Requester cannot write | `403` on create and on edit, for a Ticket they own as well as one they do not; the row count is unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-06 | Authorization | BR-04, AC-03, AC-05 | Requester reads own Ticket only | Own Ticket: `200` with every field of every Action Taken. Another Requester's Ticket: `404` with a body byte-identical to a Ticket id that does not exist | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-07 | API | BR-07, AC-07, AC-08 | Follow-up rule | Follow-up required with an empty or whitespace note is `400` on `followUpNote` and nothing is stored; follow-up not required with a note sent is saved with a null note | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-08 | API | BR-05, BR-06, AC-09 | Field validation through the route | Blank and over-long Description and Result, over-long Attachment Notes, and each bad Action Date/Time are `400` with a message per field and nothing stored; a missing or malformed `requestKey` is `400` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-09 | Workflow | BR-02, AC-10 | Different staff on one Ticket | Two staff users who do not own the Ticket, and an Administrator, each record an action; all three are listed under their own names and the Ticket Owner is unchanged | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-10 | API | BR-09, AC-11 | Edit by another staff user | The six fields change; Performed by, Ticket and creation time do not; `editedBy` and `editedAt` are set; version is 2 | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-11 | Workflow | BR-17, AC-12 | Stale edit | An edit naming version 1 after the row reached version 2 is `409 STALE_ACTION` with the current row in `current`; the stored row is unchanged; a missing `expectedVersion` is `400` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-12 | API | BR-20, AC-13, AC-42 | Retry-safe create | The same body sent twice, and twice at once, yields one row and the same id (`201` then `200`); the same key on another Ticket or from another user is `409 REQUEST_KEY_REUSED` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-13 | Workflow | BR-08, AC-14 | Frozen once finished | Create and edit are `409 TICKET_NOT_ACTIVE` on a Resolved, a Closed and a Cancelled Ticket, and succeed again once the Ticket is Reopened | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-14 | API | BR-01, BR-09, AC-15 | No delete, no cross-Ticket access | `DELETE` on an Action Taken is `404` and the row remains; editing an action id through another Ticket's path is `404` | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-15 | API | BR-11, AC-16 | Effect on the Ticket | After a create and after an edit the Ticket's `updatedAt` is later and its status, owner, IT Priority and version are the same | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-16 | Authorization | AC-17 | Deactivated while signed in | A staff session whose user has been deactivated gets `401` on create and nothing is written | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
+| API-17 | Integration | BR-07 | Database constraint | A direct database write with follow-up required and no note, and one with a note and no follow-up, are both rejected by the check constraint | `server/tests/lab-04/actions-taken.api.test.ts` | Pass |
 
 ### API - Ticket workflow
 
@@ -261,6 +262,24 @@ the release.
 | Client | 17 files, 256 tests, all passed |
 | `npm run e2e:fresh` | 91 passed |
 | Type checks (`server/`, `client/`, root), client lint and build | Clean |
+
+**#67, Actions Taken API.** UNIT-01, UNIT-06 and API-01 to API-17 are Pass. UNIT-06 is new: the
+client calls were added here so that the next Issue is screens only, and they are tested where they
+were written.
+
+| Suite | Result |
+| :-- | :-- |
+| Server, on the database `npm run e2e:fresh` builds | 25 files, 457 tests, all passed |
+| Server, on the development database | 456 of 457, the same Daniel Okafor case as above |
+| Client | 18 files, 262 tests, all passed |
+| `npm run e2e:fresh` | 91 passed |
+| Type checks (`server/`, `client/`, root), client lint and build | Clean |
+
+Six deliberate faults were put into the routes one at a time, to see that the tests notice:
+taking Performed by from the body, finding an action through the wrong Ticket, not advancing the
+Ticket's `updatedAt`, breaking the tie in the list order the other way, answering a replay to a
+different user, and dropping the row lock. Each made exactly one test fail, and the file passed
+again once it was put back.
 
 MIG-02 does not run on the development database. It builds one of its own from the migrations,
 seeds it twice and compares the rows, because "the counts did not change" is only a statement

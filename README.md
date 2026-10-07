@@ -186,8 +186,8 @@ API tests query the real database rather than mocking it.
 
 ```bash
 # One-time setup, from server/
-npx prisma migrate deploy   # creates the Lab 1 + Lab 2 + Lab 3 tables
-npm run db:seed             # categories, related systems, users, tickets, comments
+npx prisma migrate deploy   # creates the Lab 1 to Lab 4 tables
+npm run db:seed             # categories, related systems, users, tickets, comments, actions taken
 
 # Run the suites
 cd server && npm test       # Supertest API + unit tests
@@ -237,6 +237,30 @@ Test files live in `server/tests/lab-0{1,2,3}/`, `client/tests/lab-0{1,2,3}/` an
 [`docs/lab-03/tests.md`](docs/lab-03/tests.md) for the full test lists and their
 traceability to acceptance criteria.
 
+## Rolling back the Lab 4 migration
+
+The Lab 4 migration only adds: the `ActionTaken` table, `Ticket.version`, `Ticket.resolvedAt` and
+one index. Prisma has no down migrations, so the way back is a script kept outside
+`prisma/migrations`, where Prisma will never run it by itself.
+
+```bash
+# From server/, with the Docker database from "Start PostgreSQL" (container toktickit-postgres)
+docker exec toktickit-postgres pg_dump -U postgres --format=custom toktickit_dev > before-lab4-rollback.dump
+docker exec -i toktickit-postgres psql -U postgres -d toktickit_dev \
+  --single-transaction -v ON_ERROR_STOP=1 < prisma/rollback/lab4_down.sql
+```
+
+With a locally installed PostgreSQL the same two steps are `pg_dump --format=custom` and
+`psql --single-transaction -v ON_ERROR_STOP=1 -f prisma/rollback/lab4_down.sql`, against the same
+database. Take the dump first: it is the only way to get the discarded rows back
+(`pg_restore --clean`).
+
+Rolling back discards every Action Taken recorded since the migration, each Ticket's version and
+each Ticket's resolution time. Nothing from Labs 1 to 3 is touched. Afterwards
+`npx prisma migrate deploy` applies the migration again. `npm run db:migration-check` runs the
+migration, this script and the migration again on a throwaway database and compares every row at
+each step.
+
 ## Available scripts
 
 ### `server/`
@@ -248,8 +272,8 @@ traceability to acceptance criteria.
 | `npm test` | Run the Supertest suite |
 | `npm run typecheck` | Type-check without emitting |
 | `npm run db:check` | Verify PostgreSQL connectivity |
-| `npm run db:seed` | Seed categories, related systems, users, tickets and comments (idempotent) |
-| `npm run db:migration-check` | Rebuild the Lab 2 schema on a throwaway database, apply the Lab 3 migration, and assert no Ticket, Attachment or owner was lost |
+| `npm run db:seed` | Seed categories, related systems, users, tickets, comments and actions taken (idempotent) |
+| `npm run db:migration-check` | On a throwaway database: rebuild the Lab 2 schema, apply the Lab 3 migration and assert no Ticket, Attachment or owner was lost; then apply the Lab 4 migration, its rollback, and the migration again, asserting every earlier row is unchanged each time |
 | `npm run prisma:generate` | Regenerate the Prisma client |
 
 ### Repository root

@@ -45,6 +45,11 @@ model User {
 
   comments TicketComment[]
   sessions Session[]
+
+  // Lab 4. Two relations to ActionTaken for the same reason Ticket has two to
+  // User: who did the work and who last edited the record are different facts.
+  actionsPerformed ActionTaken[] @relation("ActionPerformedBy")
+  actionsEdited    ActionTaken[] @relation("ActionEditedBy")
 }
 
 enum Role {
@@ -150,17 +155,74 @@ model Ticket {
   // The Requester's "this looks fixed" signal (BR-24). Never a status: only IT
   // Staff resolve or close a Ticket.
   requesterResolvedAt DateTime?
+  // Raised by one on every change of status, owner or IT Priority, and by
+  // nothing else (Lab 4 BR-16). A workflow change names the version it was
+  // based on, so it cannot overwrite one it never saw. Not `updatedAt`: that
+  // also moves when an Action Taken is recorded, which is not a conflict.
+  version             Int               @default(1)
+  // When the Ticket last entered Resolved (Lab 4 BR-18). Kept through Closed,
+  // cleared on Reopened. A column rather than something derived, because
+  // `updatedAt` moves again on closing and "resolved in the last 7 days"
+  // would otherwise have nothing to read.
+  resolvedAt          DateTime?
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
 
-  attachments Attachment[]
-  comments    TicketComment[]
+  attachments  Attachment[]
+  comments     TicketComment[]
+  actionsTaken ActionTaken[]
 
   @@index([requesterId])
   // Both are queue filters (BR-30), and the queue reads every Ticket in the
   // system rather than one Requester's slice.
   @@index([ownerId])
   @@index([currentStatus])
+  // The dashboards' "recently updated" lists.
+  @@index([updatedAt])
+}
+
+// A line of work done on a Ticket (Lab 4 specification.md 5 and 7.1). Never
+// deleted, and its Ticket and performer never change (BR-01, BR-03, BR-09).
+//
+// There is deliberately no @updatedAt here. Prisma sets one on insert, so it
+// could not mean "never edited"; editedById and editedAt are both null until
+// the first edit and are set together by every edit.
+//
+// One rule lives in the migration because Prisma cannot express it: a CHECK
+// that followUpNote is present exactly when followUpRequired is true (BR-07).
+// The resolution gate reads followUpRequired, so a row that contradicts
+// itself would be a gate deciding on nonsense.
+model ActionTaken {
+  id               Int       @id @default(autoincrement())
+  ticketId         Int
+  ticket           Ticket    @relation(fields: [ticketId], references: [id])
+  performedById    Int
+  performedBy      User      @relation("ActionPerformedBy", fields: [performedById], references: [id])
+  // When the work was done, entered by the person recording it. createdAt is
+  // when the row was written; the two differ whenever work is written up later.
+  actionAt         DateTime
+  description      String
+  result           String
+  followUpRequired Boolean   @default(false)
+  followUpNote     String?
+  attachmentNotes  String?
+  // Raised by one on every edit (BR-17).
+  version          Int       @default(1)
+  // Chosen by the client, one per form. A create that is sent twice finds the
+  // first row here instead of writing a second (BR-20). The seed uses it as
+  // its natural key for the same reason.
+  requestKey       String    @unique
+  editedById       Int?
+  // Restrict, like every other reference here: users are deactivated, never
+  // deleted, and SET NULL would leave an edit time with no editor.
+  editedBy         User?     @relation("ActionEditedBy", fields: [editedById], references: [id], onDelete: Restrict)
+  editedAt         DateTime?
+  createdAt        DateTime  @default(now())
+
+  // The per-Ticket list, and the gate's "latest action" lookup.
+  @@index([ticketId, actionAt])
+  // The dashboard's "my actions today" and "my recent actions".
+  @@index([performedById, actionAt])
 }
 
 // One model for both Public Comments and Internal Notes, separated by

@@ -42,6 +42,9 @@ async function main() {
   // Attachments do, so they have to go first. Without this the whole teardown
   // throws the moment a spec posts a comment - which Lab 3's specs will.
   const comments = await prisma.ticketComment.deleteMany({ where: { ticket: where } });
+  // Actions Taken restrict the deletion of their Ticket in the same way
+  // (Lab 4), so they go before it too.
+  const actions = await prisma.actionTaken.deleteMany({ where: { ticket: where } });
   const tickets = await prisma.ticket.deleteMany({ where });
 
   // Users the suite created. A deleted user cannot be left as an author or an
@@ -50,6 +53,15 @@ async function main() {
   // seeded Requester and carries the marker above.
   const fixtureUser = { email: { endsWith: USER_DOMAIN } };
   await prisma.ticketComment.deleteMany({ where: { author: fixtureUser } });
+  // The same for work they recorded. An action they only edited belongs to
+  // somebody who is staying, so it is kept and loses its edit mark, both
+  // halves together: an edit time with no editor is not a state the
+  // application ever writes.
+  await prisma.actionTaken.deleteMany({ where: { performedBy: fixtureUser } });
+  await prisma.actionTaken.updateMany({
+    where: { editedBy: fixtureUser },
+    data: { editedById: null, editedAt: null },
+  });
   await prisma.ticket.updateMany({ where: { owner: fixtureUser }, data: { ownerId: null } });
   await prisma.session.deleteMany({ where: { user: fixtureUser } });
   const users = await prisma.user.deleteMany({ where: fixtureUser });
@@ -60,7 +72,7 @@ async function main() {
   }
 
   console.log(
-    `e2e cleanup: removed ${tickets.count} tickets, ${attachments.count} attachments, ${comments.count} comments, ${doomed.length} files, ${users.count} users`,
+    `e2e cleanup: removed ${tickets.count} tickets, ${attachments.count} attachments, ${comments.count} comments, ${actions.count} actions taken, ${doomed.length} files, ${users.count} users`,
   );
   await prisma.$disconnect();
 }

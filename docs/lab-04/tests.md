@@ -103,13 +103,13 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| MIG-01 | Migration | BR-32, FR-18, AC-46 | Migration and rollback | On a throwaway database holding Lab 3 data: after the migration every earlier row has the same values, every Ticket has version 1 and no Actions Taken, and `resolvedAt` is set only for Resolved and Closed; after the rollback the Lab 3 rows are again identical and the Lab 4 objects are gone; the migration applies again cleanly | `server/src/scripts/migration-check.ts` (`npm run db:migration-check`) | Planned |
-| MIG-02 | Migration | FR-19, AC-47 | Seed | Running the seed twice leaves every table's row count unchanged; the seeded Tickets have 0, 1, 2 and 3 Actions Taken as §7.3 lists; one seeded Requester has no Tickets and one seeded staff user has no actions | `server/tests/lab-04/seed.api.test.ts` | Planned |
+| MIG-01 | Migration | BR-32, FR-18, AC-46 | Migration and rollback | On a throwaway database holding Lab 3 data: after the migration every earlier row has the same values, every Ticket has version 1 and no Actions Taken, and `resolvedAt` is set only for Resolved and Closed; after the rollback the Lab 3 rows are again identical and the Lab 4 objects are gone; the migration applies again cleanly | `server/src/scripts/migration-check.ts` (`npm run db:migration-check`) | Pass |
+| MIG-02 | Migration | FR-19, AC-47 | Seed | Running the seed twice leaves every table's row count unchanged; the seeded Tickets have 0, 1, 2 and 3 Actions Taken as §7.3 lists; one seeded Requester has no Tickets and one seeded staff user has no actions; a seeded Ticket too young to date work from is moved back once and then left alone | `server/tests/lab-04/seed.api.test.ts` | Pass |
 | REG-01 | Regression | FR-20, AC-50 | Lab 1 to Lab 3 server suites | Every test in `server/tests/lab-01`, `lab-02` and `lab-03` passes | `server/tests/lab-01/*`, `lab-02/*`, `lab-03/*` | Planned |
 | REG-02 | Regression | FR-20, AC-50 | Lab 1 to Lab 3 client suites | Every test in `client/tests/lab-01`, `lab-02` and `lab-03` passes | `client/tests/lab-01/*`, `lab-02/*`, `lab-03/*` | Planned |
 | REG-03 | Regression | FR-20, AC-50 | Lab 2 and Lab 3 end-to-end suites | Every spec in `e2e/lab-02` and `e2e/lab-03` passes on a fresh database | `e2e/lab-02/*`, `e2e/lab-03/*` | Planned |
 | REG-04 | Regression | FR-16, FR-17, AC-44 | Whole-application sweep | Each of the three roles visits every screen available to them, on a fresh database: no console error, no failed request, no link to a missing page, and no visible placeholder text | `e2e/lab-04/regression.spec.ts` | Planned |
-| REG-05 | Regression | FR-19 | Cleanup contract | The end-to-end teardown removes the Actions Taken of the Tickets it removes, so repeated runs leave the same row counts | `e2e/lab-03/cleanup-contract.spec.ts` | Planned |
+| REG-05 | Regression | FR-19 | Cleanup contract | The real teardown script, run against rows shaped as the end-to-end suite shapes them: a marked Ticket goes together with its Actions Taken; a user the suite created goes together with the work they recorded; an unmarked Ticket stays, and an action a remaining user performed stays and loses the departing user's edit mark, editor and time together | `server/tests/lab-04/e2e-cleanup.api.test.ts` | Pass |
 
 ### UI component
 
@@ -249,6 +249,28 @@ test.
 Filled in as each Issue's Pull Request lands in `lab4-staging`, then once more from `main` after
 the release.
 
+### Per Issue
+
+**#66, schema, migration, rollback and seed.** MIG-01, MIG-02 and REG-05 are Pass.
+
+| Suite | Result |
+| :-- | :-- |
+| `npm run db:migration-check` | Passed, 47 checks: 11 for Lab 2 to Lab 3 as before, then 36 for Lab 4 across the migration, the constraint, the rollback and applying it again |
+| Server, on the database `npm run e2e:fresh` builds | 23 files, 364 tests, all passed |
+| Server, on the development database | 363 of 364. The one failure is `seed-credentials.api.test.ts` for Daniel Okafor, whose password in that database had been changed by hand; the seed never rewrites a password. Not a product failure |
+| Client | 17 files, 256 tests, all passed |
+| `npm run e2e:fresh` | 91 passed |
+| Type checks (`server/`, `client/`, root), client lint and build | Clean |
+
+MIG-02 does not run on the development database. It builds one of its own from the migrations,
+seeds it twice and compares the rows, because "the counts did not change" is only a statement
+about the seed when nothing else is in the database.
+
+REG-05 was planned as an addition to `e2e/lab-03/cleanup-contract.spec.ts`. That spec can only
+read the script's source, and the thing worth proving is that the script still runs once a Ticket
+has Actions Taken under it. It is a server test instead, and it was seen to fail against the
+teardown as it stood before this Issue.
+
 ## 7. Earlier Tests This Contract Changes
 
 These are changed on purpose, in the Issue named, because the contract they tested has changed.
@@ -264,8 +286,15 @@ Any other change to a Lab 1 to Lab 3 test is a regression and is treated as one.
 | `client/tests/lab-02/AppShellNav.test.tsx`, `client/tests/lab-03/AppShellAuth.test.tsx`, `client/tests/lab-03/Login.test.tsx` | Dashboard joins each role's navigation and becomes the landing route | #71 |
 | `client/tests/lab-02/MyTickets.test.tsx` | Filters, sort and page move into the URL, and a Status filter is added | #71 |
 | `e2e/lab-02/helpers.ts`, `e2e/lab-03/helpers.ts`, `e2e/lab-03/authentication.spec.ts`, `e2e/lab-03/user-administration.spec.ts` | Assertions about where a role lands after signing in | #71 |
-| `e2e/lab-03/cleanup-contract.spec.ts`, `server/src/scripts/e2e-cleanup.ts` | The teardown must remove Actions Taken before the Tickets they belong to | #66 |
+| `server/src/scripts/e2e-cleanup.ts` | The teardown removes Actions Taken before the Tickets and users they refer to. No earlier test changed; REG-05 is new | #66 |
 
 ## 8. Known Limitations or Deferred Tests
 
-None at the time of writing. Anything deferred during the sprint is recorded here with its reason.
+- **Rare one-off failures on the development database, not reproduced.** In 14 full runs of the
+  server suite during Issue #66, three runs each had a failure in a test this Issue does not touch:
+  `POST /api/tickets` answering `426` in `lab-02/create-ticket.api.test.ts`; "settles two
+  simultaneous claims" in `lab-03/staff-ticket-detail.api.test.ts` timing out at 5 seconds; and two
+  attachment cases in `lab-02/attachments.api.test.ts`, in the run straight after a Playwright run.
+  None repeated. The staff file then passed 8 of 8 alone on each database, and every full run on
+  the fresh database was clean. A development API and client were running on the same machine and
+  the same database throughout. Recorded, not explained.

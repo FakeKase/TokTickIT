@@ -140,6 +140,51 @@ describe("Action Date/Time (BR-05)", () => {
     expect(fieldsOf(valid({ actionAt: value }))).toHaveProperty("actionAt");
   });
 
+  // The right shape, naming a moment that does not exist. `new Date()` does
+  // not refuse these: it rolls them over into a different day, which would
+  // then be stored in place of the one that was sent.
+  it.each([
+    ["2026-02-31T10:00Z", "31 February, which would be stored as 3 March"],
+    ["2026-04-31T09:00+07:00", "31 April, which would be stored as 1 May"],
+    ["2026-03-01T24:00Z", "hour 24, which would be stored as the next day"],
+    ["2026-02-29T10:00Z", "29 February in a year that is not a leap year"],
+    ["2026-00-10T10:00Z", "month 0"],
+    ["2026-13-10T10:00Z", "month 13"],
+    ["2026-03-00T10:00Z", "day 0"],
+    ["2026-03-32T10:00Z", "day 32"],
+    ["2026-03-01T23:60Z", "minute 60"],
+    ["2026-03-01T23:59:60Z", "second 60"],
+    ["2026-03-01T10:00+15:00", "an offset past 14 hours"],
+    ["2026-03-01T10:00+07:60", "an offset of 60 minutes"],
+  ])("rejects %s (%s)", (value) => {
+    // A context wide enough that the only thing wrong is the date itself.
+    const result = validateAction(valid({ actionAt: value }), {
+      ticketCreatedAt: new Date("2020-01-01T00:00:00.000Z"),
+      now: new Date("2030-01-01T00:00:00.000Z"),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(!result.ok && Object.keys(result.fields)).toEqual(["actionAt"]);
+  });
+
+  it("accepts the last real day of a month, and 29 February in a leap year", () => {
+    const wide = {
+      ticketCreatedAt: new Date("2020-01-01T00:00:00.000Z"),
+      now: new Date("2030-01-01T00:00:00.000Z"),
+    };
+    for (const [value, stored] of [
+      ["2026-02-28T23:59:59.999Z", "2026-02-28T23:59:59.999Z"],
+      ["2028-02-29T10:00Z", "2028-02-29T10:00:00.000Z"],
+      ["2026-04-30T09:00+07:00", "2026-04-30T02:00:00.000Z"],
+      ["2026-12-31T23:59Z", "2026-12-31T23:59:00.000Z"],
+      ["2026-03-01T10:00+14:00", "2026-02-28T20:00:00.000Z"],
+    ]) {
+      const result = validateAction(valid({ actionAt: value }), wide);
+      // What is stored is the moment that was sent, not a neighbour of it.
+      expect(result.ok && result.value.actionAt.toISOString()).toBe(stored);
+    }
+  });
+
   it("accepts a zone written as Z or as an offset, with or without seconds", () => {
     for (const value of [
       "2026-10-06T04:00:00.000Z",

@@ -32,10 +32,39 @@ export const REQUEST_KEY_MESSAGE =
  * mean different instants on different machines.
  */
 const ISO_INSTANT =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,3})?)?(?:Z|[+-](\d{2}):(\d{2}))$/;
 
 function parseInstant(value: unknown): Date | null {
-  if (typeof value !== "string" || !ISO_INSTANT.test(value)) return null;
+  if (typeof value !== "string") return null;
+  const match = ISO_INSTANT.exec(value);
+  if (!match) return null;
+
+  // The shape is right; now the numbers have to name a moment that exists.
+  // `new Date()` does not check that. Given 31 February it answers with
+  // 3 March, and given 24:00 with midnight the next day, so a date that was
+  // never sent would be stored without a word. Each part is checked here
+  // against its own range, and the day against the length of its month.
+  const [year, month, day, hour, minute, second, offsetHour, offsetMinute] = match
+    .slice(1)
+    .map((part) => (part === undefined ? 0 : Number(part)));
+  // Day 0 of the following month is the last day of this one, leap years
+  // included.
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > daysInMonth ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    // No zone is further than 14 hours from UTC.
+    offsetHour > 14 ||
+    offsetMinute > 59
+  ) {
+    return null;
+  }
+
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }

@@ -356,6 +356,9 @@ describe("API-08 field validation through the route (BR-05, BR-06, AC-09)", () =
     ["actionAt", undefined],
     ["actionAt", "not a date"],
     ["actionAt", "2026-10-06T04:00:00"],
+    // A date that does not exist is refused, not stored as a different day.
+    ["actionAt", "2026-02-31T10:00:00.000Z"],
+    ["actionAt", "2026-03-01T24:00:00.000Z"],
     ["followUpRequired", "yes"],
   ])("rejects a bad %s (%j) with a message on that field", async (field, value) => {
     const response = await create(ownerStaffCookie, validBody({ [field]: value }));

@@ -36,7 +36,7 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| UNIT-01 | Unit | BR-05, BR-06, BR-07, AC-07, AC-08, AC-09 | Action Taken validation | Description 1 to 2000 and Result 1 to 1000 after trimming, both ends inclusive; Attachment Notes optional, at most 500, empty becomes null; Follow-up Note required only when follow-up is required and null otherwise; Action Date/Time rejected when missing, malformed, before the minute of the Ticket's creation or more than 5 minutes ahead, accepted at both bounds; for a Ticket created at 10:00:30, 10:00:00 is accepted and 09:59:59 refused; every failing field reported together | `server/tests/lab-04/action-validation.unit.test.ts` | Pass |
+| UNIT-01 | Unit | BR-05, BR-06, BR-07, AC-07, AC-08, AC-09 | Action Taken validation | Description 1 to 2000 and Result 1 to 1000 after trimming, both ends inclusive; Attachment Notes optional, at most 500, empty becomes null; Follow-up Note required only when follow-up is required and null otherwise; Action Date/Time rejected when missing, malformed, or naming a moment that does not exist (31 February, 31 April, hour 24, which `new Date()` would roll over into another day), before the minute of the Ticket's creation or more than 5 minutes ahead, accepted at both bounds; for a Ticket created at 10:00:30, 10:00:00 is accepted and 09:59:59 refused; every failing field reported together | `server/tests/lab-04/action-validation.unit.test.ts` | Pass |
 | UNIT-02 | Unit | BR-12, BR-13, BR-14, AC-18, AC-19, AC-20, AC-22 | Transition matrix and resolution gate helper | Every cell of §5.2 against a table written out by hand; the gate refuses no owner, then no Action Taken, then a latest action requiring follow-up, in that order, with the three documented sentences; Closed needs an owner and not the gate; `blockedReason` is null exactly when the move would be accepted | `server/tests/lab-04/resolution-gate.unit.test.ts` | Planned |
 | UNIT-03 | Unit | BR-25, AC-34, AC-38 | Bangkok day boundaries | At 16:59:59.999Z "today" began at 17:00Z the day before; at 17:00:00.000Z it began at that instant; the 7-day window starts six Bangkok days before today; no dependence on the machine's time zone | `server/tests/lab-04/bangkok-day.unit.test.ts` | Planned |
 | UNIT-04 | Unit | BR-22, AC-39 | List query parsers | `status=ACTIVE` expands to the five active statuses on both lists; a single status still works; an unknown status is dropped and does not mark the list filtered; My Tickets accepts `sortBy=updatedAt`; the Lab 2 and Lab 3 defaults are unchanged | `server/tests/lab-04/ticket-query.unit.test.ts` | Planned |
@@ -269,8 +269,8 @@ were written.
 
 | Suite | Result |
 | :-- | :-- |
-| Server, on the database `npm run e2e:fresh` builds | 25 files, 457 tests, all passed |
-| Server, on the development database | 456 of 457, the same Daniel Okafor case as above |
+| Server, on the database `npm run e2e:fresh` builds | 25 files, 472 tests, all passed |
+| Server, on the development database | 471 of 472, the same Daniel Okafor case as above |
 | Client | 18 files, 262 tests, all passed |
 | `npm run e2e:fresh` | 91 passed |
 | Type checks (`server/`, `client/`, root), client lint and build | Clean |

@@ -53,6 +53,12 @@ import {
 } from "./lib/status-transitions.js";
 import { validateComment } from "./lib/comment-validation.js";
 import {
+  TICKET_NOT_FOUND,
+  parseId,
+  resolveTicketFor,
+} from "./lib/ticket-access.js";
+import { registerActionsTaken } from "./routes/actions-taken.js";
+import {
   ALLOWED_TYPES_LABEL,
   MAX_ACTIVE_ATTACHMENTS,
   MAX_ATTACHMENT_BYTES,
@@ -527,32 +533,13 @@ export function createApp(prisma = createPrismaClient()) {
    */
   const asAnyUser = [requireAuth(prisma), requirePasswordChanged];
 
-  /**
-   * Resolves the Ticket a comment route is about, or the reason it cannot.
-   *
-   * The two roles fail differently on purpose. A Requester asking about
-   * somebody else's Ticket gets the same 404 as one that does not exist
-   * (BR-18) - they must not learn it is there. Staff may read any Ticket, so
-   * for them 404 means only that the id is wrong.
-   */
-  async function resolveCommentTicket(
+  /** The Ticket a comment route is about, or null when the caller gets a
+   *  404. The rule itself is in lib/ticket-access.ts, shared with the Actions
+   *  Taken routes. */
+  const resolveCommentTicket = (
     user: { id: number; role: string },
-    // Express types a route param as string, but a wildcard route can hand
-    // over an array; Number() of one is NaN, which the guard below rejects.
     rawId: string | string[],
-  ) {
-    const ticketId = Number(rawId);
-    if (!Number.isInteger(ticketId) || ticketId <= 0) return null;
-
-    const ticket = await prisma.ticket.findUnique({
-      where: { id: ticketId },
-      select: { id: true, requesterId: true, currentStatus: true },
-    });
-    if (!ticket) return null;
-
-    if (user.role === "REQUESTER" && ticket.requesterId !== user.id) return null;
-    return ticket;
-  }
+  ) => resolveTicketFor(prisma, user, rawId);
 
   /** The response shape for one comment (api-spec.md §6). */
   const toComment = (comment: {
@@ -763,6 +750,9 @@ export function createApp(prisma = createPrismaClient()) {
     requireRole("IT_STAFF", "ADMINISTRATOR"),
   ];
 
+  // Lab 4: Actions Taken, in their own file (docs/lab-04/api-spec.md §1 to §3).
+  registerActionsTaken(app, { prisma, asAnyUser, asStaff });
+
   // api-spec.md §8 (FR-13, BR-30, BR-31). Every Ticket in the system: there is
   // no ownership clause here, which is exactly why the role guard above is the
   // whole of the access control and a Requester must never reach this handler
@@ -912,13 +902,6 @@ export function createApp(prisma = createPrismaClient()) {
       isTicketStatus(ticket.currentStatus) && requiresOwner(ticket.currentStatus),
   });
 
-  /** A positive integer id from a route param, or null. */
-  const parseId = (raw: unknown): number | null => {
-    const id = Number(raw);
-    return Number.isInteger(id) && id > 0 ? id : null;
-  };
-
-  const TICKET_NOT_FOUND = { error: "Ticket not found" };
   /** Somebody else changed the Ticket between this request reading it and
    *  writing to it. Not a validation problem and not a server fault: the
    *  screen is out of date, and reloading is the fix. */

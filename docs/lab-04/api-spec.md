@@ -84,7 +84,7 @@ Create an Action Taken (FR-02).
 | Field | Rule |
 | :-- | :-- |
 | `requestKey` | Required. 8 to 64 characters from letters, digits, `-`, `_` and `:` (BR-20) |
-| `actionAt` | Required ISO 8601 timestamp. Not before the Ticket's `createdAt` with its seconds and milliseconds set to zero, not more than 5 minutes after the server clock (BR-05). A Ticket created at 10:00:30 accepts 10:00:00 and refuses 09:59:59 |
+| `actionAt` | Required ISO 8601 timestamp with a zone (`Z` or an offset), naming a real moment: 31 February or hour 24 is `400`, never stored as a neighbouring day. Not before the Ticket's `createdAt` with its seconds and milliseconds set to zero, not more than 5 minutes after the server clock (BR-05). A Ticket created at 10:00:30 accepts 10:00:00 and refuses 09:59:59 |
 | `description` | Required, 1 to 2000 characters after trimming (BR-06) |
 | `result` | Required, 1 to 1000 characters after trimming (BR-06) |
 | `followUpRequired` | Required boolean |
@@ -129,6 +129,11 @@ update to reason about. `requestKey` is not accepted here.
 - **`409 STALE_ACTION`**: `expectedVersion` is not the current version. Nothing is written, and the
   body carries the row as it now stands so the screen can show what changed:
   `{ "error": "This Action Taken was changed by someone else.", "code": "STALE_ACTION", "current": { ...§1 shape... } }`
+
+Checked in this order after authentication and role: Ticket, Action Taken on that Ticket, the
+Ticket's status, the form of `expectedVersion`, the version, the six fields. The version is judged
+before the fields so that an out-of-date copy is always told so, with the current row, whatever
+else is wrong with what was sent.
 
 There is no `DELETE`. A `DELETE` to this path is answered by the application's ordinary `404`
 (BR-09, AC-15).

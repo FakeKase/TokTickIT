@@ -1,0 +1,219 @@
+/* Actions Taken (Lab 4 ui-spec.md §6). Table at 768px and above, the same
+   rows as cards below it; both are rendered and a media query hides one. The
+   surfaces, borders and header shading are the ones User Management uses. */
+
+.ttk-actions {
+  margin-top: var(--zg-space-6);
+}
+
+.ttk-actions__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--zg-space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--zg-space-4);
+}
+
+.ttk-actions__count {
+  margin: 0 0 var(--zg-space-3);
+  font-size: var(--zg-font-size-label);
+  font-weight: var(--zg-font-weight-label);
+}
+
+/* Why the button is not there, said where the button would have been. */
+.ttk-actions__frozen {
+  margin: 0 0 var(--zg-space-4);
+  padding: var(--zg-space-3);
+  background: var(--zg-field-readonly-bg);
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius);
+}
+
+.ttk-actions__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--zg-border);
+  border-radius: var(--zg-radius-lg);
+}
+
+.ttk-actions__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ttk-actions__table th,
+.ttk-actions__table td {
+  text-align: left;
+  padding: var(--zg-space-3);
+  border-bottom: 1px solid var(--zg-border);
+  vertical-align: top;
+}
+
+.ttk-actions__table thead th {
+  background: var(--zg-pale);
+  font-size: var(--zg-font-size-label);
+  font-weight: var(--zg-font-weight-label);
+}
+
+.ttk-actions__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Text somebody typed can hold a file name or a URL with nowhere to break.
+   It wraps anywhere, so one long word cannot widen the page; the date and the
+   badge beside it stay whole. */
+.ttk-actions__table td,
+.ttk-actions__card p,
+.ttk-actions__text {
+  overflow-wrap: anywhere;
+}
+
+.ttk-actions__when,
+.ttk-actions__open,
+.ttk-actions .ttk-badge {
+  white-space: nowrap;
+}
+
+.ttk-actions__table .ttk-actions__open {
+  text-align: right;
+}
+
+/* Three lines in the list; the whole text is in the dialog. */
+.ttk-actions__clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  white-space: pre-wrap;
+}
+
+.ttk-actions__edited {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.ttk-actions__cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------- Dialog ---------- */
+
+.ttk-actions__view {
+  display: grid;
+  gap: var(--zg-space-3);
+  margin: 0 0 var(--zg-space-4);
+}
+
+/* Keeps the line breaks that were typed. */
+.ttk-actions__text {
+  white-space: pre-wrap;
+}
+
+.ttk-actions__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-4);
+}
+
+.ttk-actions__group {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.ttk-actions__choice {
+  display: flex;
+  align-items: center;
+  gap: var(--zg-space-2);
+  min-height: 32px;
+}
+
+.ttk-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zg-space-2);
+}
+
+.ttk-actions__form textarea,
+.ttk-actions__form input[type='text'],
+.ttk-actions__form input[type='datetime-local'] {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ttk-actions__form textarea {
+  resize: vertical;
+}
+
+.ttk-actions__counter {
+  margin: var(--zg-space-1) 0 0;
+  font-size: 13px;
+  text-align: right;
+  opacity: 0.75;
+}
+
+.ttk-actions__performer {
+  margin: 0;
+}
+
+/* A colleague saved first. Set apart from a validation message: nothing typed
+   here is wrong, and the choice of what to do is the reader's. */
+.ttk-actions__conflict {
+  padding: var(--zg-space-3);
+  background: var(--zg-warning-tint);
+  border-left: 3px solid var(--zg-warning);
+  border-radius: var(--zg-radius);
+}
+
+.ttk-actions__conflict p {
+  margin: 0 0 var(--zg-space-3);
+  color: var(--zg-text);
+}
+
+@media (max-width: 767px) {
+  .ttk-actions__table-wrap {
+    display: none;
+  }
+
+  .ttk-actions__cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--zg-space-3);
+  }
+
+  .ttk-actions__card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--zg-space-2);
+    padding: var(--zg-space-4);
+    border: 1px solid var(--zg-border);
+    border-radius: var(--zg-radius-lg);
+  }
+
+  .ttk-actions__card p {
+    margin: 0;
+  }
+
+  .ttk-actions__card-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--zg-space-2);
+    font-weight: var(--zg-font-weight-label);
+  }
+
+  .ttk-actions__head .ttk-btn {
+    width: 100%;
+  }
+
+  .ttk-actions__buttons .ttk-btn {
+    flex: 1;
+  }
+}

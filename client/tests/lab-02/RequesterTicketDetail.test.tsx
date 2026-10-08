@@ -33,6 +33,8 @@ function mockApi(detail: () => Promise<Response>) {
     // branch below and the detail screen gets a paginated object where it
     // expects an array.
     if (/\/api\/tickets\/\d+\/comments$/.test(url)) return Promise.resolve(Response.json([]))
+    // Lab 4 added the Actions Taken area, read from its own endpoint.
+    if (/\/api\/tickets\/\d+\/actions$/.test(url)) return Promise.resolve(Response.json([]))
     if (/\/api\/tickets\/\d+$/.test(url)) return detail()
     if (url.includes('/api/tickets')) {
       return Promise.resolve(
@@ -110,17 +112,27 @@ describe('Requester Ticket Detail', () => {
   // Lab 2 asserted this screen had no comments at all, which handout §4.2 put
   // out of scope for that sprint. Lab 3 Issue #42 adds the public thread and
   // the "appears resolved" signal, so what is left to assert is the boundary
-  // that still holds: no internal notes, no Actions Taken, and no control that
-  // changes the Ticket's status (BR-05).
-  it('handout §4.6: no Internal Notes, no Actions Taken, no status control', async () => {
+  // that still holds: no internal notes and no control that changes the
+  // Ticket's status (BR-05).
+  //
+  // Lab 4 changes one more part of it on purpose (Lab 4 FR-04, handout 8.3:
+  // "Requesters will see all Actions Taken items"). The Requester now sees the
+  // Actions Taken area, read-only, so this no longer asserts its absence. It
+  // asserts what replaced that: the area is there and offers no way to add
+  // or edit. The area's own behaviour is covered in lab-04/ActionsTaken.
+  it('handout §4.6: no Internal Notes, no status control, and Actions Taken read-only', async () => {
     mockApi(() => Promise.resolve(Response.json(TICKET)))
 
     await renderDetail()
     await screen.findByText('TKT-2026-000042')
 
-    for (const forbidden of [/internal note/i, /actions taken/i]) {
-      expect(screen.queryByText(forbidden)).not.toBeInTheDocument()
-    }
+    expect(screen.queryByText(/internal note/i)).not.toBeInTheDocument()
+
+    expect(screen.getByRole('heading', { name: 'Actions Taken' })).toBeInTheDocument()
+    expect(
+      await screen.findByText('No Actions Taken have been recorded for this Ticket yet.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add action taken|^edit$/i })).not.toBeInTheDocument()
 
     // Current Status is displayed, and nothing offers to change it. The
     // resolved signal is not a status control: it is excluded by name below so

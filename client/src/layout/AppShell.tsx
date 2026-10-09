@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import type { Role } from '../api'
+import { landingPathFor } from '../auth/landing'
 import { Badge } from '../components/Badge'
 import { ThemeToggle } from '../theme/ThemeToggle'
 import './AppShell.css'
@@ -30,6 +31,13 @@ interface NavItem {
 const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   REQUESTER: [
     {
+      // Active on its own route only. A Ticket opened from a dashboard row
+      // lives under My Tickets, and that is the item it marks (ui-spec.md §1).
+      to: '/dashboard',
+      label: 'Dashboard',
+      isActive: (pathname) => pathname === '/dashboard',
+    },
+    {
       to: '/tickets',
       label: 'My Tickets',
       // The list and every ticket detail, but not the create form.
@@ -45,12 +53,22 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   ],
   IT_STAFF: [
     {
+      to: '/staff/dashboard',
+      label: 'Dashboard',
+      isActive: (pathname) => pathname === '/staff/dashboard',
+    },
+    {
       to: '/staff/tickets',
       label: 'Ticket Queue',
       isActive: (pathname) => pathname.startsWith('/staff/tickets'),
     },
   ],
   ADMINISTRATOR: [
+    {
+      to: '/staff/dashboard',
+      label: 'Dashboard',
+      isActive: (pathname) => pathname === '/staff/dashboard',
+    },
     {
       to: '/staff/tickets',
       label: 'Ticket Queue',
@@ -60,6 +78,11 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
       to: '/admin/users',
       label: 'User Management',
       isActive: (pathname) => pathname.startsWith('/admin/users'),
+    },
+    {
+      to: '/system-status',
+      label: 'System Status',
+      isActive: (pathname) => pathname === '/system-status',
     },
   ],
 }
@@ -96,9 +119,18 @@ export function AppShell() {
 
   return (
     <div className="ttk-shell">
-      <header className="ttk-shell__header">
+      {/* More than two items do not fit beside the identity controls at
+          tablet width, so a role that has more gets the menu there too
+          (AppShell.css). */}
+      <header
+        className={`ttk-shell__header${navItems.length > 2 ? ' ttk-shell__header--long-nav' : ''}`}
+      >
         <div className="ttk-shell__header-inner">
-          <Link to="/" className="ttk-shell__wordmark" onClick={closeNav}>
+          <Link
+            to={user ? landingPathFor(user.role) : '/'}
+            className="ttk-shell__wordmark"
+            onClick={closeNav}
+          >
             TokTickIT
           </Link>
 

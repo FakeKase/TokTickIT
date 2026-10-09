@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { CheckSystemPage } from '../../src/pages/CheckSystemPage'
+import { SystemStatusPage } from '../../src/pages/SystemStatusPage'
 
 // Rendered as the page rather than through <App />: Lab 3 put every screen
-// behind a session, and these tests are about the Check System screen itself.
+// behind a session, and these tests are about the screen itself. Since Lab 4
+// it is System Status, for an Administrator at /system-status: it checks on
+// arrival, and its "Submit Request" buttons are gone (Lab 4 ui-spec.md §8).
+// Who may open it is UI-28 in tests/lab-04/SystemStatus.test.tsx.
 // UI-03: when the API cannot be reached the user must be told, rather than the
 // page silently doing nothing. Both failure modes are covered: the request
 // never lands (network error) and it lands but fails (5xx).
@@ -20,14 +22,12 @@ describe('UI-03 API failure', () => {
 
   it('shows a useful error message when the backend is unreachable', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Failed to fetch'))
-    const user = userEvent.setup()
 
     render(
       <MemoryRouter>
-        <CheckSystemPage />
+        <SystemStatusPage />
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /Unable to connect to TokTickIT API/i,
@@ -39,14 +39,12 @@ describe('UI-03 API failure', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response('', { status: 500 }),
     )
-    const user = userEvent.setup()
 
     render(
       <MemoryRouter>
-        <CheckSystemPage />
+        <SystemStatusPage />
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /Unable to connect to TokTickIT API/i,
@@ -63,14 +61,12 @@ describe('UI-03 API failure', () => {
         { id: 1, name: 'Hardware', description: 'Hardware issues' },
       ]),
     )
-    const user = userEvent.setup()
 
     render(
       <MemoryRouter>
-        <CheckSystemPage />
+        <SystemStatusPage />
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     expect(await screen.findByText(/Online/i)).toBeInTheDocument()
   })

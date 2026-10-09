@@ -16,12 +16,18 @@ export {
 export const shot = (screen: string, name: string) =>
   `artifacts/lab-03/screenshots/${screen}/${name}.png`
 
-/** One seeded account per role, by the addresses the README documents. */
+/**
+ * One seeded account per role, by the addresses the README documents.
+ *
+ * `home` is the role's own working screen, which is what the Lab 3 captures
+ * open. `landing` is where the role arrives after signing in, which since
+ * Lab 4 is its Dashboard.
+ */
 export const ACCOUNTS = {
-  requester: { email: 'peter.parker@toktickit.test', name: 'Peter Parker', home: '/tickets' },
-  staff: { email: 'sarah.chen@toktickit.test', name: 'Sarah Chen', home: '/staff/tickets' },
-  colleague: { email: 'marcus.reed@toktickit.test', name: 'Marcus Reed', home: '/staff/tickets' },
-  admin: { email: 'alex.morgan@toktickit.test', name: 'Alex Morgan', home: '/admin/users' },
+  requester: { email: 'peter.parker@toktickit.test', name: 'Peter Parker', home: '/tickets', landing: '/dashboard' },
+  staff: { email: 'sarah.chen@toktickit.test', name: 'Sarah Chen', home: '/staff/tickets', landing: '/staff/dashboard' },
+  colleague: { email: 'marcus.reed@toktickit.test', name: 'Marcus Reed', home: '/staff/tickets', landing: '/staff/dashboard' },
+  admin: { email: 'alex.morgan@toktickit.test', name: 'Alex Morgan', home: '/admin/users', landing: '/staff/dashboard' },
 } as const
 
 export type Role = keyof typeof ACCOUNTS

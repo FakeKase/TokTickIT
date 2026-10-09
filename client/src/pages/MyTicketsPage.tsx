@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchCategories, fetchTickets } from '../api'
 import type {
   Category,
   RequestedPriority,
+  StatusFilter,
   TicketListParams,
   TicketListResponse,
+  TicketSortField,
+  TicketStatus,
 } from '../api'
 import { Badge } from '../components/Badge'
 import type { BadgeTone } from '../components/Badge'
@@ -16,16 +19,24 @@ import { EmptyState } from '../components/EmptyState'
 import { ErrorState } from '../components/ErrorState'
 import { Field } from '../components/Field'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { STATUS_LABEL } from '../components/ticketLabels'
 import { useAuth } from '../auth/useAuth'
 import './MyTicketsPage.css'
 
 type Filters = {
   search: string
+  status: StatusFilter | ''
   categoryId: string
   requestedPriority: RequestedPriority | ''
 }
 
-const NO_FILTERS: Filters = { search: '', categoryId: '', requestedPriority: '' }
+const NO_FILTERS: Filters = { search: '', status: '', categoryId: '', requestedPriority: '' }
+
+const STATUSES = Object.keys(STATUS_LABEL) as TicketStatus[]
+/** A status, or every active one (Lab 4 BR-22): what the dashboard's Open
+ *  Tickets card links to. */
+const STATUS_FILTERS: StatusFilter[] = ['ACTIVE', ...STATUSES]
+const PRIORITIES: RequestedPriority[] = ['LOW', 'MEDIUM', 'HIGH']
 
 const PRIORITY_TONE: Record<RequestedPriority, BadgeTone> = {
   LOW: 'pale',
@@ -39,14 +50,68 @@ const PRIORITY_LABEL: Record<RequestedPriority, string> = {
   HIGH: 'High',
 }
 
-const SORT_COLUMNS = [
+const SORTS: { field: TicketSortField; label: string }[] = [
   { field: 'ticketNumber', label: 'Ticket No.' },
   { field: 'createdAt', label: 'Created Date' },
   { field: 'requestedPriority', label: 'Requested Priority' },
   { field: 'currentStatus', label: 'Current Status' },
-] as const
+  { field: 'updatedAt', label: 'Last Updated' },
+]
 
-type SortField = TicketListParams['sortBy']
+/** What the list is showing: the filters in force, the order and the page. */
+interface View extends Filters {
+  sortBy: TicketSortField
+  sortDir: 'asc' | 'desc'
+  page: number
+}
+
+const DEFAULT_VIEW: View = { ...NO_FILTERS, sortBy: 'createdAt', sortDir: 'desc', page: 1 }
+
+const pick = <T extends string>(allowed: readonly T[], raw: string | null): T | '' =>
+  (allowed as readonly string[]).includes(raw ?? '') ? (raw as T) : ''
+
+/**
+ * The view, read out of the address bar, as the Ticket Queue reads its own
+ * (Lab 4 ui-spec.md §5).
+ *
+ * The URL is the state and not a copy of it, so a dashboard card can link to
+ * a filtered list, and a reload or the Back button shows the list that was
+ * left. Anything unrecognised falls back to its default, which is what the
+ * API does with it too: a stale or hand-edited link still shows the Tickets.
+ */
+function readView(params: URLSearchParams): View {
+  const page = Number(params.get('page'))
+
+  return {
+    search: params.get('search')?.trim() ?? '',
+    status: pick(STATUS_FILTERS, params.get('status')),
+    categoryId: /^[1-9]\d*$/.test(params.get('categoryId') ?? '') ? params.get('categoryId')! : '',
+    requestedPriority: pick(PRIORITIES, params.get('requestedPriority')),
+    sortBy:
+      pick(
+        SORTS.map((sort) => sort.field),
+        params.get('sortBy'),
+      ) || DEFAULT_VIEW.sortBy,
+    sortDir: params.get('sortDir') === 'asc' ? 'asc' : 'desc',
+    page: Number.isInteger(page) && page >= 1 ? page : 1,
+  }
+}
+
+/** Defaults are left out, so the plain list is `/tickets`. */
+function writeView(view: View): URLSearchParams {
+  const params = new URLSearchParams()
+  for (const key of Object.keys(view) as (keyof View)[]) {
+    if (view[key] !== DEFAULT_VIEW[key]) params.set(key, String(view[key]))
+  }
+  return params
+}
+
+const filtersOf = ({ search, status, categoryId, requestedPriority }: View): Filters => ({
+  search,
+  status,
+  categoryId,
+  requestedPriority,
+})
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -67,15 +132,20 @@ export function MyTicketsPage() {
   const { user: requester } = useAuth()
   const navigate = useNavigate()
 
+  const [params, setParams] = useSearchParams()
+  const view = useMemo(() => readView(params), [params])
+  const { sortBy, sortDir } = view
+
   const [categories, setCategories] = useState<Category[]>([])
-  // `filters` is what the user has typed; `applied` is what the last request
-  // used. Keeping them apart stops a half-typed search from firing a request
-  // and lets Clear Filters reset both in one go.
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS)
-  const [applied, setApplied] = useState<Filters>(NO_FILTERS)
-  const [sortBy, setSortBy] = useState<SortField>('createdAt')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-  const [page, setPage] = useState(1)
+  // `filters` is what the user has chosen in the toolbar; the URL holds what
+  // the last request used. Keeping them apart stops a half-typed search from
+  // firing a request. They are brought back together whenever the URL's own
+  // filters change: on arrival from a dashboard card, on Back, on Clear.
+  const [filters, setFilters] = useState<Filters>(() => filtersOf(view))
+  const appliedKey = JSON.stringify(filtersOf(view))
+  useEffect(() => {
+    setFilters(JSON.parse(appliedKey) as Filters)
+  }, [appliedKey])
 
   const [response, setResponse] = useState<TicketListResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -83,40 +153,52 @@ export function MyTicketsPage() {
 
   const signedInUserId = requester?.id
 
-  const load = useCallback(async () => {
-    if (!signedInUserId) return
-    setLoading(true)
-    setFailed(false)
-    try {
-      setResponse(
-        await fetchTickets({
-          search: applied.search || undefined,
-          categoryId: applied.categoryId ? Number(applied.categoryId) : undefined,
-          requestedPriority: applied.requestedPriority || undefined,
-          sortBy,
-          sortDir,
-          page,
-        }),
-      )
-    } catch {
-      setFailed(true)
-      setResponse(null)
-    } finally {
-      setLoading(false)
+  /** Any change to what is being looked at goes back to page 1; only paging
+   *  itself keeps the page. */
+  const change = useCallback(
+    (patch: Partial<View>) => {
+      setParams(writeView({ ...view, page: 1, ...patch }), { replace: true })
+    },
+    [view, setParams],
+  )
+
+  const load = useCallback(
+    async (isCurrent: () => boolean = () => true) => {
+      if (!signedInUserId) return
+      setLoading(true)
+      setFailed(false)
+      try {
+        const request: TicketListParams = {
+          search: view.search || undefined,
+          status: view.status || undefined,
+          categoryId: view.categoryId ? Number(view.categoryId) : undefined,
+          requestedPriority: view.requestedPriority || undefined,
+          sortBy: view.sortBy,
+          sortDir: view.sortDir,
+          page: view.page,
+        }
+        const loaded = await fetchTickets(request)
+        if (isCurrent()) setResponse(loaded)
+      } catch {
+        if (!isCurrent()) return
+        setFailed(true)
+        setResponse(null)
+      } finally {
+        if (isCurrent()) setLoading(false)
+      }
+    },
+    [signedInUserId, view],
+  )
+
+  useEffect(() => {
+    // Sorting applies as it changes, so two requests can be out at once. Only
+    // the newest may land.
+    let current = true
+    void load(() => current)
+    return () => {
+      current = false
     }
-  }, [signedInUserId, applied, sortBy, sortDir, page])
-
-  useEffect(() => {
-    void load()
   }, [load])
-
-  // AC-12/BR-05: switching Requester must not leave the previous one's page
-  // number or filters in place.
-  useEffect(() => {
-    setFilters(NO_FILTERS)
-    setApplied(NO_FILTERS)
-    setPage(1)
-  }, [signedInUserId])
 
   useEffect(() => {
     fetchCategories()
@@ -126,25 +208,36 @@ export function MyTicketsPage() {
 
   function applyFilters(event: React.FormEvent) {
     event.preventDefault()
-    setApplied(filters)
-    setPage(1)
+    change({ ...filters, search: filters.search.trim() })
   }
 
   function clearFilters() {
+    // Emptied here as well as through the URL: something chosen but never
+    // applied is not in the URL, so nothing there would change to clear it.
     setFilters(NO_FILTERS)
-    setApplied(NO_FILTERS)
-    setPage(1)
+    change(NO_FILTERS)
   }
 
-  function toggleSort(field: NonNullable<SortField>) {
-    if (sortBy === field) {
-      setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortBy(field)
-      setSortDir('desc')
-    }
-    setPage(1)
+  function toggleSort(field: TicketSortField) {
+    change(
+      sortBy === field
+        ? { sortDir: sortDir === 'asc' ? 'desc' : 'asc' }
+        : { sortBy: field, sortDir: 'desc' },
+    )
   }
+
+  const sortHeader = (field: TicketSortField) => (
+    <th
+      key={field}
+      scope="col"
+      aria-sort={sortBy === field ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button type="button" onClick={() => toggleSort(field)}>
+        {SORTS.find((sort) => sort.field === field)!.label}
+        {sortBy === field && <span aria-hidden="true">{sortDir === 'asc' ? ' ▲' : ' ▼'}</span>}
+      </button>
+    </th>
+  )
 
   if (!requester) return null
 
@@ -156,7 +249,16 @@ export function MyTicketsPage() {
   return (
     <div className="ttk-my-tickets">
       <div className="ttk-my-tickets__head">
-        <h2>My Tickets</h2>
+        <div className="ttk-my-tickets__title">
+          <h2>My Tickets</h2>
+          {/* The number a dashboard card showed, so the two can be compared
+              at a glance (Lab 4 AC-37). */}
+          {!loading && pagination && pagination.totalItems > 0 && (
+            <p className="ttk-my-tickets__count" data-testid="list-total">
+              {pagination.totalItems} {pagination.totalItems === 1 ? 'Ticket' : 'Tickets'}
+            </p>
+          )}
+        </div>
         <Button onClick={() => navigate('/tickets/new')}>Create Ticket</Button>
       </div>
 
@@ -174,6 +276,26 @@ export function MyTicketsPage() {
                 value={filters.search}
                 onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
               />
+            )}
+          </Field>
+
+          <Field id="filter-status" label="Status">
+            {(attrs) => (
+              <select
+                {...attrs}
+                value={filters.status}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, status: e.target.value as StatusFilter | '' }))
+                }
+              >
+                <option value="">All Statuses</option>
+                <option value="ACTIVE">Active</option>
+                {STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {STATUS_LABEL[status]}
+                  </option>
+                ))}
+              </select>
             )}
           </Field>
 
@@ -224,12 +346,9 @@ export function MyTicketsPage() {
                 <select
                   {...attrs}
                   value={sortBy}
-                  onChange={(e) => {
-                    setSortBy(e.target.value as NonNullable<SortField>)
-                    setPage(1)
-                  }}
+                  onChange={(e) => change({ sortBy: e.target.value as TicketSortField })}
                 >
-                  {SORT_COLUMNS.map((column) => (
+                  {SORTS.map((column) => (
                     <option key={column.field} value={column.field}>
                       {column.label}
                     </option>
@@ -239,10 +358,7 @@ export function MyTicketsPage() {
             </Field>
             <Button
               variant="secondary"
-              onClick={() => {
-                setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))
-                setPage(1)
-              }}
+              onClick={() => change({ sortDir: sortDir === 'asc' ? 'desc' : 'asc' })}
             >
               {sortDir === 'asc' ? 'Ascending' : 'Descending'}
             </Button>
@@ -298,29 +414,13 @@ export function MyTicketsPage() {
             </caption>
             <thead>
               <tr>
-                {SORT_COLUMNS.map((column) => (
-                  <th
-                    key={column.field}
-                    scope="col"
-                    aria-sort={
-                      sortBy === column.field
-                        ? sortDir === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    <button type="button" onClick={() => toggleSort(column.field)}>
-                      {column.label}
-                      {sortBy === column.field && (
-                        <span aria-hidden="true">{sortDir === 'asc' ? ' ▲' : ' ▼'}</span>
-                      )}
-                    </button>
-                  </th>
-                ))}
+                {sortHeader('ticketNumber')}
+                {sortHeader('createdAt')}
+                {sortHeader('requestedPriority')}
+                {sortHeader('currentStatus')}
                 <th scope="col">Summary</th>
                 <th scope="col">Category</th>
-                <th scope="col">Last Updated</th>
+                {sortHeader('updatedAt')}
               </tr>
             </thead>
             <tbody>
@@ -371,7 +471,7 @@ export function MyTicketsPage() {
             <nav className="ttk-my-tickets__pagination" aria-label="Ticket list pages">
               <Button
                 variant="secondary"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                onClick={() => change({ page: Math.max(1, pagination.page - 1) })}
                 disabled={pagination.page <= 1}
               >
                 Previous
@@ -384,7 +484,7 @@ export function MyTicketsPage() {
               </span>
               <Button
                 variant="secondary"
-                onClick={() => setPage((p) => p + 1)}
+                onClick={() => change({ page: pagination.page + 1 })}
                 disabled={pagination.page >= pagination.totalPages}
               >
                 Next

@@ -144,6 +144,14 @@ export function ActionsTaken({
   const viewLabel = (action: ActionTaken) =>
     `View the Action Taken by ${action.performedBy.name} on ${formatAbsolute(action.actionAt)}`
 
+  // A link from the dashboard names this area (`#actions-taken`). The browser
+  // only scrolls to a fragment that exists when the page loads, and this one
+  // is drawn after the Ticket arrives, so it is brought into view here.
+  useEffect(() => {
+    if (window.location.hash !== '#actions-taken') return
+    document.getElementById('actions-taken')?.scrollIntoView?.()
+  }, [])
+
   return (
     <Card id="actions-taken" className="ttk-actions">
       <div className="ttk-actions__head">

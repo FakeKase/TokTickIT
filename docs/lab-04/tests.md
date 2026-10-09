@@ -40,7 +40,7 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | UNIT-02 | Unit | BR-12, BR-13, BR-14, AC-18, AC-19, AC-20, AC-22 | Transition matrix and resolution gate helper | Every cell of §5.2 against a table written out by hand; the gate refuses no owner, then no Action Taken, then a latest action requiring follow-up, in that order, with the three documented sentences; Closed needs an owner and not the gate; `blockedReason` is null exactly when the move would be accepted | `server/tests/lab-04/resolution-gate.unit.test.ts` | Planned |
 | UNIT-03 | Unit | BR-25, AC-34, AC-38 | Bangkok day boundaries | At 16:59:59.999Z "today" began at 17:00Z the day before; at 17:00:00.000Z it began at that instant; the 7-day window starts six Bangkok days before today; no dependence on the machine's time zone | `server/tests/lab-04/bangkok-day.unit.test.ts` | Planned |
 | UNIT-04 | Unit | BR-22, AC-39 | List query parsers | `status=ACTIVE` expands to the five active statuses on both lists; a single status still works; an unknown status is dropped and does not mark the list filtered; My Tickets accepts `sortBy=updatedAt`; the Lab 2 and Lab 3 defaults are unchanged | `server/tests/lab-04/ticket-query.unit.test.ts` | Planned |
-| UNIT-05 | Unit | BR-05, BR-06, BR-07, AC-07, AC-09 | Client-side Action Taken form validation | The same limits as UNIT-01, with the message attached to the right field; the prefilled time for a Ticket created earlier in the same minute passes; a hidden Follow-up Note is not validated and not sent | `client/tests/lab-04/actionValidation.test.ts` | Planned |
+| UNIT-05 | Unit | BR-05, BR-06, BR-07, AC-07, AC-09 | Client-side Action Taken form validation | The same limits as UNIT-01, with the message attached to the right field; the prefilled time for a Ticket created earlier in the same minute passes; a hidden Follow-up Note is not validated and not sent | `client/tests/lab-04/actionValidation.test.ts` | Pass |
 | UNIT-06 | Unit | FR-02, FR-03, BR-17, BR-20 | Client calls for Actions Taken | The create call sends the request key and the six entered fields and no performer; the edit call sends `expectedVersion`; a refusal reaches the caller with its field messages, its conflict code and, for a stale edit, the current row; a non-JSON error body still reports the status | `client/tests/lab-04/actionsApi.test.ts` | Pass |
 
 ### API - Actions Taken
@@ -116,16 +116,16 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| UI-01 | UI | FR-01, AC-03 | Actions Taken list | Rows in the order served, with all list columns, the worded follow-up badge, the count line and "Edited by" on an edited row | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-02 | UI | FR-17 | Section states | Loading, the empty line, and a failure with a retry that reloads only this section | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-03 | UI | FR-04, AC-03 | Requester view | Every Action Taken and the view dialog with all fields; no Add and no Edit control; the Requester subtitle | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-04 | UI | FR-02, AC-01 | Create | Action Date/Time prefilled; Follow-up Note appears only when the box is checked; the request carries a request key and the six fields and no performer; the list reloads and the save is announced | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-05 | UI | AC-07, AC-09 | Validation placement | Each message sits under its own field and is referenced by `aria-describedby`; the first invalid field takes focus; a server `fields` map is shown the same way | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-06 | UI | BR-30, AC-42 | Repeated click | Save is disabled and busy while the request is in flight, and a second click sends nothing | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-07 | UI | BR-20, BR-31, AC-13, AC-43 | Failure keeps the form | After a network failure and after a `500` the dialog is open with every value intact, and the retry carries the same request key | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-08 | UI | FR-03, AC-11 | View and edit | View shows read-only text; Edit fills the form, shows Performed by as read-only text, and sends `expectedVersion` | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-09 | UI | BR-17, AC-12 | Stale edit | The alert names who changed it and the typed text remains; "Save my version" resends with the current version; "Discard my changes" loads the current values | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
-| UI-10 | UI | BR-08, AC-14 | Finished Ticket | On Resolved, Closed and Cancelled there is no Add or Edit and the "Reopen it to record more work" line is shown | `client/tests/lab-04/ActionsTaken.test.tsx` | Planned |
+| UI-01 | UI | FR-01, AC-03 | Actions Taken list | Rows in the order served, with all list columns, the worded follow-up badge, the count line and "Edited by" on an edited row | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-02 | UI | FR-17 | Section states | Loading, the empty line, and a failure with a retry that reloads only this section | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-03 | UI | FR-04, AC-03 | Requester view | Every Action Taken and the view dialog with all fields; no Add and no Edit control; the Requester subtitle | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-04 | UI | FR-02, AC-01 | Create | Action Date/Time prefilled; Follow-up Note appears only when the box is checked; the request carries a request key and the six fields and no performer; the list reloads and the save is announced | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-05 | UI | AC-07, AC-09 | Validation placement | Each message sits under its own field and is referenced by `aria-describedby`; the first invalid field takes focus; a server `fields` map is shown the same way | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-06 | UI | BR-30, AC-42 | Repeated click | Save is disabled and busy while the request is in flight, and a second click sends nothing | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-07 | UI | BR-20, BR-31, AC-13, AC-43 | Failure keeps the form | After a network failure and after a `500` the dialog is open with every value intact, and the retry carries the same request key | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-08 | UI | FR-03, AC-11 | View and edit | View shows read-only text; Edit fills the form, shows Performed by as read-only text, and sends `expectedVersion` | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-09 | UI | BR-17, AC-12 | Stale edit | The alert names who changed it and the typed text remains; "Save my version" resends with the current version; "Discard my changes" loads the current values | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
+| UI-10 | UI | BR-08, AC-14 | Finished Ticket | On Resolved, Closed and Cancelled there is no Add or Edit and the "Reopen it to record more work" line is shown | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 | UI-11 | UI | FR-08, AC-27 | Permitted and blocked moves | `Move to` holds exactly the served transitions; a blocked one is disabled and its server reason is visible as text | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
 | UI-12 | UI | AC-27 | Gate clears without reload | After an Action Taken is saved the Ticket is fetched again and Resolved becomes selectable | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
 | UI-13 | UI | BR-16, AC-28 | Successful change | Status, owner and priority requests carry the Ticket's version; afterwards the summary badge shows the new status and the change is announced | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
@@ -156,8 +156,8 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | RESP-04 | Accessibility | AC-49 | Keyboard and focus | Every control reached by Tab on both dashboards and in the Actions Taken area shows a focus ring; the dialog traps focus and returns it to its trigger | `e2e/lab-04/visual-regression.spec.ts` | Planned |
 | RESP-05 | Accessibility | AC-49 | Non-colour cues | The follow-up badge and the blocked-move reason carry text; status, IT Priority and follow-up badges differ by computed colour and each label has at least 4.5:1 contrast in both themes | `e2e/lab-04/visual-regression.spec.ts` | Planned |
 | RESP-06 | Responsive | AC-48 | Table and cards | The Actions Taken table is shown at 768px and above and the cards below it, never both | `e2e/lab-04/visual-regression.spec.ts` | Planned |
-| E2E-01 | E2E | AC-01, AC-10, AC-11, AC-42 | Actions Taken flow | IT Staff sign in, open a Ticket a colleague owns, record an Action Taken with follow-up, and see it under their own name; a second staff user records another and edits the first; both names and the edit mark are shown; a double click on Save creates one row | `e2e/lab-04/actions-taken-flow.spec.ts` | Planned |
-| E2E-02 | E2E | AC-03, AC-04 | Requester sees the work | The owning Requester opens the same Ticket, sees every Action Taken with all fields and no way to add or edit, sees no Internal Note, and is refused by the API when creating one directly | `e2e/lab-04/actions-taken-flow.spec.ts` | Planned |
+| E2E-01 | E2E | AC-01, AC-10, AC-11, AC-42 | Actions Taken flow | IT Staff sign in, open a Ticket a colleague owns, record an Action Taken with follow-up, and see it under their own name; a second staff user records another and edits the first; both names and the edit mark are shown; a double click on Save creates one row | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
+| E2E-02 | E2E | AC-03, AC-04 | Requester sees the work | The owning Requester opens the same Ticket, sees every Action Taken with all fields and no way to add or edit, sees no Internal Note, and is refused by the API when creating one directly | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
 | E2E-03 | E2E | AC-19, AC-20, AC-21, AC-27, AC-28 | Resolution | On an owned Ticket with no Action Taken, Resolved is disabled with its reason; after an action requiring follow-up the reason changes; after a later action without follow-up Resolved is chosen, the summary badge reads Resolved and Add Action Taken is gone | `e2e/lab-04/ticket-resolution.spec.ts` | Planned |
 | E2E-04 | E2E | AC-25, AC-29 | Stale change | Two staff users hold the same Ticket open; one changes IT Priority; the other's status change is refused with the conflict message and their screen shows the reloaded Ticket | `e2e/lab-04/ticket-resolution.spec.ts` | Planned |
 | E2E-05 | E2E | AC-33, AC-37, AC-40 | Staff dashboard | IT Staff land on the Dashboard after login; each card's number equals the total the queue shows after following it, with the filter visible in the queue's controls; a status row and a recent-action row open the right place | `e2e/lab-04/dashboards.spec.ts` | Planned |
@@ -281,6 +281,19 @@ Ticket's `updatedAt`, breaking the tie in the list order the other way, answerin
 different user, and dropping the row lock. Each made exactly one test fail, and the file passed
 again once it was put back.
 
+**#68, Actions Taken on Ticket Detail.** UNIT-05, UI-01 to UI-10, E2E-01 and E2E-02 are Pass.
+
+| Suite | Result |
+| :-- | :-- |
+| Client | 20 files, 318 tests, all passed |
+| `npm run e2e:fresh` | 93 passed |
+| Server, on the database `npm run e2e:fresh` builds | 25 files, 472 tests, all passed |
+| Type checks (`server/`, `client/`, root), client lint and build | Clean |
+
+One Lab 2 test changed on purpose and is listed in §7. Four Lab 3 tests failed at first because the
+page had gained a second announcement region; the fix was in the screen, not in those tests: the
+Actions Taken area announces through the region the page already has.
+
 MIG-02 does not run on the development database. It builds one of its own from the migrations,
 seeds it twice and compares the rows, because "the counts did not change" is only a statement
 about the seed when nothing else is in the database.
@@ -301,6 +314,7 @@ Any other change to a Lab 1 to Lab 3 test is a regression and is treated as one.
 | `client/tests/lab-03/StaffTicketDetail.test.tsx` | Fixtures gain `version` and `blockedReason`; request bodies gain `expectedVersion` | #69 |
 | `e2e/lab-03/staff-ticket-flow.spec.ts`, `e2e/lab-03/submission-evidence.spec.ts` | The flow records an Action Taken before resolving | #69 |
 | `server/tests/lab-02/my-tickets.api.test.ts`, `server/tests/lab-03/staff-queue.unit.test.ts` | Only if an assertion lists the accepted sort keys or statuses exhaustively; the defaults themselves do not change | #70 |
+| `client/tests/lab-02/RequesterTicketDetail.test.tsx` | It asserted that the Requester's Ticket Detail shows no Actions Taken, which was true while they were out of scope. FR-04 puts them there read-only, so the test now asserts that the area is present and offers no way to add or edit. Its mock also answers the new endpoint | #68 |
 | `client/tests/lab-01/UI-01` to `UI-03` | The page they render moves from `/` to `/system-status`, is opened as an Administrator, and no longer has "Submit Request" | #71 |
 | `client/tests/lab-02/AppShellNav.test.tsx`, `client/tests/lab-03/AppShellAuth.test.tsx`, `client/tests/lab-03/Login.test.tsx` | Dashboard joins each role's navigation and becomes the landing route | #71 |
 | `client/tests/lab-02/MyTickets.test.tsx` | Filters, sort and page move into the URL, and a Status filter is added | #71 |

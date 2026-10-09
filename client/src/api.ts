@@ -658,7 +658,14 @@ export async function fetchActions(ticketId: number): Promise<ActionTaken[]> {
     throw await readError(response, 'Unable to load the Actions Taken')
   }
 
-  return (await response.json()) as ActionTaken[]
+  // Anything but a list is a failure to load, said here once so the screen
+  // can show its retry state. Left unchecked, a body of some other shape
+  // would only fail later, inside the render, and take the page down with it.
+  const actions: unknown = await response.json()
+  if (!Array.isArray(actions)) {
+    throw new ApiError(response.status, 'Unable to load the Actions Taken')
+  }
+  return actions as ActionTaken[]
 }
 
 /**

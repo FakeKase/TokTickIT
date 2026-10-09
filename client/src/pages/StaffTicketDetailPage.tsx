@@ -19,6 +19,7 @@ import type {
 } from '../api'
 import { landingPathFor } from '../auth/landing'
 import { useAuth } from '../auth/useAuth'
+import { ActionsTaken } from '../components/ActionsTaken'
 import { Button } from '../components/Button'
 import { Card } from '../components/Card'
 import { CommentThread } from '../components/CommentThread'
@@ -551,6 +552,20 @@ export function StaffTicketDetailPage() {
               </ul>
             )}
           </Card>
+
+          {/* What was done, then what was said (Lab 4 ui-spec.md §6). A save
+              reloads the Ticket quietly: recording work moves its Last
+              Updated, and from the next Issue on it decides whether Resolved
+              is on offer. */}
+          <ActionsTaken
+            ticketId={ticket.id}
+            ticketStatus={ticket.currentStatus}
+            ticketCreatedAt={ticket.createdAt}
+            canWrite
+            currentUserName={user.name}
+            onTicketChanged={() => void loadTicket(undefined, true)}
+            onAnnounce={setAnnouncement}
+          />
 
           <CommentThread
             ticketId={ticket.id}

@@ -4,6 +4,7 @@ import { ApiError, fetchComments, fetchTicket } from '../api'
 import type { RequestedPriority, TicketComment, TicketDetail } from '../api'
 import { Badge } from '../components/Badge'
 import type { BadgeTone } from '../components/Badge'
+import { ActionsTaken } from '../components/ActionsTaken'
 import { AttachmentSection } from '../components/AttachmentSection'
 import { CommentThread } from '../components/CommentThread'
 import { ResolvedSignal } from '../components/ResolvedSignal'
@@ -221,6 +222,16 @@ export function TicketDetailPage() {
             ticketId={ticket.id}
             attachments={ticket.attachments}
             onChange={(attachments) => setTicket({ ...ticket, attachments })}
+          />
+
+          {/* Read-only here: every Action Taken and every field of it, and no
+              control to add or change one (Lab 4 FR-04). */}
+          <ActionsTaken
+            ticketId={ticket.id}
+            ticketStatus={ticket.currentStatus}
+            ticketCreatedAt={ticket.createdAt}
+            canWrite={false}
+            currentUserName={requester.name}
           />
 
           <ResolvedSignal

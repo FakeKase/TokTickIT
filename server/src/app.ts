@@ -41,6 +41,8 @@ import {
   type TicketStatusValue,
   parseStaffQueueQuery,
   parseTicketQuery,
+  requesterTicketWhere,
+  staffTicketWhere,
 } from "./lib/ticket-query.js";
 import {
   ROLES,
@@ -64,6 +66,7 @@ import {
   resolveTicketFor,
 } from "./lib/ticket-access.js";
 import { registerActionsTaken } from "./routes/actions-taken.js";
+import { registerDashboards } from "./routes/dashboard.js";
 import {
   ALLOWED_TYPES_LABEL,
   MAX_ACTIVE_ATTACHMENTS,
@@ -122,7 +125,16 @@ function allowedOrigins() {
     .filter(Boolean);
 }
 
-export function createApp(prisma = createPrismaClient()) {
+export interface AppOptions {
+  /** The clock the dashboards read "today" from. Tests fix it; nothing else
+   *  should need to. */
+  now?: () => Date;
+}
+
+export function createApp(
+  prisma = createPrismaClient(),
+  { now = () => new Date() }: AppOptions = {},
+) {
   const app = express();
 
   // credentials: true is what lets the browser send the session cookie at all.
@@ -390,33 +402,9 @@ export function createApp(prisma = createPrismaClient()) {
 
     const query = parseTicketQuery(req.query as Record<string, unknown>);
 
-    const where = {
-      requesterId,
-      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
-      ...(query.requestedPriority
-        ? { requestedPriority: query.requestedPriority }
-        : {}),
-      // BR-09: matches Ticket Number or Summary. Nested under AND with
-      // requesterId above, so the OR can never widen past the owner.
-      ...(query.search
-        ? {
-            OR: [
-              {
-                ticketNumber: {
-                  contains: query.search,
-                  mode: "insensitive" as const,
-                },
-              },
-              {
-                summary: {
-                  contains: query.search,
-                  mode: "insensitive" as const,
-                },
-              },
-            ],
-          }
-        : {}),
-    };
+    // Ownership is a WHERE clause inside the builder, never a post-filter.
+    // The Requester Dashboard counts through the same builder (Lab 4 BR-24).
+    const where = requesterTicketWhere(requesterId, query);
 
     try {
       const [totalItems, rows] = await Promise.all([
@@ -759,6 +747,9 @@ export function createApp(prisma = createPrismaClient()) {
   // Lab 4: Actions Taken, in their own file (docs/lab-04/api-spec.md §1 to §3).
   registerActionsTaken(app, { prisma, asAnyUser, asStaff });
 
+  // Lab 4: both dashboards (docs/lab-04/api-spec.md §8 and §9).
+  registerDashboards(app, { prisma, asRequester, asStaff, now });
+
   // api-spec.md §8 (FR-13, BR-30, BR-31). Every Ticket in the system: there is
   // no ownership clause here, which is exactly why the role guard above is the
   // whole of the access control and a Requester must never reach this handler
@@ -769,38 +760,8 @@ export function createApp(prisma = createPrismaClient()) {
     async (req: AuthenticatedRequest, res) => {
       const query = parseStaffQueueQuery(req.query as Record<string, unknown>);
 
-      const where = {
-        ...(query.status ? { currentStatus: query.status } : {}),
-        ...(query.itPriority ? { itPriority: query.itPriority } : {}),
-        ...(query.categoryId ? { categoryId: query.categoryId } : {}),
-        // `me` is resolved from the session, never from the query string: the
-        // filter means "mine" for whoever is asking.
-        ...(query.owner === "me"
-          ? { ownerId: req.auth!.user.id }
-          : query.owner === "unassigned"
-            ? { ownerId: null }
-            : query.owner !== undefined
-              ? { ownerId: query.owner }
-              : {}),
-        ...(query.search
-          ? {
-              OR: [
-                {
-                  ticketNumber: {
-                    contains: query.search,
-                    mode: "insensitive" as const,
-                  },
-                },
-                {
-                  summary: {
-                    contains: query.search,
-                    mode: "insensitive" as const,
-                  },
-                },
-              ],
-            }
-          : {}),
-      };
+      // The IT Staff Dashboard counts through the same builder (Lab 4 BR-24).
+      const where = staffTicketWhere(req.auth!.user.id, query);
 
       try {
         // Counted first, not alongside, because the page depends on it. A

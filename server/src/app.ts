@@ -1344,6 +1344,26 @@ export function createApp(prisma = createPrismaClient()) {
 
     try {
       const outcome = await prisma.$transaction(async (tx) => {
+        // First, the Tickets this edit may hand back: every live Ticket the
+        // user owns, locked in id order, before any User row is.
+        //
+        // The order is the point. A change of Ticket Owner locks the Ticket
+        // and then reads the User it names (Lab 4, `workflowChange`). If this
+        // route locked the User and only then reached for their Tickets, the
+        // two would each hold what the other was waiting for whenever the
+        // user named was the one being deactivated here; Postgres would kill
+        // one of them and that request would end in a 500. Ticket first,
+        // then User, in both routes, and there is no cycle to form.
+        //
+        // A Ticket assigned to this user after this statement is not in the
+        // set, and does not need to be: that assignment holds a share lock
+        // on the User row until it commits, the lock below waits for it, and
+        // the unassign further down then finds the Ticket.
+        await tx.$queryRaw`SELECT "id" FROM "Ticket"
+          WHERE "ownerId" = ${id}
+            AND "currentStatus"::text = ANY(${[...LIVE_STATUSES]}::text[])
+          ORDER BY "id" FOR NO KEY UPDATE`;
+
         // One statement locks the user being edited and every active
         // Administrator, in id order.
         //

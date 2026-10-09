@@ -685,6 +685,42 @@ describe("API-28 what moves the version, and what does not (BR-16)", () => {
   });
 });
 
+describe("API-28 an owner change racing the deactivation of that owner", () => {
+  it("never answers either request with a 500, in 40 runs", async () => {
+    // The owner route locks the Ticket and then reads the User. Deactivation
+    // locks the User and then unassigns their Tickets. Taken in opposite
+    // orders those two deadlock, Postgres kills one, and that route answers
+    // 500. The case that reaches it is an owner request naming the user who
+    // already owns the Ticket, while that user is being deactivated.
+    const owner = await prisma.user.create({
+      data: fixtureUser({ name: `racer ${TAG}`, email: email(`racer-${Date.now()}`), role: "IT_STAFF" }),
+    });
+    const outcomes = new Set<string>();
+
+    for (let run = 0; run < 40; run++) {
+      await prisma.user.update({ where: { id: owner.id }, data: { isActive: true } });
+      const before = await reset({ ownerId: owner.id });
+
+      const [assign, deactivate] = await Promise.all([
+        patch("owner", { ownerId: owner.id, expectedVersion: before.version }, colleagueCookie),
+        request(app).patch(`/api/users/${owner.id}`).set("Cookie", adminCookie).send({ isActive: false }),
+      ]);
+
+      expect([run, assign.status]).not.toEqual([run, 500]);
+      expect([run, deactivate.status]).toEqual([run, 200]);
+      outcomes.add(`${assign.status}`);
+
+      // Whichever came first, the rule holds afterwards: a deactivated user
+      // owns no live Ticket (Lab 3 BR-19).
+      expect((await row()).ownerId).toBeNull();
+    }
+
+    // The owner request is refused one of two ways, and never accepted in a
+    // way that leaves the Ticket with its deactivated owner.
+    for (const status of outcomes) expect(["200", "409"]).toContain(status);
+  }, 60_000);
+});
+
 describe("API-29 resolving while a colleague records a follow-up (BR-13, AC-20)", () => {
   it("never leaves a Resolved Ticket whose latest Action Taken asks for follow-up, in 20 runs", async () => {
     const outcomes = new Set<string>();

@@ -299,8 +299,8 @@ UI-15, E2E-03 and E2E-04 are Pass.
 
 | Suite | Result |
 | :-- | :-- |
-| Server, on the database `npm run e2e:fresh` builds | 27 files, 589 tests, all passed, 31 runs in a row |
-| Server, on the development database | 588 of 589, the same Daniel Okafor case as above |
+| Server, on the database `npm run e2e:fresh` builds | 27 files, 590 tests, all passed |
+| Server, on the development database | 589 of 590, the same Daniel Okafor case as above |
 | Client | 21 files, 333 tests, all passed |
 | `npm run e2e:fresh` | 95 passed |
 | `npm run db:migration-check` | Passed |
@@ -312,6 +312,12 @@ the oldest action in place of the latest, no version rise when deactivation unas
 closing. Each made between one and six tests fail.
 
 This Issue also found and fixed the cause of the one-off server failures recorded in §8.
+
+Review found a deadlock this Issue introduced: an owner change naming the user who already owns the
+Ticket, racing that user's deactivation, ended one of the two requests in a `500`. The owner route
+had started locking the Ticket before the User while deactivation locked the User before the
+Tickets. Deactivation now locks the Tickets first. The race is a test under API-28, 40 runs, and
+it failed on its first run before the fix.
 
 MIG-02 does not run on the development database. It builds one of its own from the migrations,
 seeds it twice and compares the rows, because "the counts did not change" is only a statement

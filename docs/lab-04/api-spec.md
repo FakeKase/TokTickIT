@@ -305,6 +305,9 @@ The IT Staff Dashboard (FR-10, FR-11). No parameters.
 Neither dashboard returns a description, a comment, a note, an attachment or an email address
 (BR-28). The only Action Taken text either carries is the 120-character preview above.
 
+Each dashboard is read in one `REPEATABLE READ` transaction, so every number and list in a response
+describes the database at the same moment. Parameters on either endpoint are ignored.
+
 ## 10. Safe failure and retry
 
 - Any unexpected failure in a Lab 4 route is `500 { "error": "<what could not be done>" }`, for

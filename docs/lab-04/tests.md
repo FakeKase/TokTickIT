@@ -38,8 +38,8 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | --- | --- | --- | --- | --- | --- | --- |
 | UNIT-01 | Unit | BR-05, BR-06, BR-07, AC-07, AC-08, AC-09 | Action Taken validation | Description 1 to 2000 and Result 1 to 1000 after trimming, both ends inclusive; Attachment Notes optional, at most 500, empty becomes null; Follow-up Note required only when follow-up is required and null otherwise; Action Date/Time rejected when missing, malformed, or naming a moment that does not exist (31 February, 31 April, hour 24, which `new Date()` would roll over into another day), before the minute of the Ticket's creation or more than 5 minutes ahead, accepted at both bounds; for a Ticket created at 10:00:30, 10:00:00 is accepted and 09:59:59 refused; every failing field reported together | `server/tests/lab-04/action-validation.unit.test.ts` | Pass |
 | UNIT-02 | Unit | BR-12, BR-13, BR-14, AC-18, AC-19, AC-20, AC-22 | Transition matrix and resolution gate helper | Every cell of §5.2 against a table written out by hand; the gate refuses no owner, then no Action Taken, then a latest action requiring follow-up, in that order, with the three documented sentences; Closed needs an owner and not the gate; `blockedReason` is null exactly when the move would be accepted | `server/tests/lab-04/resolution-gate.unit.test.ts` | Pass |
-| UNIT-03 | Unit | BR-25, AC-34, AC-38 | Bangkok day boundaries | At 16:59:59.999Z "today" began at 17:00Z the day before; at 17:00:00.000Z it began at that instant; the 7-day window starts six Bangkok days before today; no dependence on the machine's time zone | `server/tests/lab-04/bangkok-day.unit.test.ts` | Planned |
-| UNIT-04 | Unit | BR-22, AC-39 | List query parsers | `status=ACTIVE` expands to the five active statuses on both lists; a single status still works; an unknown status is dropped and does not mark the list filtered; My Tickets accepts `sortBy=updatedAt`; the Lab 2 and Lab 3 defaults are unchanged | `server/tests/lab-04/ticket-query.unit.test.ts` | Planned |
+| UNIT-03 | Unit | BR-25, AC-34, AC-38 | Bangkok day boundaries | At 16:59:59.999Z "today" began at 17:00Z the day before; at 17:00:00.000Z it began at that instant; the 7-day window starts six Bangkok days before today; no dependence on the machine's time zone | `server/tests/lab-04/bangkok-day.unit.test.ts` | Pass |
+| UNIT-04 | Unit | BR-22, AC-39 | List query parsers | `status=ACTIVE` expands to the five active statuses on both lists; a single status still works; an unknown status is dropped and does not mark the list filtered; My Tickets accepts `sortBy=updatedAt`; the Lab 2 and Lab 3 defaults are unchanged | `server/tests/lab-04/ticket-query.unit.test.ts` | Pass |
 | UNIT-05 | Unit | BR-05, BR-06, BR-07, AC-07, AC-09 | Client-side Action Taken form validation | The same limits as UNIT-01, with the message attached to the right field; the prefilled time for a Ticket created earlier in the same minute passes; a hidden Follow-up Note is not validated and not sent | `client/tests/lab-04/actionValidation.test.ts` | Pass |
 | UNIT-06 | Unit | FR-02, FR-03, BR-17, BR-20 | Client calls for Actions Taken | The create call sends the request key and the six entered fields and no performer; the edit call sends `expectedVersion`; a refusal reaches the caller with its field messages, its conflict code and, for a stale edit, the current row; a non-JSON error body still reports the status | `client/tests/lab-04/actionsApi.test.ts` | Pass |
 
@@ -86,19 +86,19 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| API-30 | Authorization | BR-23, AC-02 | Requester sees only their own | With two Requesters holding different Tickets, each response counts and lists only that Requester's; adding a query parameter naming the other changes nothing | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| API-31 | API | BR-24, AC-30 | Counts equal list totals | Each of the four `value`s equals `pagination.totalItems` from `GET /api/tickets?<query>`, and moving one Ticket between statuses moves exactly the two affected counts by one | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| API-32 | API | BR-27, AC-31 | Requester with nothing | Four metrics of 0 and three empty arrays, `200` | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| API-33 | Authorization | AC-06, AC-32 | Who may call it | `401` with no session; `403` for IT Staff and for an Administrator, with no data in the body | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| API-34 | API | BR-26, BR-28, AC-36, AC-38 | Lists | No list exceeds 5; Needs attention is longest-waiting first, the other two newest first; Recently resolved includes a Ticket resolved within 7 Bangkok days and excludes one resolved earlier and one since reopened; no row has a description or an email address | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| API-35 | API | FR-12, AC-39 | My Tickets filters | `status=ACTIVE` returns only the five active statuses and `filtered: true`; a single status filters to it; `sortBy=updatedAt` orders by it; another Requester's Tickets never appear under any filter | `server/tests/lab-04/requester-dashboard.api.test.ts` | Planned |
-| API-36 | API | BR-24, AC-33 | Staff counts equal queue totals | `unassigned`, `myTickets`, `urgent` and each of the eight `byStatus` values equal the queue's total under their `query`; the eight sum to the unfiltered total; all eight statuses are present when some are zero | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| API-37 | API | BR-25, AC-34 | My Actions Today | With the clock fixed, counts the caller's actions dated inside the Bangkok day and excludes one a second before it, one in the next day, and a colleague's | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| API-38 | Authorization | BR-29, AC-35 | User counts | An Administrator's response has `users` equal to the counts of active and inactive accounts; an IT Staff response has no `users` key | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| API-39 | Authorization | AC-06, AC-32 | Who may call it | `401` with no session; `403` for a Requester with no data | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| API-40 | API | BR-26, BR-28, AC-36 | Lists and shape | Each list at most 5 and in the documented order; `myRecentActions` holds only the caller's actions with a preview of at most 120 characters; no description, comment, note, attachment or email address anywhere in the body | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| API-41 | API | FR-12, AC-39 | Queue `status=ACTIVE` | Only the five active statuses, `filtered: true`, and it combines with `owner` and `itPriority` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Planned |
-| PERF-01 | Performance smoke | AC-51 | Dashboards under load | With 300 extra Tickets and 300 Actions Taken, each dashboard endpoint answers in under 1 second with a body under 16 KB and lists still capped at 5 | `server/tests/lab-04/dashboard-performance.api.test.ts` | Planned |
+| API-30 | Authorization | BR-23, AC-02 | Requester sees only their own | With two Requesters holding different Tickets, each response counts and lists only that Requester's; adding a query parameter naming the other changes nothing | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| API-31 | API | BR-24, AC-30 | Counts equal list totals | Each of the four `value`s equals `pagination.totalItems` from `GET /api/tickets?<query>`, and moving one Ticket between statuses moves exactly the two affected counts by one | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| API-32 | API | BR-27, AC-31 | Requester with nothing | Four metrics of 0 and three empty arrays, `200` | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| API-33 | Authorization | AC-06, AC-32 | Who may call it | `401` with no session; `403` for IT Staff and for an Administrator, with no data in the body | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| API-34 | API | BR-26, BR-28, AC-36, AC-38 | Lists | No list exceeds 5; Needs attention is longest-waiting first, the other two newest first; Recently resolved includes a Ticket resolved within 7 Bangkok days and excludes one resolved earlier and one since reopened; no row has a description or an email address | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| API-35 | API | FR-12, AC-39 | My Tickets filters | `status=ACTIVE` returns only the five active statuses and `filtered: true`; a single status filters to it; `sortBy=updatedAt` orders by it; another Requester's Tickets never appear under any filter | `server/tests/lab-04/requester-dashboard.api.test.ts` | Pass |
+| API-36 | API | BR-24, AC-33 | Staff counts equal queue totals | `unassigned`, `myTickets`, `urgent` and each of the eight `byStatus` values equal the queue's total under their `query`; the eight sum to the unfiltered total; all eight statuses are present when some are zero | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| API-37 | API | BR-25, AC-34 | My Actions Today | With the clock fixed, counts the caller's actions dated inside the Bangkok day and excludes one a second before it, one in the next day, and a colleague's | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| API-38 | Authorization | BR-29, AC-35 | User counts | An Administrator's response has `users` equal to the counts of active and inactive accounts; an IT Staff response has no `users` key | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| API-39 | Authorization | AC-06, AC-32 | Who may call it | `401` with no session; `403` for a Requester with no data | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| API-40 | API | BR-26, BR-28, AC-36 | Lists and shape | Each list at most 5 and in the documented order; `myRecentActions` holds only the caller's actions with a preview of at most 120 characters; no description, comment, note, attachment or email address anywhere in the body | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| API-41 | API | FR-12, AC-39 | Queue `status=ACTIVE` | Only the five active statuses, `filtered: true`, and it combines with `owner` and `itPriority` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
+| PERF-01 | Performance smoke | AC-51 | Dashboards under load | With 300 extra Tickets and 300 Actions Taken, each dashboard endpoint answers in under 1 second with a body under 16 KB and lists still capped at 5 | `server/tests/lab-04/dashboard-performance.api.test.ts` | Pass |
 
 ### Migration and regression
 
@@ -318,6 +318,37 @@ Ticket, racing that user's deactivation, ended one of the two requests in a `500
 had started locking the Ticket before the User while deactivation locked the User before the
 Tickets. Deactivation now locks the Tickets first. The race is a test under API-28, 40 runs, and
 it failed on its first run before the fix.
+
+**#70, Dashboard API and drill-down filters.** UNIT-03, UNIT-04, API-30 to API-41 and PERF-01 are
+Pass.
+
+| Suite | Result |
+| :-- | :-- |
+| Server, on the database `npm run e2e:fresh` builds | 32 files, 671 tests, all passed |
+| Server, on the development database | 670 of 671, the same Daniel Okafor case as above |
+| Client | 21 files, 333 tests, all passed (no client change in this Issue) |
+| `npm run e2e:fresh` | 95 passed |
+| `npm run db:migration-check` | Passed |
+| Type checks (`server/`, `client/`, root) | Clean |
+
+Both list routes now build their `where` in `lib/ticket-query.ts`, and each dashboard count is a
+`count()` over what that builder returns for the query string the response carries. The Lab 2 and
+Lab 3 list tests passed unchanged over the move.
+
+Each dashboard is read inside one `REPEATABLE READ` transaction, so its numbers describe one
+moment: without it, a Ticket changing status between two of the reads could be counted under both
+statuses or neither.
+
+Nine deliberate faults were put in one at a time: the status check dropped from Recently resolved,
+each end of the Bangkok day moved by a millisecond, user counts served to IT Staff, Needs attention
+ordered newest first, `status=ACTIVE` dropped from the Urgent card, My recent Actions Taken not
+limited to the caller, Reopened left out of the active statuses, and the Requester condition
+removed from the My Tickets builder. Each made at least one test fail.
+
+Two things differ from the plan in §2. API-36 cannot make a status empty in a shared database, so
+"all eight present when some are zero" is asserted on the function that fills the rows in, in the
+same file. PERF-01 takes the median of five calls after a warm-up, not one call, so a single slow
+or lucky request decides nothing.
 
 MIG-02 does not run on the development database. It builds one of its own from the migrations,
 seeds it twice and compares the rows, because "the counts did not change" is only a statement

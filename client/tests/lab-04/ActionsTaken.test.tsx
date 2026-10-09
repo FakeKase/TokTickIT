@@ -603,6 +603,55 @@ describe('UI-07 a failed save keeps the form (BR-20, BR-31, AC-13, AC-43)', () =
     expect(sent[1].body).toEqual(sent[0].body)
   })
 
+  it('keeps the dialog and the typed text when Esc is pressed while a save is in flight', async () => {
+    // Cancel is disabled while saving, but Esc is a second way out. If it
+    // closed the dialog, a save that then failed would have nowhere to put
+    // the text or the error, and reopening would mint a new request key.
+    let fail: () => void = () => {}
+    let failing = true
+    mockApi({
+      create: () =>
+        failing
+          ? new Promise<Response>((_, reject) => {
+              fail = () => reject(new TypeError('Failed to fetch'))
+            })
+          : (undefined as unknown as Response),
+    })
+    await openAsStaff()
+    await openCreate()
+    await fillRequired()
+    await userEvent.click(dialog().getByRole('button', { name: 'Save Action Taken' }))
+    await waitFor(() => expect(sent).toHaveLength(1))
+
+    await userEvent.keyboard('{Escape}')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    fail()
+    expect(
+      await dialog().findByText('Unable to save the Action Taken. Your text is still here. Try again.'),
+    ).toBeInTheDocument()
+    expect(dialog().getByLabelText(/^Action Description/)).toHaveValue('Reseated the HDMI cable.')
+    expect(dialog().getByLabelText(/^Result/)).toHaveValue('Image is stable.')
+
+    // The retry is still the same form, so it still carries the same key.
+    failing = false
+    await userEvent.click(dialog().getByRole('button', { name: 'Save Action Taken' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(sent[1].body.requestKey).toBe(sent[0].body.requestKey)
+  })
+
+  it('still closes on Esc when nothing is being saved', async () => {
+    mockApi()
+    await openAsStaff()
+    await openCreate()
+    await fillRequired()
+
+    await userEvent.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(sent).toEqual([])
+  })
+
   it('uses a new request key for a new form', async () => {
     mockApi()
     await openAsStaff()
@@ -690,6 +739,40 @@ describe('UI-08 viewing and editing (FR-03, AC-11)', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(await (await loadedTable()).findByText('Hours are at 12.')).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('Action Taken updated.')
+  })
+})
+
+describe('UI-08 the time of an edited action', () => {
+  // The form holds minutes only. An action recorded through the API can carry
+  // seconds, and an edit that only touches the text must not move it.
+  const WITH_SECONDS = action({ id: 14, actionAt: '2026-09-03T03:15:42.500Z' })
+
+  const openEdit = async () => {
+    serverActions = [WITH_SECONDS]
+    mockApi()
+    await openAsStaff()
+    await userEvent.click((await (await loadedTable()).findAllByRole('button', { name: /^View the Action Taken/ }))[0])
+    await userEvent.click(dialog().getByRole('button', { name: 'Edit' }))
+  }
+
+  it('is sent back exactly as it was when the field is not touched', async () => {
+    await openEdit()
+
+    await userEvent.type(dialog().getByLabelText(/^Result/), ' Confirmed.')
+    await userEvent.click(dialog().getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0].body.actionAt).toBe('2026-09-03T03:15:42.500Z')
+  })
+
+  it('is the new value, to the minute, when the field is changed', async () => {
+    await openEdit()
+
+    fireEvent.change(dialog().getByLabelText(/^Action Date\/Time/), { target: { value: '2026-09-03T12:00' } })
+    await userEvent.click(dialog().getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0].body.actionAt).toBe(new Date('2026-09-03T12:00').toISOString())
   })
 })
 

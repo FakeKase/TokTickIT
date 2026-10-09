@@ -363,6 +363,11 @@ function ActionDialog({
   // The version an edit is based on. It moves only when the person chooses
   // to continue from the row a colleague saved.
   const [baseVersion, setBaseVersion] = useState(editing?.version ?? 0)
+  // The row the form was last filled from. Its Action Date/Time is sent back
+  // as it is when the field has not been touched: the form holds minutes
+  // only, so sending the field's own value would quietly move an action
+  // recorded with seconds to the start of its minute.
+  const [filledFrom, setFilledFrom] = useState<ActionTaken | null>(editing)
   // The row as a colleague left it, while this form waits for a decision.
   const [theirs, setTheirs] = useState<ActionTaken | null>(null)
   const formRef = useRef<HTMLFormElement>(null)
@@ -429,6 +434,9 @@ function ActionDialog({
     setSaving(true)
     try {
       const input = toActionInput(form)
+      if (filledFrom && form.actionAt === actionFormFrom(filledFrom).actionAt) {
+        input.actionAt = filledFrom.actionAt
+      }
       if (editing) {
         await updateAction(ticketId, editing.id, version, input)
         onSaved('Action Taken updated.')
@@ -486,7 +494,17 @@ function ActionDialog({
   )
 
   return (
-    <Dialog title={DIALOG_TITLE[open.mode]} onClose={onClose}>
+    <Dialog
+      title={DIALOG_TITLE[open.mode]}
+      // Not while a save is in flight. Cancel is disabled then, but Esc is a
+      // second way out, and a dialog that closed under a save that then
+      // failed would take the typed text and the error with it (BR-31). It
+      // would also throw away the request key, so saving again from a fresh
+      // dialog could record the same work twice.
+      onClose={() => {
+        if (!saving) onClose()
+      }}
+    >
       <form ref={formRef} className="ttk-actions__form" onSubmit={handleSubmit} noValidate>
         {theirs && (
           <div className="ttk-actions__conflict" role="alert">
@@ -512,6 +530,7 @@ function ActionDialog({
                 disabled={saving}
                 onClick={() => {
                   setForm(actionFormFrom(theirs))
+                  setFilledFrom(theirs)
                   setBaseVersion(theirs.version)
                   setErrors({})
                   setTheirs(null)

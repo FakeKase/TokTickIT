@@ -285,7 +285,7 @@ again once it was put back.
 
 | Suite | Result |
 | :-- | :-- |
-| Client | 20 files, 314 tests, all passed |
+| Client | 20 files, 318 tests, all passed |
 | `npm run e2e:fresh` | 93 passed |
 | Server, on the database `npm run e2e:fresh` builds | 25 files, 472 tests, all passed |
 | Type checks (`server/`, `client/`, root), client lint and build | Clean |

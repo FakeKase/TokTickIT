@@ -724,6 +724,13 @@ export interface StatusTransition {
   to: TicketStatus
   /** The move also needs a Ticket Owner (BR-23). */
   requiresOwner: boolean
+  /**
+   * Null when the server would accept this move now. Otherwise the sentence
+   * it would refuse with (Lab 4 api-spec.md §4): no Ticket Owner, no Action
+   * Taken recorded, or follow-up still required on the latest one. The screen
+   * shows it; it does not work the resolution gate out for itself.
+   */
+  blockedReason: string | null
 }
 
 /** A Ticket as IT Staff see it (api-spec.md §9). */
@@ -737,6 +744,11 @@ export interface StaffTicketDetail extends StaffQueueItem {
   /** The Ticket's status is one that must keep its owner (BR-23), so it
    *  cannot be unassigned, only handed to someone else. */
   ownerRequired: boolean
+  /** Sent back as `expectedVersion` with every workflow change, so a change
+   *  made from an out-of-date copy is refused (Lab 4 BR-16). */
+  version: number
+  /** When the Ticket last entered Resolved; null unless Resolved or Closed. */
+  resolvedAt: string | null
 }
 
 export interface AssignableUser {
@@ -788,18 +800,27 @@ async function patchStaffTicket(
   return (await response.json()) as StaffTicketDetail
 }
 
+// Each of the three names the version of the Ticket the change was made from
+// (Lab 4 api-spec.md §5). If the Ticket has moved on since, the server
+// refuses with the code STALE_TICKET and nothing is written.
+
 /** Claim, reassign, or (with `null`) unassign (api-spec.md §10). */
-export const setTicketOwner = (id: number, ownerId: number | null) =>
-  patchStaffTicket(id, 'owner', { ownerId }, 'Unable to change the Ticket Owner')
+export const setTicketOwner = (id: number, ownerId: number | null, expectedVersion: number) =>
+  patchStaffTicket(id, 'owner', { ownerId, expectedVersion }, 'Unable to change the Ticket Owner')
 
 /** api-spec.md §11. Requested Priority is not touched (BR-21). */
-export const setItPriority = (id: number, itPriority: ItPriority) =>
-  patchStaffTicket(id, 'it-priority', { itPriority }, 'Unable to change the IT Priority')
+export const setItPriority = (id: number, itPriority: ItPriority, expectedVersion: number) =>
+  patchStaffTicket(
+    id,
+    'it-priority',
+    { itPriority, expectedVersion },
+    'Unable to change the IT Priority',
+  )
 
 /** api-spec.md §12. Only the target is sent; the server judges the move from
  *  the status it holds, not from one this screen believes. */
-export const setTicketStatus = (id: number, currentStatus: TicketStatus) =>
-  patchStaffTicket(id, 'status', { currentStatus }, 'Unable to change the status')
+export const setTicketStatus = (id: number, currentStatus: TicketStatus, expectedVersion: number) =>
+  patchStaffTicket(id, 'status', { currentStatus, expectedVersion }, 'Unable to change the status')
 
 export interface ResolvedSignal {
   id: number

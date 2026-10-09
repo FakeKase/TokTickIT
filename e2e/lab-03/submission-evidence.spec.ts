@@ -20,6 +20,8 @@ import {
   shot,
   signInThroughForm,
   signOut,
+  recordAction,
+  workflowChange,
 } from './helpers'
 
 /**
@@ -322,8 +324,10 @@ test.describe('Part 7: the IT Staff Ticket Detail', () => {
     const staff = await cookieFor(request, ACCOUNTS.staff.email)
     const colleague = await cookieFor(request, ACCOUNTS.colleague.email)
     const me = (await (await request.get(`${API}/api/auth/me`, { headers: { Cookie: staff } })).json()).user
-    await request.patch(`${API}/api/staff/tickets/${second.id}/owner`, { headers: { Cookie: staff }, data: { ownerId: me.id } })
-    await request.patch(`${API}/api/staff/tickets/${second.id}/status`, { headers: { Cookie: staff }, data: { currentStatus: 'IN_PROGRESS' } })
+    await workflowChange(request, second.id, 'owner', { ownerId: me.id }, staff)
+    await workflowChange(request, second.id, 'status', { currentStatus: 'IN_PROGRESS' }, staff)
+    // Lab 4: with work recorded, Resolved is on offer, as it was in Lab 3.
+    await recordAction(request, second.id, staff)
 
     await loginAs(page, 'staff')
     await page.goto(`/staff/tickets/${second.id}`)
@@ -331,14 +335,14 @@ test.describe('Part 7: the IT Staff Ticket Detail', () => {
     await workflow.getByLabel('Move to').selectOption('RESOLVED')
 
     // While this screen sits open, a colleague cancels the Ticket.
-    const cancelled = await request.patch(`${API}/api/staff/tickets/${second.id}/status`, {
-      headers: { Cookie: colleague },
-      data: { currentStatus: 'CANCELLED' },
-    })
+    const cancelled = await workflowChange(request, second.id, 'status', { currentStatus: 'CANCELLED' }, colleague)
     expect(cancelled.status()).toBe(200)
 
     await workflow.getByRole('button', { name: 'Change status' }).click()
-    await expect(workflow.getByRole('alert')).toContainText('Cannot move a Ticket from Cancelled to Resolved')
+    // Lab 3 answered with the matrix ("Cannot move a Ticket from Cancelled to
+    // Resolved"). Lab 4 answers sooner: the request named a version of the
+    // Ticket that is no longer current (Lab 4 BR-16).
+    await expect(workflow.getByRole('alert')).toContainText('This Ticket was changed by someone else')
     // The screen has caught up with what the Ticket really is.
     await expect(workflow.getByText(/Cancelled is final/)).toBeVisible()
     await workflow.screenshot({ path: shot('staff-ticket-detail', 'conflict') })

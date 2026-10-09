@@ -9,6 +9,7 @@ import {
   firstRequester,
   loginAs,
   sessionAs,
+  workflowChange,
 } from './helpers'
 
 // E2E-01, E2E-02 (Lab 4 AC-01, AC-03, AC-04, AC-10, AC-11, AC-42).
@@ -53,10 +54,7 @@ test.describe('work recorded on one Ticket, and what its Requester sees', () => 
     const me = ((await assignable.json()) as { id: number; name: string }[]).find(
       (user) => user.name === ACCOUNTS.colleague.name,
     )
-    const owned = await request.patch(`${API}/api/staff/tickets/${ticket.id}/owner`, {
-      headers: { Cookie: marcus },
-      data: { ownerId: me!.id },
-    })
+    const owned = await workflowChange(request, ticket.id, 'owner', { ownerId: me!.id }, marcus)
     expect(owned.status(), await owned.text()).toBe(200)
     const noted = await request.post(`${API}/api/tickets/${ticket.id}/comments`, {
       headers: { Cookie: marcus },

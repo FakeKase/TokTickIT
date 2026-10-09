@@ -13,6 +13,7 @@ import {
   shot,
   signInThroughForm,
   API,
+  workflowChange,
 } from './helpers'
 
 /**
@@ -98,10 +99,10 @@ test.beforeAll(async ({ request }) => {
   const send = (method: 'patch' | 'post', path: string, data: unknown) =>
     request[method](`${API}${path}`, { headers: { Cookie: staff }, data })
   const me = (await (await request.get(`${API}/api/auth/me`, { headers: { Cookie: staff } })).json()).user
-  await send('patch', `/api/staff/tickets/${ticket.id}/owner`, { ownerId: me.id })
-  await send('patch', `/api/staff/tickets/${ticket.id}/it-priority`, { itPriority: 'URGENT' })
-  await send('patch', `/api/staff/tickets/${ticket.id}/status`, { currentStatus: 'IN_PROGRESS' })
-  await send('patch', `/api/staff/tickets/${ticket.id}/status`, { currentStatus: 'WAITING_FOR_REQUESTER' })
+  await workflowChange(request, ticket.id, 'owner', { ownerId: me.id }, staff)
+  await workflowChange(request, ticket.id, 'it-priority', { itPriority: 'URGENT' }, staff)
+  await workflowChange(request, ticket.id, 'status', { currentStatus: 'IN_PROGRESS' }, staff)
+  await workflowChange(request, ticket.id, 'status', { currentStatus: 'WAITING_FOR_REQUESTER' }, staff)
   await send('post', `/api/tickets/${ticket.id}/comments`, { body: `Could you try the upload again from ${UNBREAKABLE_URL} and tell us which browser you are using?`, visibility: 'PUBLIC' })
   await send('post', `/api/tickets/${ticket.id}/comments`, { body: `Likely the column-order check added last month. See ${UNBREAKABLE_URL} before replying.`, visibility: 'INTERNAL' })
 

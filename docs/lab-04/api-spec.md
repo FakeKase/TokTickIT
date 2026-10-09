@@ -211,6 +211,12 @@ sent from the same version exactly one succeeds (AC-26). The version also rises 
 Administrator's edit unassigns a deactivated user's Tickets (Lab 3 api-spec §16), because that is a
 change of Ticket Owner like any other.
 
+**Lock order.** Every route that locks both a Ticket and a User takes the Ticket first. The owner
+route locks the Ticket and then reads the User it names `FOR SHARE`. The user-edit route (Lab 3
+api-spec §16) therefore locks the live Tickets that user owns, in id order, before it locks any
+User row. Taken in opposite orders the two deadlock when the owner named is the user being
+deactivated, and one of the requests ends in a `500`.
+
 `POST /api/tickets/:id/requester-resolved` is unchanged. It does not move the version, because the
 Requester's indication is not a workflow field.
 

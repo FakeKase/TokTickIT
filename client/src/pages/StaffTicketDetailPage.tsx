@@ -218,10 +218,17 @@ export function StaffTicketDetailPage() {
 
   const ownedByMe = ticket?.owner?.id === user.id
   const chosen = ticket?.transitions.find((move) => move.to === nextStatus)
-  const blockedByOwner = Boolean(chosen?.requiresOwner && !ticket?.owner)
   const anyNeedsOwner = Boolean(
     ticket && !ticket.owner && ticket.transitions.some((move) => move.requiresOwner),
   )
+  // A move the server would refuse right now, in the server's own words
+  // (Lab 4 ui-spec.md §7). With no owner the hint above already says so for
+  // Resolved and Closed together, so what is listed here is the rest of the
+  // resolution gate: no Action Taken yet, or follow-up still required.
+  const blockedMoves = ticket?.owner
+    ? ticket.transitions.filter((move) => move.blockedReason)
+    : []
+  const chosenBlocked = Boolean(chosen?.blockedReason)
 
   return (
     <div className="ttk-detail ttk-staff-detail">
@@ -315,7 +322,7 @@ export function StaffTicketDetailPage() {
                       onClick={() =>
                         void change(
                           'owner',
-                          () => setTicketOwner(ticket.id, user.id),
+                          () => setTicketOwner(ticket.id, user.id, ticket.version),
                           () => 'You are now the Ticket Owner.',
                         )
                       }
@@ -331,7 +338,7 @@ export function StaffTicketDetailPage() {
                       onClick={() =>
                         void change(
                           'owner',
-                          () => setTicketOwner(ticket.id, null),
+                          () => setTicketOwner(ticket.id, null, ticket.version),
                           () => 'The Ticket is now unassigned.',
                         )
                       }
@@ -365,7 +372,7 @@ export function StaffTicketDetailPage() {
                         if (!target) return
                         void change(
                           'owner',
-                          () => setTicketOwner(ticket.id, target.id),
+                          () => setTicketOwner(ticket.id, target.id, ticket.version),
                           () => `Ticket Owner is now ${target.name}.`,
                         )
                       }}
@@ -402,7 +409,7 @@ export function StaffTicketDetailPage() {
                           const itPriority = event.target.value as ItPriority
                           void change(
                             'priority',
-                            () => setItPriority(ticket.id, itPriority),
+                            () => setItPriority(ticket.id, itPriority, ticket.version),
                             () => `IT Priority set to ${IT_PRIORITY_LABEL[itPriority]}.`,
                           )
                         }}
@@ -464,10 +471,17 @@ export function StaffTicketDetailPage() {
                             <option
                               key={move.to}
                               value={move.to}
-                              disabled={move.requiresOwner && !ticket.owner}
+                              // Offered and disabled, not hidden: the move
+                              // exists from here, it is only not available
+                              // yet, and the line below says why.
+                              disabled={Boolean(move.blockedReason)}
                             >
                               {STATUS_LABEL[move.to]}
-                              {move.requiresOwner && !ticket.owner ? ' (needs a Ticket Owner)' : ''}
+                              {!move.blockedReason
+                                ? ''
+                                : ticket.owner
+                                  ? ' (not available yet)'
+                                  : ' (needs a Ticket Owner)'}
                             </option>
                           ))}
                         </select>
@@ -479,18 +493,28 @@ export function StaffTicketDetailPage() {
                         or assign it first.
                       </p>
                     )}
+                    {blockedMoves.map((move) => (
+                      <p
+                        key={move.to}
+                        className="ttk-workflow__hint ttk-workflow__blocked"
+                        data-testid={`blocked-${move.to}`}
+                      >
+                        <strong>{STATUS_LABEL[move.to]}:</strong> {move.blockedReason}.{' '}
+                        <a href="#actions-taken">Go to Actions Taken</a>
+                      </p>
+                    ))}
                     {/* A separate button, not save-on-change like IT Priority:
                         a priority can be put back, but Cancelled cannot. */}
                     <Button
                       busy={saving === 'status'}
                       busyLabel="Saving…"
-                      disabled={!nextStatus || blockedByOwner || saving !== null}
+                      disabled={!nextStatus || chosenBlocked || saving !== null}
                       onClick={() => {
                         if (!nextStatus) return
                         const target = nextStatus
                         void change(
                           'status',
-                          () => setTicketStatus(ticket.id, target),
+                          () => setTicketStatus(ticket.id, target, ticket.version),
                           () => `Status changed to ${STATUS_LABEL[target]}.`,
                         )
                       }}
@@ -555,8 +579,8 @@ export function StaffTicketDetailPage() {
 
           {/* What was done, then what was said (Lab 4 ui-spec.md §6). A save
               reloads the Ticket quietly: recording work moves its Last
-              Updated, and from the next Issue on it decides whether Resolved
-              is on offer. */}
+              Updated and decides whether Resolved is on offer, so the status
+              control above is brought up to date without a page reload. */}
           <ActionsTaken
             ticketId={ticket.id}
             ticketStatus={ticket.currentStatus}

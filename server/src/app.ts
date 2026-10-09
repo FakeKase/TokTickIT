@@ -37,6 +37,8 @@ import {
 import { validateTicketInput } from "./lib/ticket-validation.js";
 import {
   IT_PRIORITIES,
+  type ItPriorityValue,
+  type TicketStatusValue,
   parseStaffQueueQuery,
   parseTicketQuery,
 } from "./lib/ticket-query.js";
@@ -46,14 +48,18 @@ import {
   validateUser,
 } from "./lib/user-validation.js";
 import {
+  type GateFacts,
   isTicketStatus,
-  permittedTransitions,
+  offeredTransitions,
   requiresOwner,
-  transitionRefusal,
+  workflowRefusal,
 } from "./lib/status-transitions.js";
 import { validateComment } from "./lib/comment-validation.js";
 import {
+  type LockedTicket,
   TICKET_NOT_FOUND,
+  type Tx,
+  lockTicket,
   parseId,
   resolveTicketFor,
 } from "./lib/ticket-access.js";
@@ -861,6 +867,10 @@ export function createApp(prisma = createPrismaClient()) {
     itPriority: true,
     currentStatus: true,
     requesterResolvedAt: true,
+    // Lab 4: what the next workflow change must send back (BR-16), and when
+    // the Ticket last entered Resolved (BR-18).
+    version: true,
+    resolvedAt: true,
     createdAt: true,
     updatedAt: true,
     category: { select: { id: true, name: true } },
@@ -885,15 +895,19 @@ export function createApp(prisma = createPrismaClient()) {
   /**
    * The staff view of a Ticket, plus where it may go next.
    *
-   * `transitions` is the §5.2 matrix read for this Ticket's current status.
-   * It travels with the Ticket so the screen offers what the server will
-   * accept without keeping a second copy of the matrix that could fall out of
-   * step with this one.
+   * `transitions` is the §5.2 matrix read for this Ticket's current status,
+   * each move with the reason it would be refused right now, if any. It
+   * travels with the Ticket so the screen offers what the server will accept
+   * without keeping a second copy of the matrix, or of the resolution gate,
+   * that could fall out of step with this one.
    */
-  const toStaffTicket = <T extends { currentStatus: string }>(ticket: T) => ({
+  const toStaffTicket = <T extends { currentStatus: string }>(
+    ticket: T,
+    facts: GateFacts,
+  ) => ({
     ...ticket,
     transitions: isTicketStatus(ticket.currentStatus)
-      ? permittedTransitions(ticket.currentStatus)
+      ? offeredTransitions(ticket.currentStatus, facts)
       : [],
     // True while the Ticket's status is one that must keep its owner
     // (BR-23), so the screen can explain a disabled Unassign instead of
@@ -902,11 +916,52 @@ export function createApp(prisma = createPrismaClient()) {
       isTicketStatus(ticket.currentStatus) && requiresOwner(ticket.currentStatus),
   });
 
-  /** Somebody else changed the Ticket between this request reading it and
-   *  writing to it. Not a validation problem and not a server fault: the
+  type Reader = Tx | typeof prisma;
+
+  /**
+   * What the resolution gate looks at for one Ticket (Lab 4 BR-13).
+   *
+   * "Latest" is by Action Date/Time and then id, the order the list is shown
+   * in (BR-10), not the order of entry: work written up late still sits where
+   * it happened.
+   */
+  async function gateFacts(
+    db: Reader,
+    ticketId: number,
+    hasOwner: boolean,
+  ): Promise<GateFacts> {
+    // One after the other, not together: inside a transaction both run on
+    // the same connection, which takes one query at a time.
+    const actionCount = await db.actionTaken.count({ where: { ticketId } });
+    const latest = await db.actionTaken.findFirst({
+      where: { ticketId },
+      orderBy: [{ actionAt: "desc" }, { id: "desc" }],
+      select: { followUpRequired: true },
+    });
+    return {
+      hasOwner,
+      actionCount,
+      latestRequiresFollowUp: latest?.followUpRequired ?? false,
+    };
+  }
+
+  /** The whole staff Ticket as the API returns it, or null when there is
+   *  none. Every route below answers with this. */
+  async function readStaffTicket(db: Reader, id: number) {
+    const ticket = await db.ticket.findUnique({
+      where: { id },
+      select: staffTicketSelect,
+    });
+    if (!ticket) return null;
+    return toStaffTicket(ticket, await gateFacts(db, id, ticket.owner !== null));
+  }
+
+  /** The request was based on a copy of the Ticket that is no longer current
+   *  (Lab 4 BR-16). Not a validation problem and not a server fault: the
    *  screen is out of date, and reloading is the fix. */
-  const TICKET_MOVED = {
+  const STALE_TICKET = {
     error: "This Ticket was changed by someone else. Reload it and try again.",
+    code: "STALE_TICKET",
   };
 
   // api-spec.md §9 (FR-14).
@@ -918,13 +973,10 @@ export function createApp(prisma = createPrismaClient()) {
       if (!id) return res.status(404).json(TICKET_NOT_FOUND);
 
       try {
-        const ticket = await prisma.ticket.findUnique({
-          where: { id },
-          select: staffTicketSelect,
-        });
+        const ticket = await readStaffTicket(prisma, id);
         if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
 
-        res.json(toStaffTicket(ticket));
+        res.json(ticket);
       } catch {
         res.status(500).json({ error: "Unable to load the Ticket" });
       }
@@ -952,214 +1004,216 @@ export function createApp(prisma = createPrismaClient()) {
     },
   );
 
-  // api-spec.md §10 (FR-15, BR-19, BR-20). Claim, reassign, or unassign.
-  app.patch(
-    "/api/staff/tickets/:id/owner",
-    ...asStaff,
-    async (req: AuthenticatedRequest, res) => {
+  type Refusal = { status: number; body: unknown };
+  /** What a workflow change decided: a refusal, the columns to write, or
+   *  null when the Ticket already is what was asked for. */
+  type Decision =
+    | { refuse: Refusal }
+    | { write: Record<string, unknown> | null };
+
+  /**
+   * One change of status, owner or IT Priority (Lab 4 api-spec.md §5).
+   *
+   * The three routes differ only in the field they read from the body and in
+   * what they decide. Everything around that is here, once, in the order the
+   * contract fixes: the body, then that the Ticket exists, then the version,
+   * then the route's own rules, then the write.
+   *
+   * The Ticket's row is locked for the whole of it. So of two changes sent
+   * from the same version exactly one finds that version still current, and a
+   * move to Resolved cannot be judged while a colleague is halfway through
+   * recording an Action Taken, which takes the same lock.
+   */
+  const workflowChange =
+    <Value>(
+      failure: string,
+      read: (body: Record<string, unknown>) => { value: Value } | { problem: Record<string, string> },
+      decide: (tx: Tx, ticket: LockedTicket, value: Value) => Promise<Decision>,
+    ) =>
+    async (req: AuthenticatedRequest, res: express.Response) => {
       const id = parseId(req.params.id);
       if (!id) return res.status(404).json(TICKET_NOT_FOUND);
 
-      const ownerId: unknown = (req.body ?? {}).ownerId;
-      const valid =
-        ownerId === null ||
-        (typeof ownerId === "number" && Number.isInteger(ownerId) && ownerId > 0);
-      if (!valid) {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const parsed = read(body);
+      const expectedVersion = body.expectedVersion;
+      const versionValid =
+        typeof expectedVersion === "number" &&
+        Number.isInteger(expectedVersion) &&
+        expectedVersion >= 1;
+      if ("problem" in parsed || !versionValid) {
         return res.status(400).json({
           error: "Validation failed",
-          fields: { ownerId: "Ticket Owner must be a user id, or null to unassign" },
+          // Both at once when both are wrong, like every other form here.
+          fields: {
+            ...("problem" in parsed ? parsed.problem : {}),
+            ...(versionValid
+              ? {}
+              : { expectedVersion: "State the version of the Ticket being changed" }),
+          },
         });
       }
-      const nextOwnerId = ownerId as number | null;
 
       try {
-        // The rule spans two tables: the Ticket being written and the User
-        // who must still be active staff when it is (BR-19). A plain check
-        // followed by a write would let the account be deactivated in between
-        // and still receive the Ticket. So the check takes a lock on the
-        // User's row (see below) and holds it until this transaction ends.
-        const outcome = await prisma.$transaction(async (tx) => {
-          const ticket = await tx.ticket.findUnique({
-            where: { id },
-            select: { ownerId: true, currentStatus: true },
-          });
+        const outcome = await prisma.$transaction(async (tx): Promise<Refusal> => {
+          const ticket = await lockTicket(tx, id);
           if (!ticket) return { status: 404, body: TICKET_NOT_FOUND };
 
-          if (nextOwnerId === null) {
-            // BR-23 read forwards: a Ticket may not become Resolved or Closed
-            // without an owner, so it may not be left without one after.
-            // Otherwise the rule is one unassign away from meaning nothing.
-            if (
-              isTicketStatus(ticket.currentStatus) &&
-              requiresOwner(ticket.currentStatus)
-            ) {
-              return {
-                status: 409,
-                body: {
-                  error: "A Resolved or Closed Ticket must keep its Ticket Owner",
-                },
-              };
-            }
-          } else {
-            // FOR SHARE: this row cannot be changed until we commit, and if
-            // somebody is changing it right now we wait and then read what
-            // they wrote. Deactivation updates this same row before it hands
-            // the user's Tickets back, so whichever of the two comes second
-            // sees the other's result. It works at the default isolation
-            // level, so no other route has to remember anything for it to hold.
-            const [target] = await tx.$queryRaw<
-              { isActive: boolean; role: string }[]
-            >`SELECT "isActive", "role"::text AS "role" FROM "User" WHERE "id" = ${nextOwnerId} FOR SHARE`;
-            // One message for all three failures. Telling them apart would
-            // let the caller probe which ids are accounts and which of those
-            // are inactive.
-            if (!target || !target.isActive || target.role === "REQUESTER") {
-              return {
-                status: 409,
-                body: {
-                  error: "Ticket Owner must be an active IT Staff or Administrator",
-                },
-              };
-            }
+          // Before anything the route itself would say: somebody whose copy
+          // is out of date should hear that first, whatever else is also
+          // wrong. Checked even when the change would turn out to be a
+          // no-op, because "nothing to do" was decided from a stale copy too.
+          if (ticket.version !== expectedVersion) {
+            return { status: 409, body: STALE_TICKET };
           }
 
-          // Assigning the owner a Ticket already has changes nothing, so it
-          // writes nothing. An update would still advance `updatedAt`, and the
-          // queue sorts by it: a no-op would float the Ticket to the top as
-          // though something had happened to it.
-          if (ticket.ownerId === nextOwnerId) {
-            return {
-              status: 200,
-              body: toStaffTicket(
-                await tx.ticket.findUniqueOrThrow({
-                  where: { id },
-                  select: staffTicketSelect,
-                }),
-              ),
-            };
-          }
+          const decision = await decide(tx, ticket, parsed.value);
+          if ("refuse" in decision) return decision.refuse;
 
-          const updated = await tx.ticket.update({
-            where: { id },
-            data: { ownerId: nextOwnerId },
-            select: staffTicketSelect,
-          });
-          return { status: 200, body: toStaffTicket(updated) };
+          // Asking for what the Ticket already has changes nothing, so it
+          // writes nothing: no new version, and no new `updatedAt` to float
+          // the Ticket to the top of the queue as though something happened.
+          if (decision.write) {
+            await tx.ticket.update({
+              where: { id },
+              data: { ...decision.write, version: { increment: 1 } },
+            });
+          }
+          return { status: 200, body: await readStaffTicket(tx, id) };
         });
 
         res.status(outcome.status).json(outcome.body);
       } catch {
-        res.status(500).json({ error: "Unable to change the Ticket Owner" });
+        res.status(500).json({ error: failure });
       }
-    },
+    };
+
+  // api-spec.md §10 (FR-15, BR-19, BR-20). Claim, reassign, or unassign.
+  app.patch(
+    "/api/staff/tickets/:id/owner",
+    ...asStaff,
+    workflowChange<number | null>(
+      "Unable to change the Ticket Owner",
+      (body) => {
+        const ownerId = body.ownerId;
+        const valid =
+          ownerId === null ||
+          (typeof ownerId === "number" && Number.isInteger(ownerId) && ownerId > 0);
+        return valid
+          ? { value: ownerId as number | null }
+          : { problem: { ownerId: "Ticket Owner must be a user id, or null to unassign" } };
+      },
+      async (tx, ticket, nextOwnerId) => {
+        if (nextOwnerId === null) {
+          // BR-23 read forwards: a Ticket may not become Resolved or Closed
+          // without an owner, so it may not be left without one after.
+          // Otherwise the rule is one unassign away from meaning nothing.
+          if (isTicketStatus(ticket.currentStatus) && requiresOwner(ticket.currentStatus)) {
+            return {
+              refuse: {
+                status: 409,
+                body: { error: "A Resolved or Closed Ticket must keep its Ticket Owner" },
+              },
+            };
+          }
+        } else {
+          // The rule spans two tables: the Ticket being written and the User
+          // who must still be active staff when it is (BR-19). FOR SHARE:
+          // this row cannot be changed until we commit, and if somebody is
+          // changing it right now we wait and then read what they wrote.
+          // Deactivation updates this same row before it hands the user's
+          // Tickets back, so whichever of the two comes second sees the
+          // other's result.
+          const [target] = await tx.$queryRaw<
+            { isActive: boolean; role: string }[]
+          >`SELECT "isActive", "role"::text AS "role" FROM "User" WHERE "id" = ${nextOwnerId} FOR SHARE`;
+          // One message for all three failures. Telling them apart would
+          // let the caller probe which ids are accounts and which of those
+          // are inactive.
+          if (!target || !target.isActive || target.role === "REQUESTER") {
+            return {
+              refuse: {
+                status: 409,
+                body: { error: "Ticket Owner must be an active IT Staff or Administrator" },
+              },
+            };
+          }
+        }
+
+        return { write: ticket.ownerId === nextOwnerId ? null : { ownerId: nextOwnerId } };
+      },
+    ),
   );
 
   // api-spec.md §11 (FR-16, BR-21).
   app.patch(
     "/api/staff/tickets/:id/it-priority",
     ...asStaff,
-    async (req: AuthenticatedRequest, res) => {
-      const id = parseId(req.params.id);
-      if (!id) return res.status(404).json(TICKET_NOT_FOUND);
-
-      const itPriority: unknown = (req.body ?? {}).itPriority;
-      const known = IT_PRIORITIES.find((value) => value === itPriority);
-      if (!known) {
-        return res.status(400).json({
-          error: "Validation failed",
-          fields: { itPriority: "IT Priority must be Low, Medium, High or Urgent" },
-        });
-      }
-
-      try {
-        const ticket = await prisma.ticket.findUnique({
-          where: { id },
-          select: { itPriority: true },
-        });
-        if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
-
-        // Only `itPriority` is ever written here. `requestedPriority` is what
-        // the Requester asked for and stays as they left it (BR-21).
-        const updated =
-          ticket.itPriority === known
-            ? await prisma.ticket.findUniqueOrThrow({
-                where: { id },
-                select: staffTicketSelect,
-              })
-            : await prisma.ticket.update({
-                where: { id },
-                data: { itPriority: known },
-                select: staffTicketSelect,
-              });
-
-        res.json(toStaffTicket(updated));
-      } catch {
-        res.status(500).json({ error: "Unable to change the IT Priority" });
-      }
-    },
+    workflowChange<ItPriorityValue>(
+      "Unable to change the IT Priority",
+      (body) => {
+        const known = IT_PRIORITIES.find((value) => value === body.itPriority);
+        return known
+          ? { value: known }
+          : { problem: { itPriority: "IT Priority must be Low, Medium, High or Urgent" } };
+      },
+      // Only `itPriority` is ever written here. `requestedPriority` is what
+      // the Requester asked for and stays as they left it (BR-21).
+      async (_tx, ticket, itPriority) => ({
+        write: ticket.itPriority === itPriority ? null : { itPriority },
+      }),
+    ),
   );
 
-  // api-spec.md §12 (FR-17, BR-22, BR-23).
+  // api-spec.md §12 (FR-17, BR-22, BR-23); Lab 4 FR-05, FR-06, BR-12 to BR-19.
   app.patch(
     "/api/staff/tickets/:id/status",
     ...asStaff,
-    async (req: AuthenticatedRequest, res) => {
-      const id = parseId(req.params.id);
-      if (!id) return res.status(404).json(TICKET_NOT_FOUND);
-
-      const target: unknown = (req.body ?? {}).currentStatus;
-      if (!isTicketStatus(target)) {
-        return res.status(400).json({
-          error: "Validation failed",
-          fields: { currentStatus: "Status is not one this system knows" },
-        });
-      }
-
-      try {
-        const ticket = await prisma.ticket.findUnique({
-          where: { id },
-          select: { currentStatus: true, ownerId: true },
-        });
-        if (!ticket) return res.status(404).json(TICKET_NOT_FOUND);
-
+    workflowChange<TicketStatusValue>(
+      "Unable to change the status",
+      (body) => {
+        const target = body.currentStatus;
+        return isTicketStatus(target)
+          ? { value: target }
+          : { problem: { currentStatus: "Status is not one this system knows" } };
+      },
+      async (tx, ticket, target) => {
         // Judged from the status the database holds, never from what the
         // screen believed: the body carries only where to go, not where from.
         const from = ticket.currentStatus;
-        const refusal = isTicketStatus(from)
-          ? transitionRefusal(from, target, ticket.ownerId !== null)
-          : "This Ticket's status cannot be changed";
-        if (refusal) return res.status(409).json({ error: refusal });
+        if (!isTicketStatus(from)) {
+          return {
+            refuse: { status: 409, body: { error: "This Ticket's status cannot be changed" } },
+          };
+        }
 
-        // The check above read the row; this writes it only if it is still
-        // what was read. Both conditions the decision rested on are in the
-        // WHERE, so a colleague moving the status, or unassigning the Ticket,
-        // in between leaves zero rows matched instead of an illegal state.
-        const moved = await prisma.ticket.updateMany({
-          where: {
-            id,
-            currentStatus: from,
-            ...(requiresOwner(target) ? { ownerId: { not: null } } : {}),
-          },
-          data: {
+        // The matrix, then the owner, then the rest of the gate (§5.2). The
+        // Actions Taken are read here, under the Ticket's lock, so this is
+        // the state the write will happen against and not one a client saw
+        // earlier.
+        const refusal = workflowRefusal(
+          from,
+          target,
+          await gateFacts(tx, ticket.id, ticket.ownerId !== null),
+        );
+        if (refusal) return { refuse: { status: 409, body: refusal } };
+
+        return {
+          write: {
             currentStatus: target,
-            // A reopened Ticket is live again, so the Requester's "this looks
-            // fixed" no longer describes it. Cleared, they can say it again
-            // when it is true again; the first time stays in the thread as
-            // the comment that was posted with it.
-            ...(target === "REOPENED" ? { requesterResolvedAt: null } : {}),
+            // BR-18: when the Ticket was resolved. Closed keeps it.
+            ...(target === "RESOLVED" ? { resolvedAt: new Date() } : {}),
+            // A reopened Ticket is live again. It is no longer resolved, and
+            // the Requester's "this looks fixed" no longer describes it:
+            // cleared, they can say it again when it is true again. The
+            // first time stays in the thread as the comment posted with it.
+            ...(target === "REOPENED"
+              ? { resolvedAt: null, requesterResolvedAt: null }
+              : {}),
           },
-        });
-        if (moved.count === 0) return res.status(409).json(TICKET_MOVED);
-
-        const updated = await prisma.ticket.findUniqueOrThrow({
-          where: { id },
-          select: staffTicketSelect,
-        });
-        res.json(toStaffTicket(updated));
-      } catch {
-        res.status(500).json({ error: "Unable to change the status" });
-      }
-    },
+        };
+      },
+    ),
   );
 
   // ---------------------------------------------------------------------
@@ -1290,6 +1344,26 @@ export function createApp(prisma = createPrismaClient()) {
 
     try {
       const outcome = await prisma.$transaction(async (tx) => {
+        // First, the Tickets this edit may hand back: every live Ticket the
+        // user owns, locked in id order, before any User row is.
+        //
+        // The order is the point. A change of Ticket Owner locks the Ticket
+        // and then reads the User it names (Lab 4, `workflowChange`). If this
+        // route locked the User and only then reached for their Tickets, the
+        // two would each hold what the other was waiting for whenever the
+        // user named was the one being deactivated here; Postgres would kill
+        // one of them and that request would end in a 500. Ticket first,
+        // then User, in both routes, and there is no cycle to form.
+        //
+        // A Ticket assigned to this user after this statement is not in the
+        // set, and does not need to be: that assignment holds a share lock
+        // on the User row until it commits, the lock below waits for it, and
+        // the unassign further down then finds the Ticket.
+        await tx.$queryRaw`SELECT "id" FROM "Ticket"
+          WHERE "ownerId" = ${id}
+            AND "currentStatus"::text = ANY(${[...LIVE_STATUSES]}::text[])
+          ORDER BY "id" FOR NO KEY UPDATE`;
+
         // One statement locks the user being edited and every active
         // Administrator, in id order.
         //
@@ -1361,7 +1435,11 @@ export function createApp(prisma = createPrismaClient()) {
         if (!updated.isActive || updated.role === "REQUESTER") {
           await tx.ticket.updateMany({
             where: { ownerId: id, currentStatus: { in: [...LIVE_STATUSES] } },
-            data: { ownerId: null },
+            // A change of Ticket Owner like any other, so it moves the
+            // version too (Lab 4 BR-16): a colleague with one of these
+            // Tickets open must not go on to change it as though it were
+            // still owned.
+            data: { ownerId: null, version: { increment: 1 } },
           });
         }
 

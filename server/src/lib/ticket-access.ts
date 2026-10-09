@@ -7,6 +7,9 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 
 type Db = Pick<PrismaClient, "ticket">;
 
+/** A transaction client: what the callback of `$transaction` is handed. */
+export type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
+
 export const TICKET_NOT_FOUND = { error: "Ticket not found" };
 
 /** A positive integer id from a route param, or null. */
@@ -41,4 +44,36 @@ export async function resolveTicketFor(
 
   if (user.role === "REQUESTER" && ticket.requesterId !== user.id) return null;
   return ticket;
+}
+
+export interface LockedTicket {
+  id: number;
+  currentStatus: string;
+  ownerId: number | null;
+  itPriority: string;
+  version: number;
+  createdAt: Date;
+}
+
+/**
+ * The Ticket a write is about, locked until the transaction ends, or null.
+ *
+ * Every write the resolution gate depends on takes this lock: recording or
+ * editing an Action Taken, and each change of status, owner or IT Priority.
+ * Whichever of two comes second waits and then reads what the first wrote, so
+ * the gate never decides while an Action Taken is half recorded, and two
+ * workflow changes made from the same version cannot both succeed.
+ *
+ * FOR NO KEY UPDATE, not FOR UPDATE. Postgres checks the foreign key of every
+ * comment, note and attachment inserted under this Ticket by taking FOR KEY
+ * SHARE on it, and FOR UPDATE conflicts with that, so it would make those
+ * inserts queue behind each one of these. This still conflicts with itself,
+ * which is all that is needed here.
+ */
+export async function lockTicket(tx: Tx, id: number): Promise<LockedTicket | null> {
+  const [ticket] = await tx.$queryRaw<LockedTicket[]>`
+    SELECT "id", "currentStatus"::text AS "currentStatus", "ownerId",
+           "itPriority"::text AS "itPriority", "version", "createdAt"
+    FROM "Ticket" WHERE "id" = ${id} FOR NO KEY UPDATE`;
+  return ticket ?? null;
 }

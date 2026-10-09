@@ -13,6 +13,8 @@ import { STATUS_LABEL } from "../lib/status-transitions.js";
 import { isActiveStatus, type TicketStatusValue } from "../lib/ticket-query.js";
 import {
   TICKET_NOT_FOUND,
+  type Tx,
+  lockTicket,
   parseId,
   resolveTicketFor,
 } from "../lib/ticket-access.js";
@@ -94,28 +96,6 @@ export function registerActionsTaken(
   app: Express,
   { prisma, asAnyUser, asStaff }: Dependencies,
 ) {
-  /**
-   * The Ticket a write is about, locked until the transaction ends.
-   *
-   * Every write that the resolution gate depends on takes this lock, and so
-   * will the move to Resolved: whichever comes second waits and then reads
-   * what the first wrote, so the gate never decides while an Action Taken is
-   * half recorded.
-   *
-   * FOR NO KEY UPDATE, not FOR UPDATE. Postgres checks the foreign key of
-   * every comment, note and attachment inserted under this Ticket by taking
-   * FOR KEY SHARE on it, and FOR UPDATE conflicts with that, so it would make
-   * those inserts queue behind each one of these. This still conflicts with
-   * itself, which is all that is needed here.
-   */
-  type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
-  async function lockTicket(tx: Tx, id: number) {
-    const [ticket] = await tx.$queryRaw<
-      { id: number; currentStatus: string; createdAt: Date }[]
-    >`SELECT "id", "currentStatus"::text AS "currentStatus", "createdAt" FROM "Ticket" WHERE "id" = ${id} FOR NO KEY UPDATE`;
-    return ticket ?? null;
-  }
-
   /** BR-11: recording work is something happening to the Ticket, so "recently
    *  updated" should notice. Nothing else about the Ticket changes, and in
    *  particular not its version: this is not a workflow change. */

@@ -11,7 +11,9 @@ export {
   expectNoHorizontalScroll,
   firstRequester,
   loginAs,
+  recordAction,
   sessionAs,
+  workflowChange,
 } from '../lab-03/helpers'
 
 export const shot = (screen: string, name: string) =>

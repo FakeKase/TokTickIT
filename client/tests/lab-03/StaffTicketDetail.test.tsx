@@ -31,12 +31,32 @@ const BASE: StaffTicketDetail = {
   updatedAt: '2026-09-02T09:00:00.000Z',
   attachments: [],
   transitions: [
-    { to: 'WAITING_FOR_REQUESTER', requiresOwner: false },
-    { to: 'RESOLVED', requiresOwner: true },
-    { to: 'CANCELLED', requiresOwner: false },
+    { to: 'WAITING_FOR_REQUESTER', requiresOwner: false, blockedReason: null },
+    { to: 'RESOLVED', requiresOwner: true, blockedReason: null },
+    { to: 'CANCELLED', requiresOwner: false, blockedReason: null },
   ],
   ownerRequired: false,
+  // Lab 4: every workflow change names the version it was based on.
+  version: 1,
+  resolvedAt: null,
 }
+
+/**
+ * The Ticket as the server would send it (Lab 4 api-spec.md §4): each move
+ * says whether it would be refused right now. These tests are about the Lab 3
+ * rules, so the only reason modelled is the one Lab 3 had, a missing Ticket
+ * Owner. The resolution gate is covered in lab-04/TicketWorkflow.test.tsx.
+ */
+const served = (ticket: StaffTicketDetail): StaffTicketDetail => ({
+  ...ticket,
+  transitions: ticket.transitions.map((move) => ({
+    ...move,
+    blockedReason:
+      move.requiresOwner && !ticket.owner
+        ? `A Ticket needs a Ticket Owner before it can be ${move.to === 'CLOSED' ? 'Closed' : 'Resolved'}`
+        : null,
+  })),
+})
 
 const ASSIGNABLE = [
   { id: 2, name: 'Ada Admin', role: 'ADMINISTRATOR' },
@@ -107,6 +127,8 @@ function mockApi(handlers: Handlers = {}) {
       if (custom) return answer(custom)
 
       // The default server: applies the change and returns the whole Ticket.
+      // A real change raises the version, as on the server.
+      server = { ...server, version: server.version + 1 }
       if (patched[1] === 'owner') {
         const owner = ASSIGNABLE.find((user) => user.id === body.ownerId)
         server = { ...server, owner: owner ? { id: owner.id, name: owner.name } : null }
@@ -118,14 +140,14 @@ function mockApi(handlers: Handlers = {}) {
         server = {
           ...server,
           currentStatus: body.currentStatus as StaffTicketDetail['currentStatus'],
-          transitions: [{ to: 'CLOSED', requiresOwner: true }, { to: 'REOPENED', requiresOwner: false }],
+          transitions: [{ to: 'CLOSED', requiresOwner: true, blockedReason: null }, { to: 'REOPENED', requiresOwner: false, blockedReason: null }],
         }
       }
-      return answer(Response.json(server))
+      return answer(Response.json(served(server)))
     }
 
     if (/\/api\/staff\/tickets\/\d+$/.test(path)) {
-      return answer(handlers.ticket?.() ?? Response.json(server))
+      return answer(handlers.ticket?.() ?? Response.json(served(server)))
     }
     if (path === '/api/staff/tickets') {
       // The queue, for the one test that arrives from it.
@@ -222,7 +244,7 @@ describe('UI-14 ownership (AC-27, AC-28)', () => {
 
     await waitFor(() => expect(screen.getByTestId('owner-current')).toHaveTextContent('Sarah Chen (you)'))
     expect(sent).toEqual([
-      { method: 'PATCH', path: '/api/staff/tickets/42/owner', body: { ownerId: 9 } },
+      { method: 'PATCH', path: '/api/staff/tickets/42/owner', body: { ownerId: 9, expectedVersion: 1 } },
     ])
     // Already theirs, so there is nothing left to claim.
     expect(workflow().queryByRole('button', { name: 'Claim' })).toBeNull()
@@ -266,7 +288,7 @@ describe('UI-14 ownership (AC-27, AC-28)', () => {
     expect(sent[0]).toEqual({
       method: 'PATCH',
       path: '/api/staff/tickets/42/owner',
-      body: { ownerId: 11 },
+      body: { ownerId: 11, expectedVersion: 1 },
     })
     expect(screen.getByRole('status')).toHaveTextContent('Ticket Owner is now Marcus Reed.')
   })
@@ -280,7 +302,7 @@ describe('UI-14 ownership (AC-27, AC-28)', () => {
     await user.click(workflow().getByRole('button', { name: 'Unassign' }))
 
     await waitFor(() => expect(screen.getByTestId('owner-current')).toHaveTextContent('Unassigned'))
-    expect(sent[0].body).toEqual({ ownerId: null })
+    expect(sent[0].body).toEqual({ ownerId: null, expectedVersion: 1 })
   })
 
   it('disables Unassign on a Ticket that must keep its owner, and says why', async () => {
@@ -351,7 +373,7 @@ describe('UI-15 IT Priority (AC-30)', () => {
 
     await waitFor(() => expect(workflow().getByLabelText('IT Priority')).toHaveValue('URGENT'))
     expect(sent).toEqual([
-      { method: 'PATCH', path: '/api/staff/tickets/42/it-priority', body: { itPriority: 'URGENT' } },
+      { method: 'PATCH', path: '/api/staff/tickets/42/it-priority', body: { itPriority: 'URGENT', expectedVersion: 1 } },
     ])
     expect(screen.getByTestId('requested-priority')).toHaveTextContent('Low')
     expect(screen.getByRole('status')).toHaveTextContent('IT Priority set to Urgent.')
@@ -409,7 +431,7 @@ describe('UI-15 status (AC-31, AC-32, AC-33; BR-22, BR-23)', () => {
       ...BASE,
       currentStatus: 'CLOSED',
       owner: { id: 9, name: 'Sarah Chen' },
-      transitions: [{ to: 'REOPENED', requiresOwner: false }],
+      transitions: [{ to: 'REOPENED', requiresOwner: false, blockedReason: null }],
     }
     mockApi()
     await openTicket()
@@ -471,7 +493,7 @@ describe('UI-15 status (AC-31, AC-32, AC-33; BR-22, BR-23)', () => {
 
     await waitFor(() => expect(options()).toEqual(['Choose a status…', 'Closed', 'Reopened']))
     expect(sent).toEqual([
-      { method: 'PATCH', path: '/api/staff/tickets/42/status', body: { currentStatus: 'RESOLVED' } },
+      { method: 'PATCH', path: '/api/staff/tickets/42/status', body: { currentStatus: 'RESOLVED', expectedVersion: 1 } },
     ])
     expect(screen.getByRole('status')).toHaveTextContent('Status changed to Resolved.')
     // The selection is spent. Were it kept, the button would stay armed with
@@ -726,7 +748,7 @@ describe('loading, missing, forbidden and failed', () => {
     await user.click(workflow().getByRole('button', { name: 'Claim' }))
 
     await waitFor(() => expect(screen.getByTestId('owner-current')).toHaveTextContent('Ada Admin (you)'))
-    expect(sent[0].body).toEqual({ ownerId: 2 })
+    expect(sent[0].body).toEqual({ ownerId: 2, expectedVersion: 1 })
   })
 })
 

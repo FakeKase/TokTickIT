@@ -37,7 +37,7 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | UNIT-01 | Unit | BR-05, BR-06, BR-07, AC-07, AC-08, AC-09 | Action Taken validation | Description 1 to 2000 and Result 1 to 1000 after trimming, both ends inclusive; Attachment Notes optional, at most 500, empty becomes null; Follow-up Note required only when follow-up is required and null otherwise; Action Date/Time rejected when missing, malformed, or naming a moment that does not exist (31 February, 31 April, hour 24, which `new Date()` would roll over into another day), before the minute of the Ticket's creation or more than 5 minutes ahead, accepted at both bounds; for a Ticket created at 10:00:30, 10:00:00 is accepted and 09:59:59 refused; every failing field reported together | `server/tests/lab-04/action-validation.unit.test.ts` | Pass |
-| UNIT-02 | Unit | BR-12, BR-13, BR-14, AC-18, AC-19, AC-20, AC-22 | Transition matrix and resolution gate helper | Every cell of §5.2 against a table written out by hand; the gate refuses no owner, then no Action Taken, then a latest action requiring follow-up, in that order, with the three documented sentences; Closed needs an owner and not the gate; `blockedReason` is null exactly when the move would be accepted | `server/tests/lab-04/resolution-gate.unit.test.ts` | Planned |
+| UNIT-02 | Unit | BR-12, BR-13, BR-14, AC-18, AC-19, AC-20, AC-22 | Transition matrix and resolution gate helper | Every cell of §5.2 against a table written out by hand; the gate refuses no owner, then no Action Taken, then a latest action requiring follow-up, in that order, with the three documented sentences; Closed needs an owner and not the gate; `blockedReason` is null exactly when the move would be accepted | `server/tests/lab-04/resolution-gate.unit.test.ts` | Pass |
 | UNIT-03 | Unit | BR-25, AC-34, AC-38 | Bangkok day boundaries | At 16:59:59.999Z "today" began at 17:00Z the day before; at 17:00:00.000Z it began at that instant; the 7-day window starts six Bangkok days before today; no dependence on the machine's time zone | `server/tests/lab-04/bangkok-day.unit.test.ts` | Planned |
 | UNIT-04 | Unit | BR-22, AC-39 | List query parsers | `status=ACTIVE` expands to the five active statuses on both lists; a single status still works; an unknown status is dropped and does not mark the list filtered; My Tickets accepts `sortBy=updatedAt`; the Lab 2 and Lab 3 defaults are unchanged | `server/tests/lab-04/ticket-query.unit.test.ts` | Planned |
 | UNIT-05 | Unit | BR-05, BR-06, BR-07, AC-07, AC-09 | Client-side Action Taken form validation | The same limits as UNIT-01, with the message attached to the right field; the prefilled time for a Ticket created earlier in the same minute passes; a hidden Follow-up Note is not validated and not sent | `client/tests/lab-04/actionValidation.test.ts` | Pass |
@@ -69,18 +69,18 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| API-18 | Workflow | BR-12, AC-18 | The whole matrix through the route | For all 56 ordered pairs of different statuses, with an owner and the gate met: the 18 permitted moves succeed and raise the version by one, the other 38 are `409` with status and version unchanged | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-19 | Workflow | BR-13, AC-19 | Gate: no Action Taken | An owned In Progress Ticket with no action is refused `409 RESOLUTION_GATE` with the documented sentence; the same from Waiting for Requester | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-20 | Workflow | BR-13, AC-20 | Gate: follow-up | Refused while the latest action requires follow-up, even when an earlier one does not; allowed after a later action with no follow-up is recorded; "latest" follows Action Date/Time, not the order of entry | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-21 | Workflow | BR-18, BR-19, AC-21 | Resolving and reopening | A gated move to Resolved succeeds and sets `resolvedAt`; Closed keeps it; Reopened clears it and the Requester's indication | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-22 | Workflow | BR-13, AC-22 | Order of refusal | An unassigned Ticket with no action is refused for the missing owner, not for the missing action; a move outside the matrix is reported before either | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-23 | Regression | BR-14, AC-23 | Legacy resolved Tickets | A Resolved Ticket with no Action Taken can be Closed; once Reopened and moved to In Progress it cannot be Resolved until the gate is met | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-24 | Authorization | BR-15, AC-24 | Requester and the gate | A Requester's status request is `403`; after their "appears resolved" indication the status is unchanged and a staff move to Resolved is still refused by the gate | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-25 | Workflow | BR-16, AC-25 | Stale and missing version | On each of status, owner and IT Priority: an old version is `409 STALE_TICKET` with nothing written, including for a change that would be a no-op; a missing or non-integer version is `400` on `expectedVersion` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-26 | Workflow | BR-16, AC-26 | Simultaneous changes | Two different changes sent together from the same version: exactly one `200` and one `409 STALE_TICKET`, and the version rises by one, repeated 20 times | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-27 | API | FR-08, AC-27 | Served transitions | `transitions` lists exactly the matrix row; `blockedReason` on Resolved is the sentence the status route then refuses with, and is null once the gate is met; `version` and `resolvedAt` are in the Ticket | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-28 | Workflow | BR-16 | What moves the version | A real owner or priority change raises it by one; a no-op does not; deactivating a user raises it on each Ticket that is unassigned as a result; recording an Action Taken and the Requester's indication do not | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
-| API-29 | Workflow | BR-13, AC-20 | Resolve against a concurrent follow-up | A move to Resolved and the creation of an action requiring follow-up sent together, repeated 20 times: whichever order they land in, the gate is never bypassed. If the action was written first the resolve is refused; if the resolve was first the action is refused as `TICKET_NOT_ACTIVE` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Planned |
+| API-18 | Workflow | BR-12, AC-18 | The whole matrix through the route | For all 56 ordered pairs of different statuses, with an owner and the gate met: the 18 permitted moves succeed and raise the version by one, the other 38 are `409` with status and version unchanged | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-19 | Workflow | BR-13, AC-19 | Gate: no Action Taken | An owned In Progress Ticket with no action is refused `409 RESOLUTION_GATE` with the documented sentence; the same from Waiting for Requester | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-20 | Workflow | BR-13, AC-20 | Gate: follow-up | Refused while the latest action requires follow-up, even when an earlier one does not; allowed after a later action with no follow-up is recorded; "latest" follows Action Date/Time, not the order of entry | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-21 | Workflow | BR-18, BR-19, AC-21 | Resolving and reopening | A gated move to Resolved succeeds and sets `resolvedAt`; Closed keeps it; Reopened clears it and the Requester's indication | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-22 | Workflow | BR-13, AC-22 | Order of refusal | An unassigned Ticket with no action is refused for the missing owner, not for the missing action; a move outside the matrix is reported before either | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-23 | Regression | BR-14, AC-23 | Legacy resolved Tickets | A Resolved Ticket with no Action Taken can be Closed; once Reopened and moved to In Progress it cannot be Resolved until the gate is met | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-24 | Authorization | BR-15, AC-24 | Requester and the gate | A Requester's status request is `403`; after their "appears resolved" indication the status is unchanged and a staff move to Resolved is still refused by the gate | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-25 | Workflow | BR-16, AC-25 | Stale and missing version | On each of status, owner and IT Priority: an old version is `409 STALE_TICKET` with nothing written, including for a change that would be a no-op; a missing or non-integer version is `400` on `expectedVersion` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-26 | Workflow | BR-16, AC-26 | Simultaneous changes | Two different changes sent together from the same version: exactly one `200` and one `409 STALE_TICKET`, and the version rises by one, repeated 20 times | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-27 | API | FR-08, AC-27 | Served transitions | `transitions` lists exactly the matrix row; `blockedReason` on Resolved is the sentence the status route then refuses with, and is null once the gate is met; `version` and `resolvedAt` are in the Ticket | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-28 | Workflow | BR-16 | What moves the version | A real owner or priority change raises it by one; a no-op does not; deactivating a user raises it on each Ticket that is unassigned as a result; recording an Action Taken and the Requester's indication do not | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
+| API-29 | Workflow | BR-13, AC-20 | Resolve against a concurrent follow-up | A move to Resolved and the creation of an action requiring follow-up sent together, repeated 20 times: whichever order they land in, the gate is never bypassed. If the action was written first the resolve is refused; if the resolve was first the action is refused as `TICKET_NOT_ACTIVE` | `server/tests/lab-04/ticket-workflow.api.test.ts` | Pass |
 
 ### API - Dashboards
 
@@ -126,11 +126,11 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | UI-08 | UI | FR-03, AC-11 | View and edit | View shows read-only text; Edit fills the form, shows Performed by as read-only text, and sends `expectedVersion` | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 | UI-09 | UI | BR-17, AC-12 | Stale edit | The alert names who changed it and the typed text remains; "Save my version" resends with the current version; "Discard my changes" loads the current values | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
 | UI-10 | UI | BR-08, AC-14 | Finished Ticket | On Resolved, Closed and Cancelled there is no Add or Edit and the "Reopen it to record more work" line is shown | `client/tests/lab-04/ActionsTaken.test.tsx` | Pass |
-| UI-11 | UI | FR-08, AC-27 | Permitted and blocked moves | `Move to` holds exactly the served transitions; a blocked one is disabled and its server reason is visible as text | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
-| UI-12 | UI | AC-27 | Gate clears without reload | After an Action Taken is saved the Ticket is fetched again and Resolved becomes selectable | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
-| UI-13 | UI | BR-16, AC-28 | Successful change | Status, owner and priority requests carry the Ticket's version; afterwards the summary badge shows the new status and the change is announced | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
-| UI-14 | UI | AC-29 | Conflict | `STALE_TICKET` and `RESOLUTION_GATE` show the server's message beside the control and reload the Ticket; the control shows the reloaded value | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
-| UI-15 | UI | BR-15, AC-24 | Requester has no status control | The Requester's Ticket Detail shows the status badge and the indication button and no control that changes status | `client/tests/lab-04/TicketWorkflow.test.tsx` | Planned |
+| UI-11 | UI | FR-08, AC-27 | Permitted and blocked moves | `Move to` holds exactly the served transitions; a blocked one is disabled and its server reason is visible as text | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-12 | UI | AC-27 | Gate clears without reload | After an Action Taken is saved the Ticket is fetched again and Resolved becomes selectable | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-13 | UI | BR-16, AC-28 | Successful change | Status, owner and priority requests carry the Ticket's version; afterwards the summary badge shows the new status and the change is announced | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-14 | UI | AC-29 | Conflict | `STALE_TICKET` and `RESOLUTION_GATE` show the server's message beside the control and reload the Ticket; the control shows the reloaded value | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
+| UI-15 | UI | BR-15, AC-24 | Requester has no status control | The Requester's Ticket Detail shows the status badge and the indication button and no control that changes status | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-16 | UI | FR-10, AC-33 | Staff metric cards | Each card shows its label and value and links to the queue with the served query; My Actions Today is not a link | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
 | UI-17 | UI | FR-10 | Tickets by Status | Eight rows, each a link to the queue for that status, zero shown as `0` | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
 | UI-18 | UI | FR-10, BR-27 | Staff lists | Rows link to the Ticket, an action row to its Actions Taken area; each empty list shows its own line | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
@@ -158,8 +158,8 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | RESP-06 | Responsive | AC-48 | Table and cards | The Actions Taken table is shown at 768px and above and the cards below it, never both | `e2e/lab-04/visual-regression.spec.ts` | Planned |
 | E2E-01 | E2E | AC-01, AC-10, AC-11, AC-42 | Actions Taken flow | IT Staff sign in, open a Ticket a colleague owns, record an Action Taken with follow-up, and see it under their own name; a second staff user records another and edits the first; both names and the edit mark are shown; a double click on Save creates one row | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
 | E2E-02 | E2E | AC-03, AC-04 | Requester sees the work | The owning Requester opens the same Ticket, sees every Action Taken with all fields and no way to add or edit, sees no Internal Note, and is refused by the API when creating one directly | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
-| E2E-03 | E2E | AC-19, AC-20, AC-21, AC-27, AC-28 | Resolution | On an owned Ticket with no Action Taken, Resolved is disabled with its reason; after an action requiring follow-up the reason changes; after a later action without follow-up Resolved is chosen, the summary badge reads Resolved and Add Action Taken is gone | `e2e/lab-04/ticket-resolution.spec.ts` | Planned |
-| E2E-04 | E2E | AC-25, AC-29 | Stale change | Two staff users hold the same Ticket open; one changes IT Priority; the other's status change is refused with the conflict message and their screen shows the reloaded Ticket | `e2e/lab-04/ticket-resolution.spec.ts` | Planned |
+| E2E-03 | E2E | AC-19, AC-20, AC-21, AC-27, AC-28 | Resolution | On an owned Ticket with no Action Taken, Resolved is disabled with its reason; after an action requiring follow-up the reason changes; after a later action without follow-up Resolved is chosen, the summary badge reads Resolved and Add Action Taken is gone | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
+| E2E-04 | E2E | AC-25, AC-29 | Stale change | Two staff users hold the same Ticket open; one changes IT Priority; the other's status change is refused with the conflict message and their screen shows the reloaded Ticket | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
 | E2E-05 | E2E | AC-33, AC-37, AC-40 | Staff dashboard | IT Staff land on the Dashboard after login; each card's number equals the total the queue shows after following it, with the filter visible in the queue's controls; a status row and a recent-action row open the right place | `e2e/lab-04/dashboards.spec.ts` | Planned |
 | E2E-06 | E2E | AC-02, AC-30, AC-31, AC-37 | Requester dashboard | A Requester lands on their Dashboard; each card's number equals the My Tickets total after following it; another Requester's Ticket never appears; the Requester with no Tickets sees zeros and the empty state | `e2e/lab-04/dashboards.spec.ts` | Planned |
 | E2E-07 | E2E | AC-32, AC-35, AC-45 | Administrator and forbidden routes | The Administrator sees the user-accounts card and can open System Status; IT Staff see neither; a Requester typing the staff dashboard address gets the Forbidden state | `e2e/lab-04/dashboards.spec.ts` | Planned |
@@ -294,6 +294,25 @@ One Lab 2 test changed on purpose and is listed in §7. Four Lab 3 tests failed 
 page had gained a second announcement region; the fix was in the screen, not in those tests: the
 Actions Taken area announces through the region the page already has.
 
+**#69, Ticket workflow, resolution gate and stale updates.** UNIT-02, API-18 to API-29, UI-11 to
+UI-15, E2E-03 and E2E-04 are Pass.
+
+| Suite | Result |
+| :-- | :-- |
+| Server, on the database `npm run e2e:fresh` builds | 27 files, 589 tests, all passed, 31 runs in a row |
+| Server, on the development database | 588 of 589, the same Daniel Okafor case as above |
+| Client | 21 files, 333 tests, all passed |
+| `npm run e2e:fresh` | 95 passed |
+| `npm run db:migration-check` | Passed |
+| Type checks (`server/`, `client/`, root), client lint and build | Clean |
+
+Six deliberate faults were put into the workflow code one at a time: no row lock, the gate reading
+the oldest action in place of the latest, no version rise when deactivation unassigns a Ticket,
+`resolvedAt` kept on reopening, a no-op priority change still writing, and the gate also asked on
+closing. Each made between one and six tests fail.
+
+This Issue also found and fixed the cause of the one-off server failures recorded in §8.
+
 MIG-02 does not run on the development database. It builds one of its own from the migrations,
 seeds it twice and compares the rows, because "the counts did not change" is only a statement
 about the seed when nothing else is in the database.
@@ -310,9 +329,10 @@ Any other change to a Lab 1 to Lab 3 test is a regression and is treated as one.
 
 | Earlier test | Why it changes | Issue |
 | :-- | :-- | :-: |
-| `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Status, owner and priority requests must send `expectedVersion`; cases that move a Ticket to Resolved first record an Action Taken. The concurrency cases now expect `STALE_TICKET` | #69 |
-| `client/tests/lab-03/StaffTicketDetail.test.tsx` | Fixtures gain `version` and `blockedReason`; request bodies gain `expectedVersion` | #69 |
-| `e2e/lab-03/staff-ticket-flow.spec.ts`, `e2e/lab-03/submission-evidence.spec.ts` | The flow records an Action Taken before resolving | #69 |
+| `server/tests/lab-03/staff-ticket-detail.api.test.ts` | Its `patch` helper reads the Ticket's version and sends it as `expectedVersion`, and the fixture Ticket always carries one Action Taken so that the gate is never what refuses a move there. Four cases change in substance: the exact-shape check gains `version`, `resolvedAt` and `blockedReason`; the two that forced a write into the gap between the route's read and its write are rewritten to send a stale version, because the route now holds the row locked and that gap no longer exists; and "two simultaneous claims" now expects one winner and one `STALE_TICKET` where Lab 3 let both succeed | #69 |
+| `server/tests/lab-03/users-admin.api.test.ts` | One owner request gains `expectedVersion` | #69 |
+| `client/tests/lab-03/StaffTicketDetail.test.tsx` | Fixtures gain `version`, `resolvedAt` and `blockedReason`, the mock server fills `blockedReason` for a missing owner and raises the version on each change, and six request-body assertions gain `expectedVersion` | #69 |
+| `e2e/lab-03/staff-ticket-flow.spec.ts`, `e2e/lab-03/submission-evidence.spec.ts`, `e2e/lab-03/visual-regression.spec.ts` | Tickets set up through the API use a helper that sends the current version, and an Action Taken is recorded before a Ticket is resolved. Two expectations change: with no work recorded the option reads "Resolved (not available yet)", and a change made from a screen a colleague has since overtaken is answered with the stale-version message where Lab 3 answered with the matrix | #69 |
 | `server/tests/lab-02/my-tickets.api.test.ts`, `server/tests/lab-03/staff-queue.unit.test.ts` | Only if an assertion lists the accepted sort keys or statuses exhaustively; the defaults themselves do not change | #70 |
 | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | It asserted that the Requester's Ticket Detail shows no Actions Taken, which was true while they were out of scope. FR-04 puts them there read-only, so the test now asserts that the area is present and offers no way to add or edit. Its mock also answers the new endpoint | #68 |
 | `client/tests/lab-01/UI-01` to `UI-03` | The page they render moves from `/` to `/system-status`, is opened as an Administrator, and no longer has "Submit Request" | #71 |
@@ -323,11 +343,19 @@ Any other change to a Lab 1 to Lab 3 test is a regression and is treated as one.
 
 ## 8. Known Limitations or Deferred Tests
 
-- **Rare one-off failures on the development database, not reproduced.** In 14 full runs of the
-  server suite during Issue #66, three runs each had a failure in a test this Issue does not touch:
-  `POST /api/tickets` answering `426` in `lab-02/create-ticket.api.test.ts`; "settles two
-  simultaneous claims" in `lab-03/staff-ticket-detail.api.test.ts` timing out at 5 seconds; and two
-  attachment cases in `lab-02/attachments.api.test.ts`, in the run straight after a Playwright run.
-  None repeated. The staff file then passed 8 of 8 alone on each database, and every full run on
-  the fresh database was clean. A development API and client were running on the same machine and
-  the same database throughout. Recorded, not explained.
+- **One-off server test failures, found and fixed in Issue #69.** From Issue #66 on, roughly one
+  full run of the server suite in four had a single failure in a test unrelated to the work in
+  hand: a `426` from `POST /api/tickets`, a `404` or `401` where the route answers `200`, or a
+  request that hung until the 5 second timeout. It was first seen only on the development database
+  and was recorded here as unexplained; in Issue #69 it appeared on the fresh database too, which
+  ruled the database out.
+
+  Supertest starts the app with `listen(0)`, which binds the IPv6 wildcard, and then sends its
+  request to `127.0.0.1`, which is IPv4. A `426` is something this application never sends, so
+  some requests were being answered by another program on the machine. `server/tests/helpers/setup.ts`
+  now makes Supertest connect to `[::1]`, the family the server is bound on. Before it, 6 of about
+  25 full runs on this branch had a failure; after it, 31 of 31 were clean.
+
+  What is established is the fix and the measurement. How another program came to hold the same
+  port number on IPv4 is not: two direct experiments (6,000 ports held on one family, 400
+  allocations on the other, both ways round) produced no collision.

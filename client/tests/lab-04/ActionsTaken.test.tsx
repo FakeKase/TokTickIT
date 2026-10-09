@@ -35,8 +35,10 @@ const STAFF_TICKET: StaffTicketDetail = {
   createdAt: '2026-09-01T09:00:00.000Z',
   updatedAt: '2026-09-02T09:00:00.000Z',
   attachments: [],
-  transitions: [{ to: 'WAITING_FOR_REQUESTER', requiresOwner: false }],
+  transitions: [{ to: 'WAITING_FOR_REQUESTER', requiresOwner: false, blockedReason: null }],
   ownerRequired: false,
+  version: 1,
+  resolvedAt: null,
 }
 
 const action = (overrides: Partial<ActionTaken> = {}): ActionTaken => ({

@@ -131,19 +131,19 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | UI-13 | UI | BR-16, AC-28 | Successful change | Status, owner and priority requests carry the Ticket's version; afterwards the summary badge shows the new status and the change is announced | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-14 | UI | AC-29 | Conflict | `STALE_TICKET` and `RESOLUTION_GATE` show the server's message beside the control and reload the Ticket; the control shows the reloaded value | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
 | UI-15 | UI | BR-15, AC-24 | Requester has no status control | The Requester's Ticket Detail shows the status badge and the indication button and no control that changes status | `client/tests/lab-04/TicketWorkflow.test.tsx` | Pass |
-| UI-16 | UI | FR-10, AC-33 | Staff metric cards | Each card shows its label and value and links to the queue with the served query; My Actions Today is not a link | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-17 | UI | FR-10 | Tickets by Status | Eight rows, each a link to the queue for that status, zero shown as `0` | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-18 | UI | FR-10, BR-27 | Staff lists | Rows link to the Ticket, an action row to its Actions Taken area; each empty list shows its own line | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-19 | UI | BR-29, AC-35 | User accounts card | Shown with both counts and a link for an Administrator; absent for IT Staff | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-20 | UI | AC-32, AC-41 | Staff dashboard states | Loading; failure with a retry and no numbers; Forbidden for a Requester with a link to their own Dashboard | `client/tests/lab-04/StaffDashboard.test.tsx` | Planned |
-| UI-21 | UI | FR-09, AC-30 | Requester metric cards | Four cards with values and links to My Tickets with the served query | `client/tests/lab-04/RequesterDashboard.test.tsx` | Planned |
-| UI-22 | UI | FR-09 | Requester lists | Needs your attention, Recently updated and Recently resolved render their rows as links, with their empty lines | `client/tests/lab-04/RequesterDashboard.test.tsx` | Planned |
-| UI-23 | UI | BR-27, AC-31 | Empty account | Four zeros, one empty state with Create Ticket, and no lists | `client/tests/lab-04/RequesterDashboard.test.tsx` | Planned |
-| UI-24 | UI | AC-32, AC-41 | Requester dashboard states | Loading; failure with a retry; Forbidden for staff | `client/tests/lab-04/RequesterDashboard.test.tsx` | Planned |
-| UI-25 | UI | FR-13, AC-40 | Navigation and landing | Dashboard is first for each role and the only item marked current on its route; `/` leads to the role's Dashboard; login lands there | `client/tests/lab-04/DashboardNav.test.tsx` | Planned |
-| UI-26 | UI | FR-12, AC-37 | My Tickets view in the URL | A `status` in the URL is applied and shown in the Status select; changing a filter, the sort or the page rewrites the URL; Clear Filters empties it; Active and Last Updated are offered | `client/tests/lab-04/MyTicketsFilters.test.tsx` | Planned |
-| UI-27 | UI | FR-12, AC-37 | Queue Active filter | The Status select offers Active and a URL carrying `status=ACTIVE` shows it selected | `client/tests/lab-04/MyTicketsFilters.test.tsx` | Planned |
-| UI-28 | UI | FR-16, AC-45 | System Status | Renders health and Categories for an Administrator, has no "Submit Request" control, and is Forbidden for the other two roles | `client/tests/lab-04/SystemStatus.test.tsx` | Planned |
+| UI-16 | UI | FR-10, AC-33 | Staff metric cards | Each card shows its label and value and links to the queue with the served query; My Actions Today is not a link | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-17 | UI | FR-10 | Tickets by Status | Eight rows, each a link to the queue for that status, zero shown as `0` | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-18 | UI | FR-10, BR-27 | Staff lists | Rows link to the Ticket, an action row to its Actions Taken area; each empty list shows its own line | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-19 | UI | BR-29, AC-35 | User accounts card | Shown with both counts and a link for an Administrator; absent for IT Staff | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-20 | UI | AC-32, AC-41 | Staff dashboard states | Loading; failure with a retry and no numbers; Forbidden for a Requester with a link to their own Dashboard | `client/tests/lab-04/StaffDashboard.test.tsx` | Pass |
+| UI-21 | UI | FR-09, AC-30 | Requester metric cards | Four cards with values and links to My Tickets with the served query | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
+| UI-22 | UI | FR-09 | Requester lists | Needs your attention, Recently updated and Recently resolved render their rows as links, with their empty lines | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
+| UI-23 | UI | BR-27, AC-31 | Empty account | Four zeros, one empty state with Create Ticket, and no lists | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
+| UI-24 | UI | AC-32, AC-41 | Requester dashboard states | Loading; failure with a retry; Forbidden for staff | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
+| UI-25 | UI | FR-13, AC-40 | Navigation and landing | Dashboard is first for each role and the only item marked current on its route; `/` leads to the role's Dashboard; login lands there | `client/tests/lab-04/DashboardNav.test.tsx` | Pass |
+| UI-26 | UI | FR-12, AC-37 | My Tickets view in the URL | A `status` in the URL is applied and shown in the Status select; changing a filter, the sort or the page rewrites the URL; Clear Filters empties it; Active and Last Updated are offered | `client/tests/lab-04/MyTicketsFilters.test.tsx` | Pass |
+| UI-27 | UI | FR-12, AC-37 | Queue Active filter | The Status select offers Active and a URL carrying `status=ACTIVE` shows it selected | `client/tests/lab-04/MyTicketsFilters.test.tsx` | Pass |
+| UI-28 | UI | FR-16, AC-45 | System Status | Renders health and Categories for an Administrator, has no "Submit Request" control, and is Forbidden for the other two roles | `client/tests/lab-04/SystemStatus.test.tsx` | Pass |
 | UI-29 | UI | BR-31, AC-43 | Earlier forms keep their data | After a failed submission the comment composer, the note composer, Create Ticket and the user dialog still hold what was typed | `client/tests/lab-04/FormPreservation.test.tsx` | Planned |
 
 ### UI style, responsive and end-to-end
@@ -160,9 +160,9 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | E2E-02 | E2E | AC-03, AC-04 | Requester sees the work | The owning Requester opens the same Ticket, sees every Action Taken with all fields and no way to add or edit, sees no Internal Note, and is refused by the API when creating one directly | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
 | E2E-03 | E2E | AC-19, AC-20, AC-21, AC-27, AC-28 | Resolution | On an owned Ticket with no Action Taken, Resolved is disabled with its reason; after an action requiring follow-up the reason changes; after a later action without follow-up Resolved is chosen, the summary badge reads Resolved and Add Action Taken is gone | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
 | E2E-04 | E2E | AC-25, AC-29 | Stale change | Two staff users hold the same Ticket open; one changes IT Priority; the other's status change is refused with the conflict message and their screen shows the reloaded Ticket | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
-| E2E-05 | E2E | AC-33, AC-37, AC-40 | Staff dashboard | IT Staff land on the Dashboard after login; each card's number equals the total the queue shows after following it, with the filter visible in the queue's controls; a status row and a recent-action row open the right place | `e2e/lab-04/dashboards.spec.ts` | Planned |
-| E2E-06 | E2E | AC-02, AC-30, AC-31, AC-37 | Requester dashboard | A Requester lands on their Dashboard; each card's number equals the My Tickets total after following it; another Requester's Ticket never appears; the Requester with no Tickets sees zeros and the empty state | `e2e/lab-04/dashboards.spec.ts` | Planned |
-| E2E-07 | E2E | AC-32, AC-35, AC-45 | Administrator and forbidden routes | The Administrator sees the user-accounts card and can open System Status; IT Staff see neither; a Requester typing the staff dashboard address gets the Forbidden state | `e2e/lab-04/dashboards.spec.ts` | Planned |
+| E2E-05 | E2E | AC-33, AC-37, AC-40 | Staff dashboard | IT Staff land on the Dashboard after login; each card's number equals the total the queue shows after following it, with the filter visible in the queue's controls; a status row and a recent-action row open the right place | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-06 | E2E | AC-02, AC-30, AC-31, AC-37 | Requester dashboard | A Requester lands on their Dashboard; each card's number equals the My Tickets total after following it; another Requester's Ticket never appears; the Requester with no Tickets sees zeros and the empty state | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-07 | E2E | AC-32, AC-35, AC-45 | Administrator and forbidden routes | The Administrator sees the user-accounts card and can open System Status; IT Staff see neither; a Requester typing the staff dashboard address gets the Forbidden state | `e2e/lab-04/dashboards.spec.ts` | Pass |
 
 ## 3. Acceptance-Criterion Traceability
 
@@ -350,6 +350,44 @@ Two things differ from the plan in §2. API-36 cannot make a status empty in a s
 same file. PERF-01 takes the median of five calls after a warm-up, not one call, so a single slow
 or lucky request decides nothing.
 
+**#71, Requester and IT Staff dashboards, navigation and landing.** UI-16 to UI-28 and E2E-05 to
+E2E-07 are Pass.
+
+| Suite | Result |
+| :-- | :-- |
+| Server, on the database `npm run e2e:fresh` builds | 32 files, 671 tests, all passed (no server change in this Issue) |
+| Client | 26 files, 413 tests, all passed |
+| `npm run e2e:fresh` | 100 passed |
+| Type checks (`server/`, `client/`, root), client lint and build | Clean |
+
+The earlier tests changed here are the ones §7 lists for this Issue, and each change is the landing
+route, the navigation labels, or the Check System screen becoming System Status. The Lab 2 My
+Tickets tests passed unchanged over the move of its view into the URL.
+
+Three things were found by looking at the captures and were not in the plan:
+
+- Dashboard and System Status took the Administrator's navigation from two items to four and the
+  Requester's from two to three. At 820px the labels wrapped onto two lines and the role badge was
+  cut to one letter. A role with more than two items now gets the menu at tablet width as well as on
+  a phone; IT Staff have two, which fit. `e2e/lab-04/dashboards.spec.ts` checks every role at every
+  width: header 64px high, each label on one line, the role badge whole.
+- My Tickets showed its total only inside the pagination, which is absent on a single page. AC-37
+  compares a card with the total of the list it opens, so the heading now carries "7 Tickets", as
+  the Ticket Queue's always has.
+- A response that is `200` but not a dashboard made the screen fail while drawing. The client call
+  now rejects it, and the screen shows its failure state with a retry.
+
+Seven deliberate faults were put into the client one at a time: the Administrator's landing
+route, the status filter not sent by My Tickets, the fragment dropped from an action row's link,
+Dashboard marked current across all of `/staff`, a "Submit Request" button put back, the user
+card decided by role, and the empty account decided by the four counts. The first five failed at
+least one test each. The sixth changes nothing a user could see, since only an Administrator is
+sent the counts. The seventh passed, which showed a missing case: a Requester whose only Ticket
+is Cancelled has four zeros and is not an empty account. That case is now a test under UI-23.
+
+One thing was seen and left for #72, because it is older than this Issue: on a phone the My Tickets
+filter fields are a few pixels wider than the card they sit in. It is in the Lab 3 capture too.
+
 MIG-02 does not run on the development database. It builds one of its own from the migrations,
 seeds it twice and compares the rows, because "the counts did not change" is only a statement
 about the seed when nothing else is in the database.
@@ -374,8 +412,9 @@ Any other change to a Lab 1 to Lab 3 test is a regression and is treated as one.
 | `client/tests/lab-02/RequesterTicketDetail.test.tsx` | It asserted that the Requester's Ticket Detail shows no Actions Taken, which was true while they were out of scope. FR-04 puts them there read-only, so the test now asserts that the area is present and offers no way to add or edit. Its mock also answers the new endpoint | #68 |
 | `client/tests/lab-01/UI-01` to `UI-03` | The page they render moves from `/` to `/system-status`, is opened as an Administrator, and no longer has "Submit Request" | #71 |
 | `client/tests/lab-02/AppShellNav.test.tsx`, `client/tests/lab-03/AppShellAuth.test.tsx`, `client/tests/lab-03/Login.test.tsx` | Dashboard joins each role's navigation and becomes the landing route | #71 |
-| `client/tests/lab-02/MyTickets.test.tsx` | Filters, sort and page move into the URL, and a Status filter is added | #71 |
-| `e2e/lab-02/helpers.ts`, `e2e/lab-03/helpers.ts`, `e2e/lab-03/authentication.spec.ts`, `e2e/lab-03/user-administration.spec.ts` | Assertions about where a role lands after signing in | #71 |
+| `client/tests/lab-02/MyTickets.test.tsx` | Expected to change when its filters, sort and page moved into the URL. It did not have to: every case passed as written, and the new behaviour is UI-26 | #71 |
+| `e2e/lab-03/helpers.ts`, `e2e/lab-03/authentication.spec.ts`, `e2e/lab-03/user-administration.spec.ts`, `e2e/lab-03/submission-evidence.spec.ts`, `e2e/lab-03/visual-regression.spec.ts` | Where a role lands after signing in, and the navigation labels each role is shown. `ACCOUNTS` gains `landing` beside `home`, which still names the role's working screen for the Lab 3 captures. `e2e/lab-02/helpers.ts` did not need to change: it signs in from a guarded address and is returned to it | #71 |
+| `client/tests/lab-03/ChangePassword.test.tsx` | One assertion about where a Requester continues to after changing their password | #71 |
 | `server/src/scripts/e2e-cleanup.ts` | The teardown removes Actions Taken before the Tickets and users they refer to. No earlier test changed; REG-05 is new | #66 |
 
 ## 8. Known Limitations or Deferred Tests

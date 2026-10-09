@@ -8,6 +8,7 @@ import type {
   StaffQueueParams,
   StaffQueueResponse,
   StaffQueueSortField,
+  StatusFilter,
   TicketStatus,
 } from '../api'
 import { landingPathFor } from '../auth/landing'
@@ -23,6 +24,9 @@ import { formatAbsolute, formatRelative } from './relativeTime'
 import './StaffTicketQueuePage.css'
 
 const STATUSES = Object.keys(STATUS_LABEL) as TicketStatus[]
+/** What the Status select may hold: a status, or every active one (Lab 4
+ *  BR-22), which is what the dashboard's cards link to. */
+const STATUS_FILTERS: StatusFilter[] = ['ACTIVE', ...STATUSES]
 const IT_PRIORITIES = Object.keys(IT_PRIORITY_LABEL) as ItPriority[]
 
 /** Every key the API sorts by. Created Date has no column (ui-spec.md §4), so
@@ -39,7 +43,7 @@ type Owner = 'me' | 'unassigned' | ''
 
 interface View {
   search: string
-  status: TicketStatus | ''
+  status: StatusFilter | ''
   itPriority: ItPriority | ''
   categoryId: string
   owner: Owner
@@ -77,7 +81,7 @@ function readView(params: URLSearchParams): View {
 
   return {
     search: params.get('search')?.trim() ?? '',
-    status: pick(STATUSES, params.get('status')),
+    status: pick(STATUS_FILTERS, params.get('status')),
     itPriority: pick(IT_PRIORITIES, params.get('itPriority')),
     categoryId: /^[1-9]\d*$/.test(params.get('categoryId') ?? '') ? params.get('categoryId')! : '',
     owner: pick(['me', 'unassigned'] as const, params.get('owner')),
@@ -275,7 +279,7 @@ export function StaffTicketQueuePage() {
       <div className="ttk-queue__head">
         <h2>Ticket Queue</h2>
         {pagination && pagination.totalItems > 0 && (
-          <p className="ttk-queue__count">
+          <p className="ttk-queue__count" data-testid="list-total">
             {pagination.totalItems} {pagination.totalItems === 1 ? 'Ticket' : 'Tickets'}
           </p>
         )}
@@ -325,6 +329,7 @@ export function StaffTicketQueuePage() {
                   onChange={(event) => change({ status: event.target.value as TicketStatus | '' })}
                 >
                   <option value="">All statuses</option>
+                  <option value="ACTIVE">Active</option>
                   {STATUSES.map((status) => (
                     <option key={status} value={status}>
                       {STATUS_LABEL[status]}

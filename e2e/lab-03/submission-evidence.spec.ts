@@ -77,7 +77,7 @@ test.describe('Part 5: authentication', () => {
     await page.getByRole('button', { name: 'Sign in' }).click()
     await expect(page.getByText('Signing in…')).toBeVisible()
     await capture(page, 'authentication', 'login-busy')
-    await expect(page).toHaveURL(/\/staff\/tickets$/)
+    await expect(page).toHaveURL(/\/staff\/dashboard$/)
   })
 
   test('an inactive account, and the API being unreachable', async ({ page }) => {

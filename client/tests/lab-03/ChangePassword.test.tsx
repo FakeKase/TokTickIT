@@ -197,7 +197,7 @@ describe('UI-07 success (AC-12)', () => {
 
     await fill('ChangeMe123!', 'Replacement1!', 'Replacement1!')
 
-    await waitFor(() => expect(window.location.pathname).toBe('/tickets'))
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
     expect(calls).toEqual([
       {
         currentPassword: 'ChangeMe123!',

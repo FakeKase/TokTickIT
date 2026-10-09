@@ -25,6 +25,9 @@ Breakpoints are unchanged: mobile below 768px, tablet from 768px, desktop from 9
   dashboard row marks My Tickets or Ticket Queue, since that is where the Ticket lives.
 - Only permitted destinations are rendered. A Requester has no staff item and IT Staff have no
   System Status item.
+- Every label stays on one line. Three or four items do not fit beside the name, role and Log out
+  between 768px and 991px, so a role with more than two items (Requester, Administrator) uses the
+  menu button at tablet width as well as on mobile. IT Staff have two and keep them in the header.
 
 ## 2. Metric cards and dashboard lists
 
@@ -131,6 +134,8 @@ A count is only as good as the list it opens, so the two list screens change to 
 - **Last Updated** becomes a sortable column and an option in the mobile Sort by select.
 - Arriving from a dashboard card, the matching filter is shown selected in its control, the
   No-Results state and `Clear Filters` behave as for a filter chosen by hand.
+- The heading carries the list's total, "7 Tickets", as the Ticket Queue's does, so the number on
+  a card can be compared with the list it opened. It is left out when the list is empty.
 
 **Ticket Queue (`/staff/tickets`).** The Status select gains "Active" after "All Statuses".
 Nothing else changes; it already reads its view from the URL.
@@ -253,6 +258,7 @@ appears resolved` button and its callout, and no status control.
 - **System Status (`/system-status`, Administrator only).** The Lab 1 Check System content: whether
   the API and the database answer, and the Category list. The "Submit Request" buttons, which never
   did anything, are removed. Any other role typing the address gets the Forbidden state.
+  The check runs when the screen opens, where Lab 1 waited for a button; `Check again` repeats it.
 - **Removed from `/`.** The landing page for every role is now their Dashboard.
 - **Swept in the hardening Issue.** Any remaining placeholder text, dead link, control without an
   effect, or style that differs between screens for the same component. Each one found is listed in

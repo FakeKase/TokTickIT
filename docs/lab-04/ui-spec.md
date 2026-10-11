@@ -129,6 +129,10 @@ A count is only as good as the list it opens, so the two list screens change to 
 **My Tickets (`/tickets`).**
 - Filters, sort and page now live in the URL, as the Ticket Queue's already do. A dashboard link, a
   reload and the Back button all show the same list.
+- A page past the end is corrected to the last real page, in the list and in the URL. Tickets leave
+  a filter as their status moves, so a reloaded or bookmarked page can stop existing, and it must
+  not read as "You haven't created any tickets yet". The Empty and No-Results states are decided on
+  the total, never on one page's rows.
 - A **Status** select joins Category and Requested Priority: All Statuses, Active, then the eight
   statuses. "Active" means New, Open, In Progress, Waiting for Requester and Reopened.
 - **Last Updated** becomes a sortable column and an option in the mobile Sort by select.

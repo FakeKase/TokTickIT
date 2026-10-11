@@ -213,6 +213,16 @@ test('E2E-06: a Requester lands on a Dashboard of their own Tickets and nobody e
   await page.goBack()
   await expect(page).toHaveURL(/\/tickets\?status=WAITING_FOR_REQUESTER$/)
   await expect(page.getByLabel('Status', { exact: true })).toHaveValue('WAITING_FOR_REQUESTER')
+
+  // A page past the end, as a reload gets once Tickets have left the filter:
+  // the last real page is shown and the address says so. Not the Empty state.
+  const waitingTotal = await listTotal(page)
+  await page.goto('/tickets?status=WAITING_FOR_REQUESTER&page=99')
+  await expect(page).not.toHaveURL(/page=99/)
+  await expect(page).toHaveURL(/\/tickets\?status=WAITING_FOR_REQUESTER(&page=\d+)?$/)
+  await expect(page.getByRole('table')).toBeVisible()
+  expect(await listTotal(page)).toBe(waitingTotal)
+  await expect(page.getByRole('heading', { name: /haven't created any tickets|No tickets match/ })).toHaveCount(0)
 })
 
 test('E2E-06: a Requester with no Tickets sees zeros and one empty state', async ({ page, request }) => {

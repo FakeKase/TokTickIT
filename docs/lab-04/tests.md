@@ -141,7 +141,7 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | UI-23 | UI | BR-27, AC-31 | Empty account | Four zeros, one empty state with Create Ticket, and no lists | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
 | UI-24 | UI | AC-32, AC-41 | Requester dashboard states | Loading; failure with a retry; Forbidden for staff | `client/tests/lab-04/RequesterDashboard.test.tsx` | Pass |
 | UI-25 | UI | FR-13, AC-40 | Navigation and landing | Dashboard is first for each role and the only item marked current on its route; `/` leads to the role's Dashboard; login lands there | `client/tests/lab-04/DashboardNav.test.tsx` | Pass |
-| UI-26 | UI | FR-12, AC-37 | My Tickets view in the URL | A `status` in the URL is applied and shown in the Status select; changing a filter, the sort or the page rewrites the URL; Clear Filters empties it; Active and Last Updated are offered | `client/tests/lab-04/MyTicketsFilters.test.tsx` | Pass |
+| UI-26 | UI | FR-12, AC-37 | My Tickets view in the URL | A `status` in the URL is applied and shown in the Status select; changing a filter, the sort or the page rewrites the URL; Clear Filters empties it; Active and Last Updated are offered. A page past the end is replaced by the last real page, in the list and in the URL, with the filter and sort kept; a Requester with no Tickets still gets the Empty state | `client/tests/lab-04/MyTicketsFilters.test.tsx` | Pass |
 | UI-27 | UI | FR-12, AC-37 | Queue Active filter | The Status select offers Active and a URL carrying `status=ACTIVE` shows it selected | `client/tests/lab-04/MyTicketsFilters.test.tsx` | Pass |
 | UI-28 | UI | FR-16, AC-45 | System Status | Renders health and Categories for an Administrator, has no "Submit Request" control, and is Forbidden for the other two roles | `client/tests/lab-04/SystemStatus.test.tsx` | Pass |
 | UI-29 | UI | BR-31, AC-43 | Earlier forms keep their data | After a failed submission the comment composer, the note composer, Create Ticket and the user dialog still hold what was typed | `client/tests/lab-04/FormPreservation.test.tsx` | Planned |
@@ -161,7 +161,7 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | E2E-03 | E2E | AC-19, AC-20, AC-21, AC-27, AC-28 | Resolution | On an owned Ticket with no Action Taken, Resolved is disabled with its reason; after an action requiring follow-up the reason changes; after a later action without follow-up Resolved is chosen, the summary badge reads Resolved and Add Action Taken is gone | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
 | E2E-04 | E2E | AC-25, AC-29 | Stale change | Two staff users hold the same Ticket open; one changes IT Priority; the other's status change is refused with the conflict message and their screen shows the reloaded Ticket | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
 | E2E-05 | E2E | AC-33, AC-37, AC-40 | Staff dashboard | IT Staff land on the Dashboard after login; each card's number equals the total the queue shows after following it, with the filter visible in the queue's controls; a status row and a recent-action row open the right place | `e2e/lab-04/dashboards.spec.ts` | Pass |
-| E2E-06 | E2E | AC-02, AC-30, AC-31, AC-37 | Requester dashboard | A Requester lands on their Dashboard; each card's number equals the My Tickets total after following it; another Requester's Ticket never appears; the Requester with no Tickets sees zeros and the empty state | `e2e/lab-04/dashboards.spec.ts` | Pass |
+| E2E-06 | E2E | AC-02, AC-30, AC-31, AC-37 | Requester dashboard | A Requester lands on their Dashboard; each card's number equals the My Tickets total after following it; a page past the end of that list shows its last page; another Requester's Ticket never appears; the Requester with no Tickets sees zeros and the empty state | `e2e/lab-04/dashboards.spec.ts` | Pass |
 | E2E-07 | E2E | AC-32, AC-35, AC-45 | Administrator and forbidden routes | The Administrator sees the user-accounts card and can open System Status; IT Staff see neither; a Requester typing the staff dashboard address gets the Forbidden state | `e2e/lab-04/dashboards.spec.ts` | Pass |
 
 ## 3. Acceptance-Criterion Traceability
@@ -356,7 +356,7 @@ E2E-07 are Pass.
 | Suite | Result |
 | :-- | :-- |
 | Server, on the database `npm run e2e:fresh` builds | 32 files, 671 tests, all passed (no server change in this Issue) |
-| Client | 26 files, 413 tests, all passed |
+| Client | 26 files, 417 tests, all passed |
 | `npm run e2e:fresh` | 100 passed |
 | Type checks (`server/`, `client/`, root), client lint and build | Clean |
 
@@ -384,6 +384,13 @@ card decided by role, and the empty account decided by the four counts. The firs
 least one test each. The sixth changes nothing a user could see, since only an Administrator is
 sent the counts. The seventh passed, which showed a missing case: a Requester whose only Ticket
 is Cancelled has four zeros and is not an empty account. That case is now a test under UI-23.
+
+Review found one more. With the page in the URL, `/tickets?page=5` for a Requester with three
+Tickets showed "You haven't created any tickets yet": the route answers a page past the end with no
+rows, and the screen decided the Empty state on the rows. The screen now moves to the last real
+page and corrects the URL, and decides Empty and No-Results on the total. Four cases under UI-26
+use a mock that answers as the route does, and each fails without the fix; E2E-06 asks for page 99
+against the real API.
 
 One thing was seen and left for #72, because it is older than this Issue: on a phone the My Tickets
 filter fields are a few pixels wider than the card they sit in. It is in the Lab 3 capture too.

@@ -178,16 +178,31 @@ export function MyTicketsPage() {
           page: view.page,
         }
         const loaded = await fetchTickets(request)
-        if (isCurrent()) setResponse(loaded)
+        if (!isCurrent()) return
+
+        // A page past the end comes back with no rows, and this route does
+        // not clamp it as the Ticket Queue's does. The page is in the address
+        // now, so a reload or a bookmark can ask for one that stopped
+        // existing when Tickets left the filter. The address is corrected to
+        // the last real page and that page is fetched instead; drawing this
+        // response would show an empty list to someone who has Tickets.
+        // The page only ever goes down, so this cannot go round for ever.
+        const lastPage = Math.max(loaded.pagination.totalPages, 1)
+        if (view.page > lastPage) {
+          setParams(writeView({ ...view, page: lastPage }), { replace: true })
+          return
+        }
+
+        setResponse(loaded)
+        setLoading(false)
       } catch {
         if (!isCurrent()) return
         setFailed(true)
         setResponse(null)
-      } finally {
-        if (isCurrent()) setLoading(false)
+        setLoading(false)
       }
     },
-    [signedInUserId, view],
+    [signedInUserId, view, setParams],
   )
 
   useEffect(() => {
@@ -243,8 +258,11 @@ export function MyTicketsPage() {
 
   const pagination = response?.pagination
   const rows = response?.data ?? []
-  const isEmptyAccount = Boolean(response) && rows.length === 0 && !response!.filtered
-  const isNoResults = Boolean(response) && rows.length === 0 && response!.filtered
+  // Decided on the total and not on this page's rows: a page with no rows is
+  // not a Requester with no Tickets.
+  const hasNone = pagination?.totalItems === 0
+  const isEmptyAccount = hasNone && !response!.filtered
+  const isNoResults = hasNone && response!.filtered
 
   return (
     <div className="ttk-my-tickets">

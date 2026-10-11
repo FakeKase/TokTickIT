@@ -230,6 +230,71 @@ describe('UI-26 My Tickets view in the URL (FR-12, AC-37)', () => {
     await waitFor(() => expect(address()).toBe('/tickets'))
   })
 
+  // The route answers a page past the end as it was asked: that page, no rows,
+  // the real total. It does not clamp, so the mock here does not either.
+  describe('a page past the end', () => {
+    const threeTickets = (query: URLSearchParams) =>
+      Number(query.get('page') ?? 1) > 1
+        ? { rows: 0, totalItems: 3, totalPages: 1 }
+        : { rows: 3, totalItems: 3, totalPages: 1 }
+
+    it('goes to the last real page instead of the Empty state', async () => {
+      mockApi(threeTickets)
+      await openMyTickets('/tickets?page=5')
+
+      await waitFor(() => expect(address()).toBe('/tickets'))
+      expect(lastRequest()).toMatchObject({ page: '1' })
+      expect(screen.getAllByRole('row')).toHaveLength(4)
+      expect(screen.getByTestId('list-total')).toHaveTextContent('3 Tickets')
+      expect(screen.getByLabelText('Search')).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: "You haven't created any tickets yet" })).not.toBeInTheDocument()
+    })
+
+    it('keeps the filter and the sort, and does not show No-Results', async () => {
+      mockApi((query) =>
+        Number(query.get('page') ?? 1) > 2
+          ? { rows: 0, totalItems: 12, totalPages: 2 }
+          : { rows: 2, totalItems: 12, totalPages: 2 },
+      )
+      await openMyTickets('/tickets?status=ACTIVE&sortBy=updatedAt&page=4')
+
+      await waitFor(() => expect(address()).toBe('/tickets?status=ACTIVE&sortBy=updatedAt&page=2'))
+      expect(lastRequest()).toMatchObject({ status: 'ACTIVE', sortBy: 'updatedAt', page: '2' })
+      expect(screen.getByLabelText('Status')).toHaveValue('ACTIVE')
+      expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled()
+      expect(screen.queryByRole('heading', { name: 'No tickets match your filters' })).not.toBeInTheDocument()
+    })
+
+    it('never draws the empty response on the way', async () => {
+      mockApi(threeTickets)
+      signedIn = authUser({ id: 1, name: 'Peter Parker', role: 'REQUESTER' })
+      window.history.pushState({}, '', '/tickets?page=5')
+      const seen: string[] = []
+      const observer = new MutationObserver(() => {
+        for (const heading of document.querySelectorAll('h2, h3')) seen.push(heading.textContent ?? '')
+      })
+      observer.observe(document.body, { childList: true, subtree: true })
+
+      await renderApp()
+      await screen.findByRole('table')
+      observer.disconnect()
+
+      expect(seen).not.toContain("You haven't created any tickets yet")
+      expect(requests.map((query) => query.get('page'))).toEqual(['5', '1'])
+    })
+
+    it('still shows the Empty state for a Requester with no Tickets, on page 1', async () => {
+      mockApi(() => ({ rows: 0 }))
+      signedIn = authUser({ id: 1, role: 'REQUESTER' })
+      window.history.pushState({}, '', '/tickets?page=5')
+      await renderApp()
+
+      expect(await screen.findByRole('heading', { name: "You haven't created any tickets yet" })).toBeInTheDocument()
+      expect(address()).toBe('/tickets')
+      expect(screen.queryByLabelText('Search')).not.toBeInTheDocument()
+    })
+  })
+
   it('follows the address when it changes under the screen, as Back does', async () => {
     mockApi()
     await openMyTickets('/tickets?status=ACTIVE')

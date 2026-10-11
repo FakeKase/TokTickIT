@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { renderApp } from '../helpers/renderApp'
 import { authRoutes, authUser } from '../helpers/auth'
 import shellCss from '../../src/layout/AppShell.css?raw'
@@ -118,10 +118,13 @@ describe('Primary nav active state', () => {
     expect(navLink(/My Tickets/i)).not.toHaveAttribute('aria-current')
   })
 
-  it('marks nothing active outside the ticket section', async () => {
+  // Lab 4: `/` used to be a screen of its own with no nav item, so nothing
+  // was marked there. It now leads to the Dashboard, which has one.
+  it('leads from / to the Dashboard and marks only that', async () => {
     await renderAt('/')
 
-    expect(activeLinkNames()).toEqual([])
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
+    expect(activeLinkNames()).toEqual(['Dashboard'])
   })
 })
 

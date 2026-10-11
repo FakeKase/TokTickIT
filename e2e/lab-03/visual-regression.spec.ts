@@ -204,9 +204,9 @@ test.describe('RESP-01 (AC-42): no overflow, clipping or overlap, at three width
 
 test.describe('role navigation shows only permitted destinations', () => {
   const NAV = {
-    requester: ['My Tickets', 'Create Ticket'],
-    staff: ['Ticket Queue'],
-    admin: ['Ticket Queue', 'User Management'],
+    requester: ['Dashboard', 'My Tickets', 'Create Ticket'],
+    staff: ['Dashboard', 'Ticket Queue'],
+    admin: ['Dashboard', 'Ticket Queue', 'User Management', 'System Status'],
   }
 
   for (const role of ['requester', 'staff', 'admin'] as const) {

@@ -81,7 +81,7 @@ describe('UI-01 Login (AC-01)', () => {
 
     await fillAndSubmit('peter.parker@toktickit.test', 'ChangeMe123!')
 
-    await waitFor(() => expect(window.location.pathname).toBe('/tickets'))
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
     expect(calls).toHaveLength(1)
     expect(calls[0]).toEqual({
       email: 'peter.parker@toktickit.test',
@@ -91,8 +91,8 @@ describe('UI-01 Login (AC-01)', () => {
 
   it('sends IT Staff and Administrators to their own landing pages', async () => {
     for (const [role, path] of [
-      ['IT_STAFF', '/staff/tickets'],
-      ['ADMINISTRATOR', '/admin/users'],
+      ['IT_STAFF', '/staff/dashboard'],
+      ['ADMINISTRATOR', '/staff/dashboard'],
     ] as const) {
       vi.restoreAllMocks()
       window.history.pushState({}, '', '/login')
@@ -160,7 +160,7 @@ describe('the remembered destination (review of PR #52)', () => {
 
     await fillAndSubmit('sarah.chen@toktickit.test', 'ChangeMe123!')
 
-    await waitFor(() => expect(window.location.pathname).toBe('/staff/tickets'))
+    await waitFor(() => expect(window.location.pathname).toBe('/staff/dashboard'))
   })
 })
 
@@ -213,7 +213,7 @@ describe('UI-03 Login busy state (AC-07)', () => {
     expect(calls).toHaveLength(1)
 
     release(Response.json({ user: authUser() }))
-    await waitFor(() => expect(window.location.pathname).toBe('/tickets'))
+    await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
   })
 })
 

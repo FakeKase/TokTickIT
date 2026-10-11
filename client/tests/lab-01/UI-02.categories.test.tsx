@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { CheckSystemPage } from '../../src/pages/CheckSystemPage'
+import { SystemStatusPage } from '../../src/pages/SystemStatusPage'
 
 // Rendered as the page rather than through <App />: Lab 3 put every screen
-// behind a session, and these tests are about the Check System screen itself.
+// behind a session, and these tests are about the screen itself. Since Lab 4
+// it is System Status, for an Administrator at /system-status: it checks on
+// arrival, and its "Submit Request" buttons are gone (Lab 4 ui-spec.md §8).
+// Who may open it is UI-28 in tests/lab-04/SystemStatus.test.tsx.
 // UI-02 (Issue 3): The app fetches and displays the four IT request categories
 // in a grid layout. Tests cover success (categories render) and failure (error
 // message when fetch fails).
@@ -25,21 +27,19 @@ describe('UI-02 Category list', () => {
     { id: 4, name: 'Other', description: 'Everything else' },
   ]
 
-  it('loads and displays all four categories when user clicks Check System', async () => {
+  it('loads and displays all four categories on arrival', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       Response.json({ status: 'ok', service: 'TokTickIT API' }),
     )
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       Response.json(mockCategories),
     )
-    const user = userEvent.setup()
 
     render(
       <MemoryRouter>
-        <CheckSystemPage />
+        <SystemStatusPage />
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     await waitFor(() => {
       expect(screen.getByText('Hardware')).toBeInTheDocument()
@@ -56,14 +56,12 @@ describe('UI-02 Category list', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       Response.json(mockCategories),
     )
-    const user = userEvent.setup()
 
     render(
       <MemoryRouter>
-        <CheckSystemPage />
+        <SystemStatusPage />
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     await waitFor(() => {
       expect(
@@ -80,14 +78,12 @@ describe('UI-02 Category list', () => {
       Response.json({ status: 'ok', service: 'TokTickIT API' }),
     )
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('Network error'))
-    const user = userEvent.setup()
 
     render(
       <MemoryRouter>
-        <CheckSystemPage />
+        <SystemStatusPage />
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/Unable to connect to TokTickIT API/)).toBeInTheDocument()
@@ -101,14 +97,12 @@ describe('UI-02 Category list', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       Response.json(mockCategories),
     )
-    const user = userEvent.setup()
 
     render(
       <MemoryRouter>
-        <CheckSystemPage />
+        <SystemStatusPage />
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: /Check System/i }))
 
     await waitFor(() => {
       expect(screen.getByText('Online')).toBeInTheDocument()

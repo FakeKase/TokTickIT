@@ -411,11 +411,23 @@ export interface TicketListResponse {
   filtered: boolean
 }
 
+/** A status, or `ACTIVE` for the five a Ticket is still being worked in
+ *  (Lab 4 BR-22). Both lists accept it. */
+export type StatusFilter = TicketStatus | 'ACTIVE'
+
+export type TicketSortField =
+  | 'createdAt'
+  | 'updatedAt'
+  | 'ticketNumber'
+  | 'requestedPriority'
+  | 'currentStatus'
+
 export interface TicketListParams {
   search?: string
+  status?: StatusFilter
   categoryId?: number
   requestedPriority?: RequestedPriority
-  sortBy?: 'createdAt' | 'ticketNumber' | 'requestedPriority' | 'currentStatus'
+  sortBy?: TicketSortField
   sortDir?: 'asc' | 'desc'
   page?: number
   pageSize?: number
@@ -485,7 +497,7 @@ export type StaffQueueSortField =
 
 export interface StaffQueueParams {
   search?: string
-  status?: TicketStatus
+  status?: StatusFilter
   itPriority?: ItPriority
   categoryId?: number
   owner?: 'me' | 'unassigned'
@@ -520,6 +532,80 @@ export async function fetchStaffTickets(
 
   return (await response.json()) as StaffQueueResponse
 }
+
+// ---------------------------------------------------------------------------
+// Dashboards (Lab 4 api-spec.md §8 and §9).
+
+/** A count, and the query string of the list that shows what was counted.
+ *  `query` is null for a count with no list behind it. */
+export interface DashboardMetric {
+  key: string
+  value: number
+  query: string | null
+}
+
+export interface DashboardTicketRow {
+  id: number
+  ticketNumber: string
+  summary: string
+  currentStatus: TicketStatus
+  updatedAt: string
+}
+
+export interface RequesterDashboard {
+  generatedAt: string
+  timeZone: string
+  metrics: DashboardMetric[]
+  needsAttention: DashboardTicketRow[]
+  recentlyUpdated: DashboardTicketRow[]
+  recentlyResolved: (DashboardTicketRow & { resolvedAt: string })[]
+}
+
+export interface StaffDashboardTicketRow extends DashboardTicketRow {
+  itPriority: ItPriority
+  owner: { id: number; name: string } | null
+}
+
+export interface DashboardActionRow {
+  id: number
+  ticketId: number
+  ticketNumber: string
+  ticketSummary: string
+  actionAt: string
+  descriptionPreview: string
+  followUpRequired: boolean
+}
+
+export interface StaffDashboard {
+  generatedAt: string
+  timeZone: string
+  metrics: DashboardMetric[]
+  byStatus: { status: TicketStatus; value: number; query: string }[]
+  recentlyUpdated: StaffDashboardTicketRow[]
+  myRecentActions: DashboardActionRow[]
+  /** Present for an Administrator and absent, not empty, for IT Staff. */
+  users?: { active: number; inactive: number }
+}
+
+async function fetchDashboard<Body>(path: string, fallback: string): Promise<Body> {
+  const response = await apiFetch(path)
+  if (!response.ok) throw await readError(response, fallback)
+
+  // A 200 that is not a dashboard (a proxy's page, an older server) is a
+  // failure to load one. Saying so here keeps the screen from drawing cards
+  // out of whatever arrived.
+  const body = (await response.json().catch(() => null)) as { metrics?: unknown } | null
+  if (!body || !Array.isArray(body.metrics)) throw new ApiError(response.status, fallback)
+  return body as Body
+}
+
+/** Throws ApiError with the status: 403 means the wrong role, which a retry
+ *  cannot fix, and the screen says so instead of offering one. */
+export const fetchRequesterDashboard = () =>
+  fetchDashboard<RequesterDashboard>('/api/dashboard/requester', 'Unable to load your dashboard')
+
+export const fetchStaffDashboard = () =>
+  fetchDashboard<StaffDashboard>('/api/dashboard/staff', 'Unable to load the dashboard')
 
 export interface TicketAttachment {
   id: number

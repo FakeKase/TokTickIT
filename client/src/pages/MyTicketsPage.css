@@ -13,13 +13,26 @@
   margin-bottom: var(--zg-space-4);
 }
 
-.ttk-my-tickets__head h2 {
+.ttk-my-tickets__head h2,
+.ttk-my-tickets__count {
   margin: 0;
+}
+
+.ttk-my-tickets__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--zg-space-3);
+  flex-wrap: wrap;
+}
+
+.ttk-my-tickets__count {
+  font-size: var(--zg-font-size-label);
+  opacity: 0.75;
 }
 
 .ttk-my-tickets__toolbar {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr auto;
+  grid-template-columns: 2fr 1fr 1fr 1fr auto;
   align-items: end;
   gap: var(--zg-space-3);
   padding: var(--zg-space-4);
@@ -145,6 +158,13 @@
 @media (max-width: 767px) {
   .ttk-my-tickets__toolbar {
     grid-template-columns: 1fr;
+  }
+
+  /* The count goes under the heading here, so Create Ticket keeps its place
+     beside it and is not pushed onto a line of its own. */
+  .ttk-my-tickets__title {
+    flex-direction: column;
+    gap: 0;
   }
 
   .ttk-my-tickets__table {

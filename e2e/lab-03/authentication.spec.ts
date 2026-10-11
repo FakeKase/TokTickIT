@@ -27,7 +27,8 @@ test.describe('E2E-01 signing in and out', () => {
     await signInThroughForm(page, 'nobody.at.all@toktickit.test', DEV_PASSWORD)
     await expect(page.getByRole('alert')).toHaveText(wrongPassword ?? '')
 
-    // AC-01.
+    // AC-01. Back to the queue, not the Dashboard: that is the address the
+    // guard interrupted at the top of this test.
     await signInThroughForm(page, ACCOUNTS.staff.email, DEV_PASSWORD)
     await expect(page).toHaveURL(/\/staff\/tickets$/)
     await expect(page.getByRole('heading', { name: 'Ticket Queue' })).toBeVisible()
@@ -59,15 +60,15 @@ test.describe('E2E-01 signing in and out', () => {
   for (const role of ['requester', 'staff', 'admin'] as const) {
     test(`${role} lands on their own screen and sees only their own navigation`, async ({ page }) => {
       await signInThroughForm(page, ACCOUNTS[role].email, DEV_PASSWORD)
-      await expect(page).toHaveURL(new RegExp(`${ACCOUNTS[role].home}$`))
+      await expect(page).toHaveURL(new RegExp(`${ACCOUNTS[role].landing}$`))
 
       const nav = page.getByRole('banner').getByRole('link')
       const labels = (await nav.allTextContents()).filter((label) => label !== 'TokTickIT')
       expect(labels).toEqual(
         {
-          requester: ['My Tickets', 'Create Ticket'],
-          staff: ['Ticket Queue'],
-          admin: ['Ticket Queue', 'User Management'],
+          requester: ['Dashboard', 'My Tickets', 'Create Ticket'],
+          staff: ['Dashboard', 'Ticket Queue'],
+          admin: ['Dashboard', 'Ticket Queue', 'User Management', 'System Status'],
         }[role],
       )
     })
@@ -122,8 +123,8 @@ test.describe('E2E-02 the first-login password change (AC-02)', () => {
     await page.getByRole('button', { name: 'Save and continue' }).click()
 
     // Straight to the screen for their role.
-    await expect(page).toHaveURL(/\/staff\/tickets$/)
-    await expect(page.getByRole('heading', { name: 'Ticket Queue' })).toBeVisible()
+    await expect(page).toHaveURL(/\/staff\/dashboard$/)
+    await expect(page.getByRole('heading', { name: /^Welcome back/ })).toBeVisible()
 
     await signOut(page)
     await signInThroughForm(page, user.email, user.password)
@@ -131,6 +132,6 @@ test.describe('E2E-02 the first-login password change (AC-02)', () => {
     await expect(page).toHaveURL(/\/login$/)
 
     await signInThroughForm(page, user.email, chosen)
-    await expect(page).toHaveURL(/\/staff\/tickets$/)
+    await expect(page).toHaveURL(/\/staff\/dashboard$/)
   })
 })

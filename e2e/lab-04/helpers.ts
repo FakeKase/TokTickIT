@@ -13,8 +13,11 @@ export {
   loginAs,
   recordAction,
   sessionAs,
+  signInThroughForm,
   workflowChange,
 } from '../lab-03/helpers'
+
+export { requesterWithoutTickets, secondRequester } from '../lab-02/helpers'
 
 export const shot = (screen: string, name: string) =>
   `artifacts/lab-04/screenshots/${screen}/${name}.png`

@@ -65,6 +65,7 @@ import {
   parseId,
   resolveTicketFor,
 } from "./lib/ticket-access.js";
+import { isDbId } from "./lib/db-id.js";
 import { registerActionsTaken } from "./routes/actions-taken.js";
 import { registerDashboards } from "./routes/dashboard.js";
 import {
@@ -463,8 +464,8 @@ export function createApp(
   app.get("/api/tickets/:id", ...asRequester, async (req: AuthenticatedRequest, res) => {
     const requesterId = req.auth!.user.id;
 
-    const ticketId = Number(req.params.id);
-    if (!Number.isInteger(ticketId) || ticketId <= 0) {
+    const ticketId = parseId(req.params.id);
+    if (!ticketId) {
       // Same 404 as a well-formed id that is not theirs — a different status
       // here would tell a prober which ids are even plausible.
       return res.status(404).json({ error: "Ticket not found" });
@@ -1057,9 +1058,7 @@ export function createApp(
       "Unable to change the Ticket Owner",
       (body) => {
         const ownerId = body.ownerId;
-        const valid =
-          ownerId === null ||
-          (typeof ownerId === "number" && Number.isInteger(ownerId) && ownerId > 0);
+        const valid = ownerId === null || isDbId(ownerId);
         return valid
           ? { value: ownerId as number | null }
           : { problem: { ownerId: "Ticket Owner must be a user id, or null to unassign" } };
@@ -1487,8 +1486,8 @@ export function createApp(
     async (req, res) => {
       const requesterId = (req as AuthenticatedRequest).auth!.user.id;
 
-      const ticketId = Number(req.params.id);
-      const ticket = Number.isInteger(ticketId)
+      const ticketId = parseId(req.params.id);
+      const ticket = ticketId
         ? await prisma.ticket.findUnique({ where: { id: ticketId } })
         : null;
 
@@ -1569,8 +1568,8 @@ export function createApp(
    * where it lives.
    */
   async function findOwnedAttachment(rawId: unknown, requesterId: number) {
-    const id = Number(rawId);
-    if (!Number.isInteger(id) || id <= 0) return null;
+    const id = parseId(rawId);
+    if (!id) return null;
 
     const attachment = await prisma.attachment.findUnique({
       where: { id },
@@ -1744,6 +1743,14 @@ export function createApp(
     } catch {
       res.status(500).json({ error: "Unable to remove the Attachment" });
     }
+  });
+
+  // An address that is not a route. Express's own answer is an HTML page that
+  // repeats the method and the path back; everything else this API says is
+  // JSON, and a client reading `error` from the body should find one here
+  // too. After every route, so it only sees what none of them took.
+  app.use((_req, res) => {
+    res.status(404).json({ error: "Not found" });
   });
 
   // Last, deliberately: Express picks the error handler by arity, and it only

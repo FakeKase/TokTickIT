@@ -156,8 +156,18 @@
 
 /* Mobile (<768px): one card per Ticket, no horizontal scroll anywhere. */
 @media (max-width: 767px) {
+  /* `1fr` alone is `minmax(auto, 1fr)`: the column would not go narrower than
+     the widest control in it, and a select is as wide as its longest option.
+     On a phone that put the fields a little past the edge of their card. */
   .ttk-my-tickets__toolbar {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ttk-my-tickets__toolbar .ttk-field,
+  .ttk-my-tickets__toolbar .ttk-field__control {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
   }
 
   /* The count goes under the heading here, so Create Ticket keeps its place

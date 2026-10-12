@@ -300,30 +300,40 @@ Responsive and accessibility rules are those of Labs 2 and 3. Specific to this s
 
 ## 10. Visual and Accessibility Checklist
 
-To be completed in the hardening and visual evidence Issue. As in Labs 2 and 3, each box is ticked
-only when an assertion in `e2e/lab-04/visual-regression.spec.ts` backs it, and each capture is also
-looked at.
+Completed in the hardening and visual evidence Issue (#72). As in Labs 2 and 3, a box is ticked
+only when an assertion backs it, and the test is named beside it. All but the last are in
+`e2e/lab-04/visual-regression.spec.ts`; each capture it wrote was also looked at.
 
-- [ ] No clipping, overlap or horizontal scroll at 375px, 820px and 1280px on both dashboards, the Actions Taken area on both Ticket Detail screens, the Action Taken dialog in all three modes, My Tickets with a status filter, and System Status
-- [ ] Design consistency: a metric card, a dashboard list and the Actions Taken table use the same card surface, border, radius, heading scale and link colour as the Lab 2 and Lab 3 screens, by computed style
-- [ ] Dashboards: every card and row is a link with an accessible name that includes its count; zero is shown as `0`; an empty list shows its line and is not hidden
-- [ ] Actions Taken: table at 768px and above, cards below; long unbroken text wraps inside its cell; the follow-up state is a worded badge
-- [ ] Editable and read-only: in the dialog, Performed by and Recorded are visibly read-only and are not focusable inputs; the view mode contains no input at all
-- [ ] Validation placement: each message is directly under its field and referenced by `aria-describedby`; the first invalid field receives focus
-- [ ] Keyboard focus: every control on both dashboards and in the Actions Taken area shows a focus ring; the dialog traps focus and returns it to the control that opened it
-- [ ] Status, IT Priority and follow-up badges are distinguishable from one another by computed colour and each carries a text label with at least 4.5:1 contrast, in both themes
-- [ ] Private and shared content: Internal Notes keep their distinct surface and left rule, and the Actions Taken section states that it is visible to the Requester
-- [ ] The blocked Resolved option is disabled and its reason is visible as text beside the control
-- [ ] Role navigation shows Dashboard first for each role, with exactly one item marked current on every route
-- [ ] No console error on any screen for any role, and no link that leads nowhere
+- [x] No clipping, overlap or horizontal scroll at 375px, 820px and 1280px on both dashboards, the Actions Taken area on both Ticket Detail screens, the Action Taken dialog in all three modes, My Tickets with a status filter, and System Status. *RESP-01, in both themes, with a file name and a URL that cannot wrap in the fixture*
+- [x] Design consistency: a metric card, a dashboard list and the Actions Taken table use the same card surface, border, radius, heading scale and link colour as the Lab 2 and Lab 3 screens, by computed style. *RESP-02; the dialog's buttons and fields are compared with Create Ticket's*
+- [x] Dashboards: every card and row is a link with an accessible name that includes its count; zero is shown as `0`; an empty list shows its line and is not hidden. *"dashboards: every number is a link that says what it counts", as an IT Staff user who owns nothing*
+- [x] Actions Taken: table at 768px and above, cards below; long unbroken text wraps inside its cell; the follow-up state is a worded badge. *RESP-06, RESP-01, RESP-05*
+- [x] Editable and read-only: in the dialog, Performed by and Recorded are visibly read-only and are not focusable inputs; the view mode contains no input at all. *RESP-03*
+- [x] Validation placement: each message is directly under its field and referenced by `aria-describedby`; the first invalid field receives focus. *"validation messages sit directly below their own field"*
+- [x] Keyboard focus: every control on both dashboards and in the Actions Taken area shows a focus ring; the dialog traps focus and returns it to the control that opened it. *RESP-04*
+- [x] Status, IT Priority and follow-up badges are distinguishable from one another by computed colour and each carries a text label with at least 4.5:1 contrast, in both themes. *RESP-05. The three are compared as they appear together on one Ticket: In Progress, Urgent and Follow-up required. Across families a tone is shared, Waiting for Requester and Medium being the same amber as Follow-up required, which is why every badge is a word*
+- [x] Private and shared content: Internal Notes keep their distinct surface and left rule, and the Actions Taken section states that it is visible to the Requester. *RESP-05, "who reads what is said in words"*
+- [x] The blocked Resolved option is disabled and its reason is visible as text beside the control. *RESP-05*
+- [x] Role navigation shows Dashboard first for each role, with exactly one item marked current on every route. *"Dashboard is first in every role's navigation", on every route of every role*
+- [x] No console error on any screen for any role, and no link that leads nowhere. *REG-04, `e2e/lab-04/regression.spec.ts`*
+
+**Found by the sweep, and what was done** (§8, "Swept in the hardening Issue"):
+
+| Found | Done |
+| :-- | :-- |
+| A bare link (a Ticket Number in My Tickets or the queue, "Back to My Tickets") was Bootstrap's blue, not `--zg-secondary` as §1 of the Lab 2 spec says | `a` takes the token in `theme.css`. A link with a class of its own is unaffected |
+| My Tickets filter fields a little wider than their card at 375px | The column is `minmax(0, 1fr)` and the controls may shrink |
+| No focus ring on the Action Date/Time field while its calendar button has focus | The ring is drawn on `:focus-within` |
+| The Actions Taken table's text columns about 70px wide at 820px | They take 28% each, and the date may wrap below 992px |
+| No placeholder text, dead link, unnamed control or console error | Nothing to do; REG-04 keeps it so |
 
 ## 11. Screenshot Paths
 
 ```text
 artifacts/lab-04/screenshots/
 ├── responsive/           (<screen>-<viewport>[-dark]: staff-dashboard, requester-dashboard, actions-taken-staff,
-│                          actions-taken-requester, action-dialog, my-tickets-status-filter, system-status;
-│                          desktop, tablet and mobile; light and dark)
+│                          actions-taken-requester, action-dialog, action-dialog-view, action-dialog-edit,
+│                          my-tickets-status-filter, system-status; desktop, tablet and mobile; light and dark)
 ├── staff-dashboard/      (desktop, tablet, mobile, admin-user-counts, drill-down-unassigned, drill-down-status,
 │                          my-recent-actions, zero-metrics, loading, forbidden, failure, metric-vs-database)
 ├── requester-dashboard/  (desktop, tablet, mobile, needs-attention, drill-down-active, empty-account,

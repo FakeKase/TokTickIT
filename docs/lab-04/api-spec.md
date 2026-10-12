@@ -84,7 +84,7 @@ Create an Action Taken (FR-02).
 | Field | Rule |
 | :-- | :-- |
 | `requestKey` | Required. 8 to 64 characters from letters, digits, `-`, `_` and `:` (BR-20) |
-| `actionAt` | Required ISO 8601 timestamp with a zone (`Z` or an offset), naming a real moment: 31 February or hour 24 is `400`, never stored as a neighbouring day. Not before the Ticket's `createdAt` with its seconds and milliseconds set to zero, not more than 5 minutes after the server clock (BR-05). A Ticket created at 10:00:30 accepts 10:00:00 and refuses 09:59:59 |
+| `actionAt` | Required ISO 8601 timestamp with a zone (`Z` or an offset), naming a real moment: 31 February, hour 24 or an offset past `±14:00` is `400`, never stored as a neighbouring day. Not before the Ticket's `createdAt` with its seconds and milliseconds set to zero, not more than 5 minutes after the server clock (BR-05). A Ticket created at 10:00:30 accepts 10:00:00 and refuses 09:59:59 |
 | `description` | Required, 1 to 2000 characters after trimming (BR-06) |
 | `result` | Required, 1 to 1000 characters after trimming (BR-06) |
 | `followUpRequired` | Required boolean |
@@ -136,7 +136,7 @@ before the fields so that an out-of-date copy is always told so, with the curren
 else is wrong with what was sent.
 
 There is no `DELETE`. A `DELETE` to this path is answered by the application's ordinary `404`
-(BR-09, AC-15).
+(BR-09, AC-15), which is `{ "error": "Not found" }` (§10).
 
 Both writes read the Ticket row `FOR NO KEY UPDATE` inside their transaction (`specification.md` §11 says why not `FOR UPDATE`). A move to Resolved takes the
 same lock (§5), so the gate never decides while an Action Taken is half written.
@@ -312,6 +312,13 @@ describes the database at the same moment. Parameters on either endpoint are ign
 
 - Any unexpected failure in a Lab 4 route is `500 { "error": "<what could not be done>" }`, for
   example `Unable to record the Action Taken` or `Unable to load the dashboard`.
+- A method and path that no route takes is `404 { "error": "Not found" }`, as JSON like every other
+  answer. Express's own page for this repeats the method and path back and is not used.
+- An id is a positive integer no greater than `2147483647`, the range of the column. Anything else
+  names no row: in a path it is the route's ordinary `404`, in a body it is a `400` on its field,
+  and as a list filter it is ignored like any other unusable filter. `page` is clamped to the
+  furthest page whose offset stays in that range. This applies to the Lab 2 and Lab 3 routes too,
+  which answered `500` for such an id.
 - A client that receives no response to a create may send the same body again with the same
   `requestKey` and is guaranteed not to create a second Action Taken (§2).
 - An edit, and every workflow change, is safe to retry because of its version: a repeat of a

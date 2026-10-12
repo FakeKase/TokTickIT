@@ -3,6 +3,8 @@
 // the backend never trusts the client (BR-16), so every rule is re-checked
 // here even when the UI would have blocked the request.
 
+import { isDbId } from "./db-id.js";
+
 export const SUMMARY_MIN = 5;
 export const SUMMARY_MAX = 120;
 export const DESCRIPTION_MIN = 10;
@@ -24,7 +26,7 @@ export type FieldErrors = Record<string, string>;
 
 function parseId(value: unknown): number | null {
   const id = typeof value === "string" ? Number(value) : value;
-  return typeof id === "number" && Number.isInteger(id) && id > 0 ? id : null;
+  return isDbId(id) ? id : null;
 }
 
 function isPriority(value: unknown): value is RequestedPriority {

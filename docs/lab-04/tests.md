@@ -99,6 +99,9 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | API-40 | API | BR-26, BR-28, AC-36 | Lists and shape | Each list at most 5 and in the documented order; `myRecentActions` holds only the caller's actions with a preview of at most 120 characters; no description, comment, note, attachment or email address anywhere in the body | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
 | API-41 | API | FR-12, AC-39 | Queue `status=ACTIVE` | Only the five active statuses, `filtered: true`, and it combines with `owner` and `itPriority` | `server/tests/lab-04/staff-dashboard.api.test.ts` | Pass |
 | PERF-01 | Performance smoke | AC-51 | Dashboards under load | With 300 extra Tickets and 300 Actions Taken, each dashboard endpoint answers in under 1 second with a body under 16 KB and lists still capped at 5 | `server/tests/lab-04/dashboard-performance.api.test.ts` | Pass |
+| API-42 | API | FR-17, AC-44 | An address that is not a route | Six method and path pairs that no route takes, signed out, as a Requester and as an Administrator: `404 { "error": "Not found" }` as JSON, with the path not repeated back. A `DELETE` on an Action Taken is one of them and removes nothing | `server/tests/lab-04/hardening.api.test.ts` | Pass |
+| API-43 | API | FR-17, AC-44 | An id no row could have | With `2147483648` and `99999999999` as the id: every Ticket, attachment, Action Taken and user route answers `404`; in a request body it is a `400` on its own field; as a list filter it is ignored; as a page number it is clamped. Never `500`. `2147483647` is still looked up | `server/tests/lab-04/hardening.api.test.ts` | Pass |
+| API-44 | API | BR-05 | Offsets that exist | `actionAt` with `+14:00`, `-12:00`, `+07:00` or `+05:45` is accepted; `+14:01`, `+14:30`, `-14:30` and `+15:00` are `400` on `actionAt` and nothing is stored | `server/tests/lab-04/hardening.api.test.ts` | Pass |
 
 ### Migration and regression
 
@@ -106,10 +109,10 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | --- | --- | --- | --- | --- | --- | --- |
 | MIG-01 | Migration | BR-32, FR-18, AC-46 | Migration and rollback | On a throwaway database holding Lab 3 data: after the migration every earlier row has the same values, every Ticket has version 1 and no Actions Taken, and `resolvedAt` is set only for Resolved and Closed; after the rollback the Lab 3 rows are again identical and the Lab 4 objects are gone; the migration applies again cleanly | `server/src/scripts/migration-check.ts` (`npm run db:migration-check`) | Pass |
 | MIG-02 | Migration | FR-19, AC-47 | Seed | Running the seed twice leaves every table's row count unchanged; the seeded Tickets have 0, 1, 2 and 3 Actions Taken as §7.3 lists; one seeded Requester has no Tickets and one seeded staff user has no actions; a seeded Ticket too young to date work from is moved back once and then left alone | `server/tests/lab-04/seed.api.test.ts` | Pass |
-| REG-01 | Regression | FR-20, AC-50 | Lab 1 to Lab 3 server suites | Every test in `server/tests/lab-01`, `lab-02` and `lab-03` passes | `server/tests/lab-01/*`, `lab-02/*`, `lab-03/*` | Planned |
-| REG-02 | Regression | FR-20, AC-50 | Lab 1 to Lab 3 client suites | Every test in `client/tests/lab-01`, `lab-02` and `lab-03` passes | `client/tests/lab-01/*`, `lab-02/*`, `lab-03/*` | Planned |
-| REG-03 | Regression | FR-20, AC-50 | Lab 2 and Lab 3 end-to-end suites | Every spec in `e2e/lab-02` and `e2e/lab-03` passes on a fresh database | `e2e/lab-02/*`, `e2e/lab-03/*` | Planned |
-| REG-04 | Regression | FR-16, FR-17, AC-44 | Whole-application sweep | Each of the three roles visits every screen available to them, on a fresh database: no console error, no failed request, no link to a missing page, and no visible placeholder text | `e2e/lab-04/regression.spec.ts` | Planned |
+| REG-01 | Regression | FR-20, AC-50 | Lab 1 to Lab 3 server suites | Every test in `server/tests/lab-01`, `lab-02` and `lab-03` passes | `server/tests/lab-01/*`, `lab-02/*`, `lab-03/*` | Pass |
+| REG-02 | Regression | FR-20, AC-50 | Lab 1 to Lab 3 client suites | Every test in `client/tests/lab-01`, `lab-02` and `lab-03` passes | `client/tests/lab-01/*`, `lab-02/*`, `lab-03/*` | Pass |
+| REG-03 | Regression | FR-20, AC-50 | Lab 2 and Lab 3 end-to-end suites | Every spec in `e2e/lab-02` and `e2e/lab-03` passes on a fresh database | `e2e/lab-02/*`, `e2e/lab-03/*` | Pass |
+| REG-04 | Regression | FR-16, FR-17, AC-44 | Whole-application sweep | Each of the three roles visits every screen available to them, on a fresh database: no console error, no uncaught error, no failed request and no error response; every link the screens offer, followed, opens the address it names; every button and link has a name and none is a dead `#`; no placeholder text and no "undefined", "NaN" or "Invalid Date". Also the Login screen signed out and the forced password change, and every dialog opened | `e2e/lab-04/regression.spec.ts` | Pass |
 | REG-05 | Regression | FR-19 | Cleanup contract | The real teardown script, run against rows shaped as the end-to-end suite shapes them: a marked Ticket goes together with its Actions Taken; a user the suite created goes together with the work they recorded; an unmarked Ticket stays, and an action a remaining user performed stays and loses the departing user's edit mark, editor and time together | `server/tests/lab-04/e2e-cleanup.api.test.ts` | Pass |
 
 ### UI component
@@ -144,18 +147,18 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | UI-26 | UI | FR-12, AC-37 | My Tickets view in the URL | A `status` in the URL is applied and shown in the Status select; changing a filter, the sort or the page rewrites the URL; Clear Filters empties it; Active and Last Updated are offered. A page past the end is replaced by the last real page, in the list and in the URL, with the filter and sort kept; a Requester with no Tickets still gets the Empty state | `client/tests/lab-04/MyTicketsFilters.test.tsx` | Pass |
 | UI-27 | UI | FR-12, AC-37 | Queue Active filter | The Status select offers Active and a URL carrying `status=ACTIVE` shows it selected | `client/tests/lab-04/MyTicketsFilters.test.tsx` | Pass |
 | UI-28 | UI | FR-16, AC-45 | System Status | Renders health and Categories for an Administrator, has no "Submit Request" control, and is Forbidden for the other two roles | `client/tests/lab-04/SystemStatus.test.tsx` | Pass |
-| UI-29 | UI | BR-31, AC-43 | Earlier forms keep their data | After a failed submission the comment composer, the note composer, Create Ticket and the user dialog still hold what was typed | `client/tests/lab-04/FormPreservation.test.tsx` | Planned |
+| UI-29 | UI | BR-31, AC-43 | Earlier forms keep their data | For the Requester's comment composer, the staff comment and note composers, Create Ticket and the user dialog: a second press while the first request is out sends nothing; after the request fails (no response, and a `500`) the message is shown and every value is still there; sending again unchanged succeeds with the same body. The user dialog cannot be closed while it saves, and one composer failing leaves the other untouched | `client/tests/lab-04/FormPreservation.test.tsx` | Pass |
 
 ### UI style, responsive and end-to-end
 
 | Test ID | Type | Requirement / AC | What It Tests | Expected Result | Automated Test File | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| RESP-01 | Responsive | AC-48 | No overflow | Both dashboards, the Actions Taken area on both Ticket Detail screens, the dialog in each mode, My Tickets with a status filter and System Status at 375, 820 and 1280px, in both themes, with awkward fixtures: nothing extends past the viewport | `e2e/lab-04/visual-regression.spec.ts` | Planned |
-| RESP-02 | Style | ui-spec §10 | Design consistency | Computed surface, border, radius, heading scale and link colour of a metric card, a dashboard list and the Actions Taken table equal those of Lab 2 and Lab 3 cards and tables | `e2e/lab-04/visual-regression.spec.ts` | Planned |
-| RESP-03 | Style | ui-spec §6.3 | Editable and read-only | In the dialog, Performed by and Recorded are not inputs and differ in computed background from the fields; view mode contains no input | `e2e/lab-04/visual-regression.spec.ts` | Planned |
-| RESP-04 | Accessibility | AC-49 | Keyboard and focus | Every control reached by Tab on both dashboards and in the Actions Taken area shows a focus ring; the dialog traps focus and returns it to its trigger | `e2e/lab-04/visual-regression.spec.ts` | Planned |
-| RESP-05 | Accessibility | AC-49 | Non-colour cues | The follow-up badge and the blocked-move reason carry text; status, IT Priority and follow-up badges differ by computed colour and each label has at least 4.5:1 contrast in both themes | `e2e/lab-04/visual-regression.spec.ts` | Planned |
-| RESP-06 | Responsive | AC-48 | Table and cards | The Actions Taken table is shown at 768px and above and the cards below it, never both | `e2e/lab-04/visual-regression.spec.ts` | Planned |
+| RESP-01 | Responsive | AC-48 | No overflow | Both dashboards, the Actions Taken area on both Ticket Detail screens, the dialog in each mode, My Tickets with a status filter and System Status at 375, 820 and 1280px, in both themes, with awkward fixtures: nothing extends past the viewport or past the card it sits in, no label or badge is cut off, the Actions Taken table needs no scrollbar of its own, and its two text columns keep at least 130px | `e2e/lab-04/visual-regression.spec.ts` | Pass |
+| RESP-02 | Style | ui-spec §10 | Design consistency | Computed surface, border, radius, heading scale and link colour of a metric card, a dashboard list and the Actions Taken table equal those of Lab 2 and Lab 3 cards and tables | `e2e/lab-04/visual-regression.spec.ts` | Pass |
+| RESP-03 | Style | ui-spec §6.3 | Editable and read-only | In the dialog, Performed by and Recorded are not inputs and differ in computed background from the fields; view mode contains no input | `e2e/lab-04/visual-regression.spec.ts` | Pass |
+| RESP-04 | Accessibility | AC-49 | Keyboard and focus | Every control reached by Tab on both dashboards and in the Actions Taken area shows a focus ring; the dialog traps focus and returns it to its trigger, whether that was Add Action Taken or a row's View | `e2e/lab-04/visual-regression.spec.ts` | Pass |
+| RESP-05 | Accessibility | AC-49 | Non-colour cues | The follow-up badge and the blocked-move reason carry text; status, IT Priority and follow-up badges differ by computed colour and each label has at least 4.5:1 contrast in both themes | `e2e/lab-04/visual-regression.spec.ts` | Pass |
+| RESP-06 | Responsive | AC-48 | Table and cards | The Actions Taken table is shown at 768px and above and the cards below it, never both, for staff and for the Requester; three rows are announced at either width, not six; long text is cut to three lines in the list and whole in the dialog | `e2e/lab-04/visual-regression.spec.ts` | Pass |
 | E2E-01 | E2E | AC-01, AC-10, AC-11, AC-42 | Actions Taken flow | IT Staff sign in, open a Ticket a colleague owns, record an Action Taken with follow-up, and see it under their own name; a second staff user records another and edits the first; both names and the edit mark are shown; a double click on Save creates one row | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
 | E2E-02 | E2E | AC-03, AC-04 | Requester sees the work | The owning Requester opens the same Ticket, sees every Action Taken with all fields and no way to add or edit, sees no Internal Note, and is refused by the API when creating one directly | `e2e/lab-04/actions-taken-flow.spec.ts` | Pass |
 | E2E-03 | E2E | AC-19, AC-20, AC-21, AC-27, AC-28 | Resolution | On an owned Ticket with no Action Taken, Resolved is disabled with its reason; after an action requiring follow-up the reason changes; after a later action without follow-up Resolved is chosen, the summary badge reads Resolved and Add Action Taken is gone | `e2e/lab-04/ticket-resolution.spec.ts` | Pass |
@@ -211,7 +214,7 @@ screen, and `npm run e2e:fresh` runs them on a database built for the run.
 | AC-41 | UI-20, UI-24 |
 | AC-42 | API-12, UI-06, E2E-01 |
 | AC-43 | UI-07, UI-29 |
-| AC-44 | REG-04 |
+| AC-44 | API-42, API-43, REG-04 |
 | AC-45 | UI-28, E2E-07 |
 | AC-46 | MIG-01 |
 | AC-47 | MIG-02 |
@@ -225,8 +228,10 @@ A row changes from Planned to Pass in the Pull Request that implements it, never
 
 ## 4. Responsive and Visual Checklist
 
-The checklist is `ui-spec.md` §10, where each box is backed by an assertion in
-`e2e/lab-04/visual-regression.spec.ts`. It is completed in Issue #72 and its result recorded here.
+The checklist is `ui-spec.md` §10. It was completed in Issue #72: all twelve boxes are ticked, and
+each names the test in `e2e/lab-04/visual-regression.spec.ts` or `regression.spec.ts` that backs it.
+The 54 captures under `artifacts/lab-04/screenshots/responsive/` were written by the same run and
+looked at; what looking at them found is in §6.
 
 ## 5. Test Commands
 
@@ -394,6 +399,57 @@ against the real API.
 
 One thing was seen and left for #72, because it is older than this Issue: on a phone the My Tickets
 filter fields are a few pixels wider than the card they sit in. It is in the Lab 3 capture too.
+
+**#72, final hardening and visual evidence.** UI-29, API-42 to API-44, REG-01 to REG-04 and
+RESP-01 to RESP-06 are Pass, and the `ui-spec.md` §10 checklist is complete.
+
+| Suite | Result |
+| :-- | :-- |
+| Server, on the database `npm run e2e:fresh` builds | 33 files, 700 tests, all passed |
+| Client | 27 files, 422 tests, all passed |
+| `npm run e2e:fresh` | 156 passed. 28 of them are `e2e/lab-04/submission-evidence.spec.ts`, which records the captures |
+| Type checks (`server/`, `client/`, root), client lint and build | Clean |
+
+REG-01 to REG-03 are those same runs: the Lab 1 to Lab 3 folders of each suite passed with no test
+in them changed in this Issue.
+
+This Issue was meant to add checks, and most of what it changed in the application is what those
+checks found. Each of these failed a new test before it was fixed:
+
+- **A link in a table was Bootstrap's blue.** `ui-spec.md` has said since Lab 2 that links are
+  `--zg-secondary`, and nothing set it, so a Ticket Number in My Tickets or the queue was drawn in
+  the reset's colour. The dashboards set the colour themselves, which is how RESP-02 came to compare
+  the two. Bare links now take the token. The Lab 2 and Lab 3 captures were taken before this and
+  still show the blue.
+- **My Tickets on a phone.** The filter fields were wider than their card, the limitation noted
+  under #71. The grid column was `1fr`, which will not go narrower than its widest control.
+- **The Action Date/Time field lost its focus ring** for one press of Tab, on its calendar button.
+  The browser does not count the field as focused there. The ring is now drawn whenever focus is
+  anywhere inside it.
+- **The Actions Taken table at tablet width** gave its two text columns about 70px each, so a
+  Result read one syllable to a line. Nothing overflowed, so no check failed; it was seen in the
+  capture, fixed, and RESP-01 now measures the columns.
+- **An address that is not a route was answered in HTML,** by Express, with the method and path
+  repeated back. It is `404 { "error": "Not found" }` now (API-42). This was seen in the capture of
+  the refused requests, where one row of JSON answers had a web page in it.
+- **An id past the range of the column was a `500`.** `GET /api/tickets/2147483648` passed the
+  "positive integer" check and the database refused the query. Every route that takes an id did this, Lab 2's
+  and Lab 3's included, and a page number could do the same through its offset (API-43).
+- **`actionAt` accepted `+14:30`,** an offset no zone has. The check was on the hour alone (API-44).
+
+REG-04 and UI-29 found nothing: no console error, failed request, dead link or leftover text on
+any screen, and all five earlier forms already kept their data and refused a second submission.
+Both were checked against a deliberate fault first. REG-04 fails when the one expected `401` on
+the Login screen is not allowed for, which shows it is listening; the three style fixes above each
+failed their RESP test before the fix.
+
+The evidence that a dashboard number matches the database is
+`artifacts/lab-04/screenshots/staff-dashboard/metric-vs-database.png`: twelve numbers read from the
+screen beside twelve `SELECT COUNT(*)` results from `server/src/scripts/dashboard-sql-check.ts`,
+which shares no code with the dashboard. The spec fails if any pair differs.
+
+Two captures in `ui-spec.md` §11 are tables of API responses and not screens, as in Lab 3:
+`requester-dashboard/ownership-api.png` and `actions-taken/forbidden-api.png`.
 
 MIG-02 does not run on the development database. It builds one of its own from the migrations,
 seeds it twice and compares the rows, because "the counts did not change" is only a statement

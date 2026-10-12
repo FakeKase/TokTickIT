@@ -74,6 +74,15 @@
   white-space: nowrap;
 }
 
+/* The two columns of typed text can shrink to almost nothing, because their
+   text may break anywhere, and the columns that may not wrap would then take
+   the room: at tablet width a Result came out one syllable to a line. They
+   are given their share outright. */
+.ttk-actions__table th:nth-child(2),
+.ttk-actions__table th:nth-child(3) {
+  width: 28%;
+}
+
 .ttk-actions__table .ttk-actions__open {
   text-align: right;
 }
@@ -152,6 +161,15 @@
   resize: vertical;
 }
 
+/* A date and time field is several small fields and a calendar button inside
+   one. On the calendar button the browser does not count the field itself as
+   focused, so the usual ring was not drawn and the cursor seemed to vanish for
+   one press of Tab. The ring is asked for whenever focus is anywhere in it. */
+.ttk-actions__form input[type='datetime-local']:focus-within {
+  outline: 2px solid var(--zg-secondary);
+  outline-offset: 2px;
+}
+
 .ttk-actions__counter {
   margin: var(--zg-space-1) 0 0;
   font-size: 13px;
@@ -175,6 +193,18 @@
 .ttk-actions__conflict p {
   margin: 0 0 var(--zg-space-3);
   color: var(--zg-text);
+}
+
+/* Tablet: the date gives up its single line so the text beside it has room. */
+@media (max-width: 991px) {
+  .ttk-actions__table .ttk-actions__when {
+    white-space: normal;
+  }
+
+  .ttk-actions__table th,
+  .ttk-actions__table td {
+    padding: var(--zg-space-2);
+  }
 }
 
 @media (max-width: 767px) {

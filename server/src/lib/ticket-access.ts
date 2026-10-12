@@ -4,6 +4,7 @@
 // rule that a Requester sees only their own Tickets is written once.
 
 import type { PrismaClient } from "../generated/prisma/client.js";
+import { isDbId } from "./db-id.js";
 
 type Db = Pick<PrismaClient, "ticket">;
 
@@ -12,10 +13,10 @@ export type Tx = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
 export const TICKET_NOT_FOUND = { error: "Ticket not found" };
 
-/** A positive integer id from a route param, or null. */
+/** An id a row could have, from a route param, or null. */
 export const parseId = (raw: unknown): number | null => {
   const id = Number(raw);
-  return Number.isInteger(id) && id > 0 ? id : null;
+  return isDbId(id) ? id : null;
 };
 
 /**

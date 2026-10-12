@@ -9,6 +9,8 @@
 // arrive as `requesterId` and was validated hard, and since Issue #41 it comes
 // from the session and never passes through here at all.
 
+import { MAX_DB_ID, isDbId } from "./db-id.js";
+
 export const DEFAULT_PAGE_SIZE = 10;
 export const MAX_PAGE_SIZE = 50;
 
@@ -51,14 +53,18 @@ function parsePositiveInt(raw: unknown): number | undefined {
   const value = firstValue(raw);
   if (value === undefined || value.trim() === "") return undefined;
   const n = Number(value);
-  return Number.isInteger(n) && n > 0 ? n : undefined;
+  // An id no row could have filters nothing, like any other unusable value.
+  return isDbId(n) ? n : undefined;
 }
 
-/** Clamped to at least 1 (BR-12); anything unparseable becomes page 1. */
+/** The furthest page whose offset the database can still be asked for. */
+const MAX_PAGE = Math.floor(MAX_DB_ID / MAX_PAGE_SIZE);
+
+/** Clamped into 1..MAX_PAGE (BR-12); anything unparseable becomes page 1. */
 function parsePage(raw: unknown): number {
   const value = firstValue(raw);
   const n = Number(value);
-  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+  return Number.isFinite(n) && n >= 1 ? Math.min(Math.floor(n), MAX_PAGE) : 1;
 }
 
 /** Clamped into 1..50 (BR-12) rather than rejected. */

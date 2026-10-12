@@ -58,9 +58,11 @@ function parseInstant(value: unknown): Date | null {
     hour > 23 ||
     minute > 59 ||
     second > 59 ||
-    // No zone is further than 14 hours from UTC.
+    // No zone is further than 14 hours from UTC, so +14:30 is no more a
+    // real offset than +15:00 is.
     offsetHour > 14 ||
-    offsetMinute > 59
+    offsetMinute > 59 ||
+    (offsetHour === 14 && offsetMinute > 0)
   ) {
     return null;
   }

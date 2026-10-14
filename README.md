@@ -7,7 +7,9 @@ This repository holds the individual sprints. Lab 1 delivered the first full-sta
 slice. Lab 2 added the Requester-facing ticketing MVP: Create Ticket with attachments, My
 Tickets, and Ticket Detail. Lab 3 replaces Lab 2's temporary Requester selector with real
 sign-in and three roles, and adds the IT Staff Ticket Queue and Ticket Detail, Public
-Comments and Internal Notes, and Administrator User Management.
+Comments and Internal Notes, and Administrator User Management. Lab 4 adds Actions Taken under
+each Ticket, a resolution rule and a version check on every workflow change, a Dashboard for
+each role, and a hardening pass over everything from Labs 1 to 3.
 
 ## Tech stack
 
@@ -29,27 +31,32 @@ toktickit/
 │   └── tests/
 │       ├── lab-01/         Vitest UI tests
 │       ├── lab-02/         Vitest UI tests
-│       └── lab-03/         Vitest UI tests
+│       ├── lab-03/         Vitest UI tests
+│       └── lab-04/         Vitest UI tests
 ├── server/                 Express + TypeScript API
-│   ├── prisma/             Prisma schema and migrations
+│   ├── prisma/             Prisma schema, migrations, seed, and the Lab 4 rollback script
 │   ├── src/
 │   ├── uploads/            Attachment storage (gitignored)
 │   └── tests/
 │       ├── lab-01/         Supertest API tests
 │       ├── lab-02/         Supertest API tests
-│       └── lab-03/         Supertest API and unit tests
+│       ├── lab-03/         Supertest API and unit tests
+│       └── lab-04/         Supertest API, unit and performance tests
 ├── docs/
 │   ├── lab-01/             Lab 1 submission evidence
 │   ├── lab-02/             Lab 2 specification, API/UI spec, tests, review record
 │   ├── lab-03/             Lab 3 specification, API/UI spec, tests, review record, AI use
+│   ├── lab-04/             Lab 4 specification, API/UI spec, tests, review record, AI use
 │   └── labSheet/           Course-issued lab sheet
 ├── e2e/
 │   ├── lab-02/             Playwright visual and end-to-end specs
 │   ├── lab-03/             Playwright flows, visual checks and submission evidence
+│   ├── lab-04/             Playwright flows, regression sweep, visual checks and evidence
 │   └── run-fresh.mjs       Runs the suite on a database built for the run
 ├── artifacts/
 │   ├── lab-02/             Lab 2 screenshots
-│   └── lab-03/             Lab 3 screenshots and API authorization evidence
+│   ├── lab-03/             Lab 3 screenshots and API authorization evidence
+│   └── lab-04/             Lab 4 screenshots
 ├── playwright.config.ts
 ├── docker-compose.yaml     Optional PostgreSQL container
 ├── .gitignore
@@ -135,7 +142,7 @@ and no real password belongs in this repository (BR-39).
 | `ned.leeds@toktickit.test` | Requester | Active |
 | `michelle.jones@toktickit.test` | Requester | Active |
 | `roronoa.zoro@toktickit.test` | Requester | Active |
-| `grace.lim@toktickit.test` | Requester | Active, owns no Tickets — the My Tickets Empty state (BR-28) |
+| `grace.lim@toktickit.test` | Requester | Active, owns no Tickets — the empty My Tickets and Dashboard |
 | `nora.bennett@toktickit.test` | Requester | Active, **must change password at first login** |
 | `david.kim@toktickit.test` | Requester | Inactive — cannot sign in (BR-01) |
 | `sarah.chen@toktickit.test` | IT Staff | Active |
@@ -154,6 +161,22 @@ migration marks every account it carries over as holding an initial password; se
 the roster back into the state shown here, so only the two accounts marked above are gated. A
 database that ran Lab 2 and one created this morning behave identically once seeded.
 
+### Seeded Tickets
+
+Eight Tickets, one in each status, with 0 to 3 Actions Taken, so every Lab 4 screen has something
+to show on a fresh database:
+
+| Ticket | Requester | Owner | Status | Actions Taken |
+| :-- | :-- | :-- | :-- | :-: |
+| `TKT-2026-800001` | Peter Parker | none | New | 0 |
+| `TKT-2026-800002` | Ned Leeds | Sarah Chen | In Progress, Urgent | 3, the latest asking for follow-up |
+| `TKT-2026-800003` | Michelle Jones | Marcus Reed | Waiting for Requester | 1 |
+| `TKT-2026-800004` | Roronoa Zoro | Sarah Chen | Resolved | 2 |
+| `TKT-2026-800005` | Peter Parker | Marcus Reed | Closed | 1 |
+| `TKT-2026-800006` | Ned Leeds | none | Open | 0 |
+| `TKT-2026-800007` | Michelle Jones | none | Cancelled | 0 |
+| `TKT-2026-800008` | Roronoa Zoro | Sarah Chen | Reopened | 0 |
+
 ## Running the app
 
 Two terminals are needed.
@@ -170,7 +193,33 @@ cd client
 npm run dev
 ```
 
-Open http://localhost:5173 in a browser.
+Open http://localhost:5173 in a browser. Each role signs in to its own Dashboard.
+
+## Demonstrating Lab 4
+
+On a freshly seeded database, signed in with the accounts above:
+
+1. **IT Staff Dashboard.** Sign in as `sarah.chen@toktickit.test`. The cards count Unassigned,
+   My Tickets and Urgent among active Tickets, and My Actions Today in Bangkok time. Each card and
+   each row of Tickets by Status opens the Ticket Queue already filtered, and the total the queue
+   shows equals the card.
+2. **Actions Taken.** Open `TKT-2026-800002` from the queue. Its three Actions Taken are listed
+   newest first. Add one: Performed by is you, and cannot be changed. Tick Follow-Up Required
+   without a note to see the validation. View a row, then Edit it: the row keeps its performer
+   and shows who edited it.
+3. **Resolution gate.** On the same Ticket, Move to offers "Resolved (not available yet)" with the
+   reason beside it, because the latest action asks for follow-up. Record one that does not, and
+   Resolved becomes available without a reload. After resolving, the Actions Taken area is frozen.
+4. **Out-of-date screens.** Open one Ticket in two browsers as two staff users, change the IT
+   Priority in one, then change the status in the other: it is refused and the screen reloads.
+5. **Requester Dashboard.** Sign in as `michelle.jones@toktickit.test`. Waiting for You and Needs
+   your attention show `TKT-2026-800003`, and each card opens My Tickets filtered to match. Open
+   the Ticket to see its Actions Taken, read-only. `grace.lim@toktickit.test` shows the empty
+   account.
+6. **Administrator.** Sign in as `alex.morgan@toktickit.test`: the staff Dashboard with user
+   counts, User Management, and System Status.
+
+The same steps are captured in `artifacts/lab-04/screenshots/` by `npm run e2e:fresh`.
 
 ## Verifying the setup
 
@@ -199,20 +248,22 @@ Expected output, on a freshly seeded database:
 
 ```
 $ cd server && npm test
- Test Files  21 passed (21)
-      Tests  353 passed (353)
+ Test Files  33 passed (33)
+      Tests  700 passed (700)
 
 $ cd client && npm test
- Test Files  17 passed (17)
-      Tests  256 passed (256)
+ Test Files  27 passed (27)
+      Tests  422 passed (422)
 
 $ npm run e2e:fresh
-  91 passed
+  156 passed
 
 $ npm run e2e
-  23 skipped
-  68 passed
+  51 skipped
+  105 passed
 ```
+
+The 51 skipped are the three submission-evidence specs, which only run on a fresh database.
 
 The server suite signs in as every seeded account, so it expects them as the table above
 describes them. If you have changed a seeded account's password by hand, one test in
@@ -226,15 +277,15 @@ Tickets and users it created afterwards, so repeated runs do not fill the demo d
 `npm run e2e:fresh` runs the same suite against a database built for the run: it creates
 `<your database>_e2e` beside the development one, migrates and seeds it, and starts its own
 API and client on ports 3101 and 5273, so it does not matter what else is running. This is
-the command that produces the Lab 3 submission screenshots in `artifacts/lab-03/screenshots/`;
-they are only captured in this mode, so that they show the seed and nothing left in a
+the command that produces the Lab 3 and Lab 4 submission screenshots in
+`artifacts/lab-0{3,4}/screenshots/`; they are only captured in this mode, so that they show the seed and nothing left in a
 development database. Anything after `--` is passed to Playwright, for example
-`npm run e2e:fresh -- e2e/lab-03`.
+`npm run e2e:fresh -- e2e/lab-04`.
 
-Test files live in `server/tests/lab-0{1,2,3}/`, `client/tests/lab-0{1,2,3}/` and
-`e2e/lab-0{2,3}/`. See [`docs/lab-01/tests.md`](docs/lab-01/tests.md),
-[`docs/lab-02/tests.md`](docs/lab-02/tests.md) and
-[`docs/lab-03/tests.md`](docs/lab-03/tests.md) for the full test lists and their
+Test files live in `server/tests/lab-0{1,2,3,4}/`, `client/tests/lab-0{1,2,3,4}/` and
+`e2e/lab-0{2,3,4}/`. See [`docs/lab-01/tests.md`](docs/lab-01/tests.md),
+[`docs/lab-02/tests.md`](docs/lab-02/tests.md), [`docs/lab-03/tests.md`](docs/lab-03/tests.md)
+and [`docs/lab-04/tests.md`](docs/lab-04/tests.md) for the full test lists and their
 traceability to acceptance criteria.
 
 ## Rolling back the Lab 4 migration
@@ -275,13 +326,14 @@ each step.
 | `npm run db:seed` | Seed categories, related systems, users, tickets, comments and actions taken (idempotent) |
 | `npm run db:migration-check` | On a throwaway database: rebuild the Lab 2 schema, apply the Lab 3 migration and assert no Ticket, Attachment or owner was lost; then apply the Lab 4 migration, its rollback, and the migration again, asserting every earlier row is unchanged each time |
 | `npm run prisma:generate` | Regenerate the Prisma client |
+| `npx tsx src/scripts/dashboard-sql-check.ts <email>` | Print the IT Staff Dashboard's counts for that user, each from a hand-written SQL query, to compare with the screen |
 
 ### Repository root
 
 | Script | Purpose |
 | --- | --- |
 | `npm run e2e` | Run the Playwright suite against the development database |
-| `npm run e2e:fresh` | Build a database for the run, then run the suite on its own ports; captures the Lab 3 evidence |
+| `npm run e2e:fresh` | Build a database for the run, then run the suite on its own ports; captures the Lab 3 and Lab 4 evidence |
 | `npm run typecheck` | Type-check the Playwright specs |
 
 ### `client/`
@@ -297,9 +349,23 @@ each step.
 ## Git workflow
 
 `main` is the stable release branch. Each lab has its own integration branch:
-`lab1-staging`, then `lab2-staging`, then `lab3-staging`. All work happens on feature
+`lab1-staging`, then `lab2-staging`, `lab3-staging` and `lab4-staging`. All work happens on feature
 branches and reaches `main` through the staging branch for that lab, one pull request at a
 time.
+
+### Lab 4 branches
+
+| Issue | Feature branch | PR target |
+| :-- | :-- | :-: |
+| 65. Sprint 4 engineering contract | `feature/lab4-specification` | `lab4-staging` |
+| 66. Actions Taken schema, migration, rollback and seed | `feature/lab4-schema` | `lab4-staging` |
+| 67. Actions Taken API | `feature/lab4-actions-api` | `lab4-staging` |
+| 68. Actions Taken on Ticket Detail | `feature/lab4-actions-ui` | `lab4-staging` |
+| 69. Ticket workflow, resolution gate and stale updates | `feature/lab4-workflow` | `lab4-staging` |
+| 70. Dashboard API and drill-down filters | `feature/lab4-dashboard-api` | `lab4-staging` |
+| 71. Requester and IT Staff dashboards, navigation and landing | `feature/lab4-dashboards-ui` | `lab4-staging` |
+| 72. Final hardening and visual evidence | `feature/lab4-hardening-evidence` | `lab4-staging` |
+| 73. Documentation and release | `feature/lab4-docs-release` | `lab4-staging` |
 
 ### Lab 3 branches
 
@@ -335,4 +401,4 @@ time.
 | 21. Documentation and release | `feature/lab2-docs-release` | `lab2-staging` |
 
 Every pull request requires peer review before merging. The review record for each lab
-is in `docs/lab-0{1,2,3}/reviewer.md`.
+is in `docs/lab-0{1,2,3,4}/reviewer.md`.

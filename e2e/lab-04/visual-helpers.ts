@@ -134,8 +134,14 @@ export async function expectMessageUnder(control: Locator, what: string) {
   const message = control.page().locator(`[id="${describedBy!.split(' ').pop()}"]`)
   await expect(message).toBeVisible()
 
-  const [field, text] = [await control.boundingBox(), await message.boundingBox()]
-  expect(text!.y, `${what}: message is not below its field`).toBeGreaterThanOrEqual(field!.y + field!.height - 1)
-  expect(text!.y - (field!.y + field!.height), `${what}: message is far from its field`).toBeLessThan(40)
+  // Both boxes in one read. The dialog scrolls to the first invalid field
+  // after the messages appear, and two separate reads can straddle that
+  // scroll and measure the two at different positions.
+  const gap = await control.evaluate((field, id) => {
+    const message = document.getElementById(id)!
+    return message.getBoundingClientRect().top - field.getBoundingClientRect().bottom
+  }, describedBy!.split(' ').pop()!)
+  expect(gap, `${what}: message is not below its field`).toBeGreaterThanOrEqual(-1)
+  expect(gap, `${what}: message is far from its field`).toBeLessThan(40)
   await expect(control).toHaveAttribute('aria-invalid', 'true')
 }

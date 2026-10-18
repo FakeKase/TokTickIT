@@ -451,6 +451,32 @@ which shares no code with the dashboard. The spec fails if any pair differs.
 Two captures in `ui-spec.md` §11 are tables of API responses and not screens, as in Lab 3:
 `requester-dashboard/ownership-api.png` and `actions-taken/forbidden-api.png`.
 
+**#73, documentation and release preparation.** No test row changes. The whole suite was run
+again on the `lab4-staging` head before the release PR:
+
+| Suite | Result |
+| :-- | :-- |
+| Server, on the database `npm run e2e:fresh` builds | 33 files, 700 tests, all passed |
+| Client | 27 files, 422 tests, all passed |
+| `npm run e2e:fresh` | 156 passed |
+| `npm run e2e`, on the development database | 105 passed, 51 skipped (the three evidence specs, which run only on a fresh database) |
+| Type checks (`server/`, `client/`, root), client lint and build | Clean |
+
+The run on the development database found one check of my own that could fail by timing. The
+validation-placement check in `visual-regression.spec.ts` read the field's box and the message's
+box in two calls, and the dialog scrolls to the first invalid field in between, so twice it
+measured the message 461px from its field. Both boxes are now read in one call, and the test
+passed 15 times in a row on the same database. The screen was right throughout.
+
+The capture for the report, made straight after a full e2e run, found one more check that could
+lose a race. `client/tests/lab-02/AppShellNav.test.tsx` "leads from / to the Dashboard" read the
+marked navigation link once, as soon as the address had changed, and the shell can draw a moment
+later. It failed once and then passed in five runs of its file and a full run. It waits for the
+link now. The test is a Lab 2 one, changed in #71 for the new landing route, which is where the
+race came in.
+
+The final figures for the report come from a run on `main` after the release.
+
 MIG-02 does not run on the development database. It builds one of its own from the migrations,
 seeds it twice and compares the rows, because "the counts did not change" is only a statement
 about the seed when nothing else is in the database.

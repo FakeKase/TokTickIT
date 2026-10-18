@@ -26,19 +26,22 @@ board in step with the work.
 
 ## Selected key prompts
 
-Eight prompts, quoted as typed, typos included. Most are short because the long instructions of
-this sprint were the plan and the specification documents; what I typed was direction.
+Seven prompts. Six are mine, quoted as I typed them with typos included, or for prompt 2 as I
+chose them. Most are short, because the long
+instructions of this sprint were the plan and the specification documents; what I typed was
+direction, and the "Why this one" column says what each one set off. Prompt 3 is the exception: it
+was written by the coding agent, not by me, and is included because it is exactly what the
+specification agent was told.
 
 | # | Prompt | What it produced | Why this one |
 | --- | --- | --- | --- |
 | 1 | `/plan read SE lab 04.pdf in labsheet an use the planning agent to plan it out` | A plan of ten issues in order, made in plan mode so nothing was written until I approved it. The planning agent read the whole handout first and found that it contradicts itself: the Actions Taken field list has no assignee or status, while the Part 6 rubric asks to see actions assigned, completed and cancelled | The sprint ran from this plan. Finding the contradiction before any code was the most valuable thing the planning step did. |
 | 2 | My three answers to the questions the plan raised: `Work log, 7 fields (Recommended)`, `Keep as admin-only status page`, `About 8 PRs` | The three decisions the contract is built on: Actions Taken as a work log with the handout's seven fields, the Lab 1 Check System page kept as System Status for Administrators, and fewer, larger PRs than Lab 3 | These were choices only I could make. The first is the riskiest decision of the lab, so it is written down in specification §11 with its reasoning, and the report points to it under Part 6. |
-| 3 | `check pr I got request chnges` | On #74, three contract fixes in one commit and a reply to each point, including agreeing to the Part 6 note | The contract was reviewed against the code before anything was built on it. All three findings would have been bugs later. |
-| 4 | `just the text no need to quote` | Review drafts as plain text I could paste, not in a quote block | Small, but it set how every later draft came back to me. |
-| 5 | `review https://github.com/gxjakkap/soften-toktickit/pull/80` | A review of his Actions Taken UI that found the form could be closed during a save, the same bug he had found in mine | One of its points was wrong: it said pressing Enter could send a second request, and a browser does not submit a form whose submit button is disabled. He corrected it, and the approval said so. |
-| 6 | `check their review` | On #80, his finding reproduced first, then fixed, with four tests that each failed without the fix | The same bug he had reported on my Lab 3 queue, now on My Tickets. It is why the next issue swept every screen instead of fixing one at a time. |
-| 7 | `continue` (starting #72, hardening and evidence) | A regression sweep of every screen for every role, a visual check per checklist line, and the captures. They found seven problems, four of them older than Lab 4 | The handout asks for console errors, broken links and unfinished controls to be removed. Writing checks for that found things neither of us had seen in three labs of review. |
-| 8 | `closed finished issue and update kanban` | Seven issues closed with a link to the PR that finished each | It found that no issue had closed by itself all sprint: GitHub closes an issue from a PR only when the PR merges into the default branch, and every PR here merged into `lab4-staging`. |
+| 3 | *Written by the coding agent for the planning agent, about 1,200 words.* It opens: `Design an implementation plan for Lab 4 of TokTickIT ... You are read-only; return the plan as your final message. ... the handout text can be extracted with: ... Read it in full first.` It then summarises what Lab 4 asks, lists the required files, and tells it to read the current code wherever it needs detail | The plan in prompt 1, with the handout's contradictions listed first and a recommended reading for each | Part 4 asks about specification-agent use. This is what the specification agent was actually told: read the handout in full before anything else, change nothing, and read the code that exists rather than assume it. |
+| 4 | `check pr I got request chnges` | On #74, three contract fixes in one commit and a reply to each point: the date rule refused the form's own default, the model had no column for `editedAt`, and the contract named a lock Lab 3 had already moved away from | The contract was reviewed against the code before anything was built on it. All three would have been bugs in the next three PRs. |
+| 5 | `check pr` | On #78, the deadlock the agent had introduced between changing a Ticket Owner and deactivating that user. It reproduced the failure with my reviewer's 40-run loop before changing anything, fixed the lock order, and put the loop in the test suite | The most serious bug of the lab, and the agent's own. The fix was only trusted because the failure was seen first. |
+| 6 | `continue` (starting #72, hardening and evidence) | A regression sweep of every screen for every role, a visual check per checklist line, and the captures. They found seven problems, four of them older than Lab 4 | The handout asks for console errors, broken links and unfinished controls to be removed. Writing checks for that found things neither of us had seen in three labs of review. |
+| 7 | `closed finished issue and update kanban` | Seven issues closed with a link to the PR that finished each | It found that no issue had closed by itself all sprint: GitHub closes an issue from a PR only when the PR merges into the default branch, and every PR here merged into `lab4-staging`. |
 
 ## What the AI got wrong
 
@@ -55,7 +58,8 @@ these reached a pull request, or would have.
 - **It introduced a deadlock** (#78). Locking the Ticket first in the owner route put it in the
   opposite order to deactivating a user. My partner raced the two 40 times and every run failed
   one side.
-- **A review point of its own was wrong** (prompt 5).
+- **A review point of its own was wrong.** In its review of my partner's #80 it said pressing Enter
+  could send a second request; a browser does not submit a form whose submit button is disabled.
 - **Its own hardening checks found more of its own work.** Links had been Bootstrap's blue since
   Lab 2 against a spec that said green; an id past the range of the column answered 500 on
   every route since Lab 2; and the offset check it wrote in #76 still accepted `+14:30`.
@@ -67,13 +71,4 @@ and, at the end, checks that cover every screen at once.
 
 ## My Reflection
 
-<!--
-  TODO: write 3 to 5 sentences in your own voice. The handout (Part 4) asks for "a brief
-  My Reflection on specification-agent and coding-agent use". Things you might touch on:
-    - the planning agent finding the Actions Taken contradiction, and choosing the work log
-    - fewer, larger PRs this time (prompt 2): did it help with review round trips
-    - the same bugs coming back (Esc during save, page past the end), and what you think
-      that says about working with an agent
-    - drafting reviews with the agent and posting them yourself, now a second lab of it
-  Leave nothing here that you did not actually think. This section has to be yours.
--->
+In this lab I used the planning agent first to read the handout and plan the sprint, and it found that the Actions Taken fields in the handout did not match the Part 6 rubric before any code was written, so I could decide early to keep it as a work log. I asked for fewer but bigger PRs than Lab 3, and each PR needed only one round of changes at most, which made the review cycle with my partner faster. The thing I noticed most is that the coding agent repeated bugs that were already fixed in Lab 3, like closing a dialog while saving and a page past the end, because a fix on one screen did not carry to the next one. That is why in the hardening issue I had it write checks that cover every screen at once, and they found problems neither of us had seen before.

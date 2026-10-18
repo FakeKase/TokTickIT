@@ -124,7 +124,10 @@ describe('Primary nav active state', () => {
     await renderAt('/')
 
     await waitFor(() => expect(window.location.pathname).toBe('/dashboard'))
-    expect(activeLinkNames()).toEqual(['Dashboard'])
+    // The address changes before the shell has drawn the screen it leads to,
+    // so the marked link is waited for too. Read once, straight away, this
+    // failed one run in many on a busy machine.
+    await waitFor(() => expect(activeLinkNames()).toEqual(['Dashboard']))
   })
 })
 

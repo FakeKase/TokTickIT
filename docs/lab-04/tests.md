@@ -468,6 +468,13 @@ box in two calls, and the dialog scrolls to the first invalid field in between, 
 measured the message 461px from its field. Both boxes are now read in one call, and the test
 passed 15 times in a row on the same database. The screen was right throughout.
 
+The capture for the report, made straight after a full e2e run, found one more check that could
+lose a race. `client/tests/lab-02/AppShellNav.test.tsx` "leads from / to the Dashboard" read the
+marked navigation link once, as soon as the address had changed, and the shell can draw a moment
+later. It failed once and then passed in five runs of its file and a full run. It waits for the
+link now. The test is a Lab 2 one, changed in #71 for the new landing route, which is where the
+race came in.
+
 The final figures for the report come from a run on `main` after the release.
 
 MIG-02 does not run on the development database. It builds one of its own from the migrations,

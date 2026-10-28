@@ -48,8 +48,9 @@ The counts here come from the GitHub reviews API for each PR, not from reading t
 | [#82](https://github.com/FakeKase/TokTickIT/pull/82) | *Changes requested:* My Reflection in `ai-use.md` was still the placeholder, and Part 4 asks for it. He checked the review counts against the GitHub API and the seeded Tickets table against `seed.ts`. | I wrote My Reflection and cut the key prompts to six. Approved, with one note that the PR description still said eight prompts, which I corrected. |
 
 **The pattern across these.** In Lab 3 the findings were mostly tests that could not fail. In
-Lab 4 none were: every finding was a behaviour, and four of the five came from running
-something, a validator called directly, a test written against my screen, a 40-run race. Two
+Lab 4 none were. Five of the six findings were behaviours, and four of those came from running
+something, a validator called directly, a test written against my screen, a 40-run race. The
+sixth, on #82, was the missing Reflection, caught by reading. Two
 were bugs I had already fixed once. The `Esc` guard on #77 is the user dialog of Lab 3 #57
 again, and the page past the end on #80 is the queue of Lab 3 #55 again, on My Tickets. What
 I took from that is that a fix applied to one screen is not a rule the codebase knows. In #81

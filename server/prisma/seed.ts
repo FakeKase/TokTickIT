@@ -126,12 +126,29 @@ async function main() {
 
 /**
  * Realistic Tickets spread across statuses, both priority scales, and assigned
- * as well as unassigned ownership, plus example comments and notes.
+ * as well as unassigned ownership, plus example comments, notes and Actions
+ * Taken.
  *
  * Idempotent through `ticketNumber`, which is the only natural key a Ticket
  * has. Seeded numbers live in the 800000 band so they can never collide with a
  * real Ticket (numbered from its own row id) or with a test fixture (900000).
  */
+const MINUTE = 60_000
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+
+/** One seeded Action Taken. Follow-up is required exactly when a note is
+ *  given, which is the rule the table itself enforces (BR-07). */
+interface SeedAction {
+  performedById: number
+  /** Hours after the Ticket was created that the work was done. */
+  afterHours: number
+  description: string
+  result: string
+  followUpNote?: string
+  attachmentNotes?: string
+}
+
 async function seedTickets() {
   const user = async (email: string) =>
     prisma.user.findUniqueOrThrow({ where: { email } })
@@ -161,6 +178,10 @@ async function seedTickets() {
     itPriority: ItPriority
     currentStatus: TicketStatus
     comments?: Array<{ authorId: number; visibility: CommentVisibility; body: string }>
+    /** Hours after the Ticket was created that it was resolved. Only for a
+     *  Ticket seeded as Resolved or Closed (Lab 4 BR-18). */
+    resolvedAfterHours?: number
+    actions?: SeedAction[]
   }> = [
     {
       number: 'TKT-2026-800001',
@@ -189,6 +210,31 @@ async function seedTickets() {
         { authorId: sarah.id, visibility: 'PUBLIC', body: 'Thanks for reporting this. Could you tell me which internet provider you are on at home?' },
         { authorId: sarah.id, visibility: 'INTERNAL', body: 'Third VPN drop report from the same building this week. Checking whether the concentrator rolled back to the old firmware.' },
       ],
+      // Three actions by two people, one of whom does not own the Ticket
+      // (BR-02), and the latest still needing follow-up: this is the Ticket
+      // the resolution gate refuses (BR-13).
+      actions: [
+        {
+          performedById: sarah.id,
+          afterHours: 2,
+          description: 'Checked the VPN concentrator logs for the sessions from the home address range.',
+          result: 'The sessions are ended by the idle timeout, which last week\'s firmware rollback reset to 5 minutes.',
+          attachmentNotes: 'Concentrator log extract: vpn-drops-ned.txt',
+        },
+        {
+          performedById: marcus.id,
+          afterHours: 26,
+          description: 'Raised the idle timeout to 8 hours on the test profile and moved the Requester onto it.',
+          result: 'No disconnects during a 40 minute test session.',
+        },
+        {
+          performedById: sarah.id,
+          afterHours: 50,
+          description: 'Asked the network team to apply the same timeout to the production profile.',
+          result: 'The change is scheduled. The Requester stays on the test profile until it is applied.',
+          followUpNote: 'Confirm the production profile has the 8 hour timeout, then move the Requester back to it.',
+        },
+      ],
     },
     {
       number: 'TKT-2026-800003',
@@ -206,6 +252,14 @@ async function seedTickets() {
         { authorId: michelle.id, visibility: 'PUBLIC', body: 'Signed out and back in, still the same error.' },
         { authorId: marcus.id, visibility: 'INTERNAL', body: 'Role exists in the directory but has not synced. Raising with the LEB2 team rather than re-issuing.' },
       ],
+      actions: [
+        {
+          performedById: marcus.id,
+          afterHours: 3,
+          description: 'Requested the course instructor role in the directory and asked the LEB2 team to run the sync.',
+          result: 'The role is present in the directory. LEB2 confirmed the sync has run.',
+        },
+      ],
     },
     {
       number: 'TKT-2026-800004',
@@ -222,6 +276,21 @@ async function seedTickets() {
         { authorId: sarah.id, visibility: 'PUBLIC', body: 'Cleared the cached credential on your profile. Please try Outlook again and let me know.' },
         { authorId: zoro.id, visibility: 'PUBLIC', body: 'Working now, thank you.' },
       ],
+      resolvedAfterHours: 48,
+      actions: [
+        {
+          performedById: sarah.id,
+          afterHours: 1,
+          description: 'Cleared the cached Outlook credential on the Requester\'s profile.',
+          result: 'Outlook signed in on the first prompt and stopped asking.',
+        },
+        {
+          performedById: marcus.id,
+          afterHours: 25,
+          description: 'Checked with the Requester the next day.',
+          result: 'Outlook has stayed signed in for 24 hours.',
+        },
+      ],
     },
     {
       number: 'TKT-2026-800005',
@@ -236,6 +305,16 @@ async function seedTickets() {
       currentStatus: 'CLOSED',
       comments: [
         { authorId: marcus.id, visibility: 'INTERNAL', body: 'Duplex unit replaced under warranty. Serial recorded in the asset sheet.' },
+      ],
+      resolvedAfterHours: 24,
+      actions: [
+        {
+          performedById: marcus.id,
+          afterHours: 4,
+          description: 'Replaced the duplex unit under warranty.',
+          result: 'Printed 20 double sided test pages with no jam.',
+          attachmentNotes: 'Warranty claim form: printer-3f-duplex-claim.pdf',
+        },
       ],
     },
     {
@@ -280,8 +359,36 @@ async function seedTickets() {
     },
   ]
 
-  for (const spec of tickets) {
+  // The seeded Tickets are given a past, six days back and a minute apart in
+  // the order they are listed, so that the work recorded on them can be dated
+  // after they were created and before now (BR-05), and the resolved ones
+  // fall inside the dashboard's seven days.
+  //
+  // An existing row keeps the creation time it has, unless it is younger than
+  // the latest thing the seed dates from it: a database seeded an hour ago
+  // under Lab 3 would otherwise get work recorded two days in the future.
+  // Such a row is moved back once and is then old enough to be left alone.
+  const firstCreatedAt = Date.now() - 6 * DAY
+  const youngestUsable = Date.now() - 3 * DAY
+  let actionCount = 0
+
+  for (const [index, spec] of tickets.entries()) {
     const [cat, sys] = await Promise.all([category(spec.category), system(spec.system)])
+    const existingTicket = await prisma.ticket.findUnique({
+      where: { ticketNumber: spec.number },
+      select: { createdAt: true },
+    })
+    const createdAt =
+      existingTicket && existingTicket.createdAt.getTime() <= youngestUsable
+        ? existingTicket.createdAt
+        : new Date(firstCreatedAt + index * MINUTE)
+    // Derived from the creation time, which never changes, so every run
+    // writes the same value. Null for a Ticket that is not resolved, which
+    // also undoes a resolution somebody made while demonstrating.
+    const resolvedAt =
+      spec.resolvedAfterHours === undefined
+        ? null
+        : new Date(createdAt.getTime() + spec.resolvedAfterHours * HOUR)
 
     // Unlike the user upsert above, this one does restore the demo state on
     // every run. A password someone changed is their data; a seeded Ticket
@@ -293,8 +400,12 @@ async function seedTickets() {
         ownerId: spec.ownerId,
         itPriority: spec.itPriority,
         currentStatus: spec.currentStatus,
+        createdAt,
+        resolvedAt,
       },
       create: {
+        createdAt,
+        resolvedAt,
         ticketNumber: spec.number,
         requesterId: spec.requesterId,
         categoryId: cat.id,
@@ -317,6 +428,29 @@ async function seedTickets() {
         data: spec.comments.map((comment) => ({ ...comment, ticketId: ticket.id })),
       })
     }
+
+    // Actions Taken do have a natural key: the request key (BR-20), which the
+    // seed fills with one only it writes. Written once and then left alone,
+    // like the comments, so an edit made during a demo is not undone here.
+    for (const [n, action] of (spec.actions ?? []).entries()) {
+      const { afterHours, followUpNote, attachmentNotes, ...fields } = action
+      await prisma.actionTaken.upsert({
+        where: { requestKey: `seed:${spec.number.slice(-6)}:${n + 1}` },
+        update: {},
+        create: {
+          ...fields,
+          ticketId: ticket.id,
+          requestKey: `seed:${spec.number.slice(-6)}:${n + 1}`,
+          actionAt: new Date(createdAt.getTime() + afterHours * HOUR),
+          // Recorded a few minutes after the work, as a person would.
+          createdAt: new Date(createdAt.getTime() + afterHours * HOUR + 10 * MINUTE),
+          followUpRequired: followUpNote !== undefined,
+          followUpNote: followUpNote ?? null,
+          attachmentNotes: attachmentNotes ?? null,
+        },
+      })
+      actionCount += 1
+    }
   }
 
   // Counted from what this file defines, not from the table: a database that
@@ -325,7 +459,7 @@ async function seedTickets() {
   const defined = tickets.flatMap((spec) => spec.comments ?? [])
   const publicCount = defined.filter((comment) => comment.visibility === 'PUBLIC').length
   const internalCount = defined.length - publicCount
-  console.log(`Seeded ${tickets.length} tickets, ${publicCount} public comments, ${internalCount} internal notes`)
+  console.log(`Seeded ${tickets.length} tickets, ${publicCount} public comments, ${internalCount} internal notes, ${actionCount} actions taken`)
 }
 
 main()

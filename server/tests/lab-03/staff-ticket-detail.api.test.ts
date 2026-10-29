@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import request from "supertest";
@@ -44,6 +44,9 @@ let relatedSystemId: number;
 const cleanup = async () => {
   const stale = { email: { contains: TAG } };
   await prisma.ticketComment.deleteMany({ where: { ticket: { requester: stale } } });
+  // Lab 4: Actions Taken restrict the deletion of their Ticket and of the
+  // user who performed them, so they go first.
+  await prisma.actionTaken.deleteMany({ where: { ticket: { requester: stale } } });
 
   // The files first, while the rows that name them still exist. Deleting the
   // rows alone leaves one orphaned upload on disk for every run.
@@ -136,6 +139,22 @@ const reset = (
 
 beforeEach(async () => {
   await reset();
+  // Lab 4: a Ticket can be Resolved only once work is recorded on it, and the
+  // latest of it asks for no follow-up (Lab 4 BR-13). These tests are about
+  // the Lab 3 rules, the matrix and the owner, so the fixture Ticket always
+  // carries one such Action Taken and the gate is never what refuses a move
+  // here. The gate has its own file, lab-04/ticket-workflow.api.test.ts.
+  await prisma.actionTaken.deleteMany({ where: { ticketId } });
+  await prisma.actionTaken.create({
+    data: {
+      ticketId,
+      performedById: staffId,
+      requestKey: `fixture-${TAG}`,
+      actionAt: new Date(),
+      description: "Fixture work, so that the resolution gate is met.",
+      result: "Done.",
+    },
+  });
 });
 
 afterAll(async () => {
@@ -148,16 +167,35 @@ const row = () => prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
 const detail = (cookie = staffCookie, id: number | string = ticketId) =>
   request(app).get(`/api/staff/tickets/${id}`).set("Cookie", cookie);
 
-const patch = (
+/**
+ * One workflow change.
+ *
+ * Lab 4 requires every such request to name the version of the Ticket it was
+ * based on (Lab 4 BR-16). These tests are not about that rule, so the helper
+ * reads the current version and sends it, as a screen that had just loaded
+ * the Ticket would. A test that is about a stale copy passes its own
+ * `expectedVersion` in the body and this leaves it alone.
+ */
+const patch = async (
   what: "owner" | "it-priority" | "status",
   body: unknown,
   cookie = staffCookie,
   id: number | string = ticketId,
-) =>
-  request(app)
+) => {
+  const current = await prisma.ticket.findUnique({
+    where: { id: Number(id) || 0 },
+    select: { version: true },
+  });
+  const isObject = typeof body === "object" && body !== null;
+  return request(app)
     .patch(`/api/staff/tickets/${id}/${what}`)
     .set("Cookie", cookie)
-    .send(body as object);
+    .send(
+      isObject && !("expectedVersion" in body)
+        ? { ...body, expectedVersion: current?.version ?? 1 }
+        : (body as object),
+    );
+};
 
 describe("who may use the staff Ticket endpoints (AC-14, AC-21)", () => {
   it("API-15: refuses a Requester on every one, with 403, no Ticket data, and nothing written", async () => {
@@ -223,6 +261,9 @@ describe("opening a Ticket as staff (FR-14)", () => {
       itPriority: "HIGH",
       currentStatus: "IN_PROGRESS",
       requesterResolvedAt: null,
+      // Lab 4 adds these two, and `blockedReason` on each move below.
+      version: expect.any(Number),
+      resolvedAt: null,
       createdAt: expect.any(String),
       updatedAt: LONG_AGO.toISOString(),
       category: { id: categoryId, name: expect.any(String) },
@@ -231,9 +272,9 @@ describe("opening a Ticket as staff (FR-14)", () => {
       owner: { id: staffId, name: `staff ${TAG}` },
       attachments: [],
       transitions: [
-        { to: "WAITING_FOR_REQUESTER", requiresOwner: false },
-        { to: "RESOLVED", requiresOwner: true },
-        { to: "CANCELLED", requiresOwner: false },
+        { to: "WAITING_FOR_REQUESTER", requiresOwner: false, blockedReason: null },
+        { to: "RESOLVED", requiresOwner: true, blockedReason: null },
+        { to: "CANCELLED", requiresOwner: false, blockedReason: null },
       ],
       ownerRequired: false,
     });
@@ -626,44 +667,20 @@ describe("status changes (FR-17, BR-22, BR-23)", () => {
 });
 
 describe("two people changing the same Ticket", () => {
-  /**
-   * An app whose first read of the Ticket is followed, before the route can
-   * act on it, by `interleave`. That is the window a second person's request
-   * lands in; forcing it open is the only way to test it without hoping two
-   * real requests happen to overlap.
-   */
-  function appWithInterleavedWrite(interleave: () => Promise<unknown>) {
-    const racing = createPrismaClient();
-    const original = racing.ticket.findUnique.bind(racing.ticket);
-    let fired = false;
-
-    vi.spyOn(racing.ticket, "findUnique").mockImplementation((async (
-      ...args: Parameters<typeof original>
-    ) => {
-      const result = await original(...args);
-      if (!fired) {
-        fired = true;
-        await interleave();
-      }
-      return result;
-    }) as never);
-
-    return { racingApp: createApp(racing), done: () => racing.$disconnect() };
-  }
-
+  // Lab 3 proved these two by forcing a second write into the gap between
+  // the route's read and its write. Lab 4 closes that gap: the route holds
+  // the Ticket's row locked from its read to its write, so nothing can land
+  // in between, and a request names the version it was based on (Lab 4
+  // BR-16). What is left to prove is the same thing from the outside: a
+  // change decided on a copy that somebody has since changed is refused.
   it("refuses a status change decided on a status that has since moved", async () => {
     await reset({ currentStatus: "IN_PROGRESS", ownerId: staffId });
-    const { racingApp, done } = appWithInterleavedWrite(() =>
-      prisma.ticket.update({ where: { id: ticketId }, data: { currentStatus: "CANCELLED" } }),
-    );
+    const seen = (await row()).version;
 
-    // Read as In Progress, so Resolved looked legal. By the time of the write
-    // it is Cancelled, and Cancelled to Resolved is not in the matrix.
-    const response = await request(racingApp)
-      .patch(`/api/staff/tickets/${ticketId}/status`)
-      .set("Cookie", staffCookie)
-      .send({ currentStatus: "RESOLVED" });
-    await done();
+    // A colleague cancels it. The first person's screen still shows In
+    // Progress, from which Resolved looks legal.
+    expect((await patch("status", { currentStatus: "CANCELLED" }, colleagueCookie)).status).toBe(200);
+    const response = await patch("status", { currentStatus: "RESOLVED", expectedVersion: seen });
 
     expect(response.status).toBe(409);
     expect(response.body.error).toMatch(/changed by someone else/);
@@ -672,15 +689,10 @@ describe("two people changing the same Ticket", () => {
 
   it("refuses to resolve a Ticket that was unassigned in the meantime (BR-23)", async () => {
     await reset({ currentStatus: "IN_PROGRESS", ownerId: staffId });
-    const { racingApp, done } = appWithInterleavedWrite(() =>
-      prisma.ticket.update({ where: { id: ticketId }, data: { ownerId: null } }),
-    );
+    const seen = (await row()).version;
 
-    const response = await request(racingApp)
-      .patch(`/api/staff/tickets/${ticketId}/status`)
-      .set("Cookie", staffCookie)
-      .send({ currentStatus: "RESOLVED" });
-    await done();
+    expect((await patch("owner", { ownerId: null }, colleagueCookie)).status).toBe(200);
+    const response = await patch("status", { currentStatus: "RESOLVED", expectedVersion: seen });
 
     expect(response.status).toBe(409);
     const after = await row();
@@ -710,10 +722,15 @@ describe("two people changing the same Ticket", () => {
       patch("owner", { ownerId: colleagueId }, colleagueCookie),
     ]);
 
-    // Both are legal one after the other, so both succeed; what matters is
-    // that neither is lost to a serialization failure surfacing as a 500.
-    expect([first.status, second.status]).toEqual([200, 200]);
-    expect([staffId, colleagueId]).toContain((await row()).ownerId);
+    // Lab 3 let both succeed, one after the other, and the second silently
+    // took the Ticket from the first. Lab 4 does not (Lab 4 BR-16): both were
+    // decided on the same unowned Ticket, so one wins and the other is told
+    // its copy is out of date. What still matters from Lab 3 is that neither
+    // is lost to a failure surfacing as a 500.
+    expect([first.status, second.status].sort()).toEqual([200, 409]);
+    const loser = first.status === 409 ? first : second;
+    expect(loser.body.code).toBe("STALE_TICKET");
+    expect((await row()).ownerId).toBe(first.status === 200 ? staffId : colleagueId);
   });
 });
 

@@ -1,0 +1,216 @@
+/* Dashboard parts (Lab 4 ui-spec.md §2). The card surface, border and radius
+   come from .ttk-card; nothing here redefines them. */
+
+.ttk-dash__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zg-space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--zg-space-6);
+}
+
+.ttk-dash__head h2 {
+  margin: 0 0 var(--zg-space-1);
+}
+
+.ttk-dash__lead {
+  margin: 0;
+  opacity: 0.75;
+}
+
+/* Four in a row on desktop, two by two on tablet, one column on mobile. */
+.ttk-dash__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--zg-space-4);
+  margin-bottom: var(--zg-space-6);
+}
+
+/* Lists side by side on desktop, stacked below 992px. */
+.ttk-dash__lists {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--zg-space-4);
+  align-items: start;
+  margin-bottom: var(--zg-space-6);
+}
+
+/* ---------- Metric card ---------- */
+
+.ttk-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zg-space-1);
+  min-width: 0;
+  padding: var(--zg-space-4);
+  color: var(--zg-text);
+  text-decoration: none;
+}
+
+.ttk-metric--link:hover {
+  border-color: var(--zg-secondary);
+}
+
+.ttk-metric__value {
+  font-size: var(--zg-font-size-heading-lg);
+  font-weight: var(--zg-font-weight-heading);
+  line-height: 1.2;
+  color: var(--zg-text);
+}
+
+.ttk-metric__action {
+  font-size: var(--zg-font-size-label);
+  color: var(--zg-secondary);
+  text-decoration: underline;
+}
+
+.ttk-metric__note {
+  font-size: var(--zg-font-size-label);
+  opacity: 0.75;
+}
+
+/* ---------- List ---------- */
+
+.ttk-dash-list {
+  min-width: 0;
+  padding: var(--zg-space-4);
+}
+
+.ttk-dash-list--attention {
+  border-left: 3px solid var(--zg-warning);
+}
+
+.ttk-dash-list__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--zg-space-3);
+  margin-bottom: var(--zg-space-2);
+}
+
+.ttk-dash-list__head h3 {
+  margin: 0;
+}
+
+.ttk-dash-list__all {
+  flex-shrink: 0;
+  font-size: var(--zg-font-size-label);
+  color: var(--zg-secondary);
+}
+
+.ttk-dash-list__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ttk-dash-list__rows > li + li {
+  border-top: 1px solid var(--zg-border);
+}
+
+.ttk-dash-list__empty {
+  margin: 0;
+  padding: var(--zg-space-2) 0;
+  opacity: 0.75;
+}
+
+.ttk-dash-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--zg-space-3);
+  row-gap: var(--zg-space-1);
+  align-items: baseline;
+  padding: var(--zg-space-2) var(--zg-space-1);
+  color: var(--zg-text);
+  text-decoration: none;
+  border-radius: var(--zg-radius);
+}
+
+.ttk-dash-row:hover {
+  background: var(--zg-pale);
+}
+
+/* A Ticket Number never wraps; the Summary beside it gives way instead. */
+.ttk-dash-row__lead {
+  white-space: nowrap;
+  font-weight: var(--zg-font-weight-label);
+  color: var(--zg-secondary);
+}
+
+.ttk-dash-row__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ttk-dash-row__meta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--zg-space-2);
+  font-size: var(--zg-font-size-label);
+}
+
+.ttk-dash-row__time {
+  opacity: 0.75;
+}
+
+/* ---------- Tickets by Status, User accounts ---------- */
+
+.ttk-dash-status {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--zg-space-6);
+}
+
+.ttk-dash-status a,
+.ttk-dash-users {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zg-space-3);
+  padding: var(--zg-space-2) var(--zg-space-1);
+  color: var(--zg-text);
+  text-decoration: none;
+  border-radius: var(--zg-radius);
+}
+
+.ttk-dash-status li {
+  border-bottom: 1px solid var(--zg-border);
+}
+
+.ttk-dash-status a:hover {
+  background: var(--zg-pale);
+}
+
+.ttk-dash-status__count {
+  font-weight: var(--zg-font-weight-heading);
+}
+
+.ttk-dash__section {
+  margin-bottom: var(--zg-space-6);
+}
+
+@media (max-width: 991px) {
+  .ttk-dash__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ttk-dash__lists {
+    grid-auto-flow: row;
+  }
+}
+
+@media (max-width: 767px) {
+  .ttk-dash__metrics,
+  .ttk-dash-status {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

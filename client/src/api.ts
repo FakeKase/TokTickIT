@@ -138,12 +138,29 @@ export class ApiError extends Error {
    */
   readonly status: number
   readonly fields: Record<string, string>
+  /**
+   * The machine-readable reason, where the API gives one (Lab 4 api-spec.md,
+   * "Conventions"). Several different refusals share the status 409, and a
+   * screen that has to tell a stale edit from a finished Ticket branches on
+   * this, never on the wording of `message`.
+   */
+  readonly code: string | undefined
+  /** The whole error body. A stale edit carries the row as it now stands in
+   *  `current`, and this is how the caller reaches it. */
+  readonly body: Record<string, unknown>
 
-  constructor(status: number, message: string, fields: Record<string, string> = {}) {
+  constructor(
+    status: number,
+    message: string,
+    fields: Record<string, string> = {},
+    body: Record<string, unknown> = {},
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.fields = fields
+    this.code = typeof body.code === 'string' ? body.code : undefined
+    this.body = body
   }
 }
 
@@ -153,7 +170,7 @@ async function readError(response: Response, fallback: string): Promise<ApiError
       error?: string
       fields?: Record<string, string>
     }
-    return new ApiError(response.status, body.error ?? fallback, body.fields ?? {})
+    return new ApiError(response.status, body.error ?? fallback, body.fields ?? {}, body)
   } catch {
     // A non-JSON body (proxy error page, empty 502) must not mask the failure,
     // and the status is still meaningful even when the body is not.
@@ -394,11 +411,23 @@ export interface TicketListResponse {
   filtered: boolean
 }
 
+/** A status, or `ACTIVE` for the five a Ticket is still being worked in
+ *  (Lab 4 BR-22). Both lists accept it. */
+export type StatusFilter = TicketStatus | 'ACTIVE'
+
+export type TicketSortField =
+  | 'createdAt'
+  | 'updatedAt'
+  | 'ticketNumber'
+  | 'requestedPriority'
+  | 'currentStatus'
+
 export interface TicketListParams {
   search?: string
+  status?: StatusFilter
   categoryId?: number
   requestedPriority?: RequestedPriority
-  sortBy?: 'createdAt' | 'ticketNumber' | 'requestedPriority' | 'currentStatus'
+  sortBy?: TicketSortField
   sortDir?: 'asc' | 'desc'
   page?: number
   pageSize?: number
@@ -468,7 +497,7 @@ export type StaffQueueSortField =
 
 export interface StaffQueueParams {
   search?: string
-  status?: TicketStatus
+  status?: StatusFilter
   itPriority?: ItPriority
   categoryId?: number
   owner?: 'me' | 'unassigned'
@@ -503,6 +532,80 @@ export async function fetchStaffTickets(
 
   return (await response.json()) as StaffQueueResponse
 }
+
+// ---------------------------------------------------------------------------
+// Dashboards (Lab 4 api-spec.md §8 and §9).
+
+/** A count, and the query string of the list that shows what was counted.
+ *  `query` is null for a count with no list behind it. */
+export interface DashboardMetric {
+  key: string
+  value: number
+  query: string | null
+}
+
+export interface DashboardTicketRow {
+  id: number
+  ticketNumber: string
+  summary: string
+  currentStatus: TicketStatus
+  updatedAt: string
+}
+
+export interface RequesterDashboard {
+  generatedAt: string
+  timeZone: string
+  metrics: DashboardMetric[]
+  needsAttention: DashboardTicketRow[]
+  recentlyUpdated: DashboardTicketRow[]
+  recentlyResolved: (DashboardTicketRow & { resolvedAt: string })[]
+}
+
+export interface StaffDashboardTicketRow extends DashboardTicketRow {
+  itPriority: ItPriority
+  owner: { id: number; name: string } | null
+}
+
+export interface DashboardActionRow {
+  id: number
+  ticketId: number
+  ticketNumber: string
+  ticketSummary: string
+  actionAt: string
+  descriptionPreview: string
+  followUpRequired: boolean
+}
+
+export interface StaffDashboard {
+  generatedAt: string
+  timeZone: string
+  metrics: DashboardMetric[]
+  byStatus: { status: TicketStatus; value: number; query: string }[]
+  recentlyUpdated: StaffDashboardTicketRow[]
+  myRecentActions: DashboardActionRow[]
+  /** Present for an Administrator and absent, not empty, for IT Staff. */
+  users?: { active: number; inactive: number }
+}
+
+async function fetchDashboard<Body>(path: string, fallback: string): Promise<Body> {
+  const response = await apiFetch(path)
+  if (!response.ok) throw await readError(response, fallback)
+
+  // A 200 that is not a dashboard (a proxy's page, an older server) is a
+  // failure to load one. Saying so here keeps the screen from drawing cards
+  // out of whatever arrived.
+  const body = (await response.json().catch(() => null)) as { metrics?: unknown } | null
+  if (!body || !Array.isArray(body.metrics)) throw new ApiError(response.status, fallback)
+  return body as Body
+}
+
+/** Throws ApiError with the status: 403 means the wrong role, which a retry
+ *  cannot fix, and the screen says so instead of offering one. */
+export const fetchRequesterDashboard = () =>
+  fetchDashboard<RequesterDashboard>('/api/dashboard/requester', 'Unable to load your dashboard')
+
+export const fetchStaffDashboard = () =>
+  fetchDashboard<StaffDashboard>('/api/dashboard/staff', 'Unable to load the dashboard')
 
 export interface TicketAttachment {
   id: number
@@ -598,11 +701,122 @@ export async function postComment(
   return (await response.json()) as TicketComment
 }
 
+/**
+ * One line of work recorded on a Ticket (Lab 4 api-spec.md §1). Every role
+ * that may read a Ticket's Actions Taken receives this same shape.
+ */
+export interface ActionTaken {
+  id: number
+  ticketId: number
+  /** When the work was done, as entered. `createdAt` is when it was recorded. */
+  actionAt: string
+  description: string
+  result: string
+  followUpRequired: boolean
+  /** Present exactly when `followUpRequired` is true. */
+  followUpNote: string | null
+  attachmentNotes: string | null
+  performedBy: { id: number; name: string }
+  createdAt: string
+  /** Both null until the first edit. */
+  editedBy: { id: number; name: string } | null
+  editedAt: string | null
+  /** Sent back as `expectedVersion` when editing. */
+  version: number
+}
+
+/** The six fields a person enters. Performed by is never among them: the
+ *  server takes it from the session. */
+export interface ActionTakenInput {
+  /** ISO 8601 with a zone, as `Date.prototype.toISOString` gives. */
+  actionAt: string
+  description: string
+  result: string
+  followUpRequired: boolean
+  followUpNote: string | null
+  attachmentNotes: string | null
+}
+
+export async function fetchActions(ticketId: number): Promise<ActionTaken[]> {
+  const response = await apiFetch(`/api/tickets/${ticketId}/actions`)
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to load the Actions Taken')
+  }
+
+  // Anything but a list is a failure to load, said here once so the screen
+  // can show its retry state. Left unchecked, a body of some other shape
+  // would only fail later, inside the render, and take the page down with it.
+  const actions: unknown = await response.json()
+  if (!Array.isArray(actions)) {
+    throw new ApiError(response.status, 'Unable to load the Actions Taken')
+  }
+  return actions as ActionTaken[]
+}
+
+/**
+ * Records an Action Taken (Lab 4 api-spec.md §2).
+ *
+ * `requestKey` is chosen once per form and sent with every attempt. If a
+ * response is lost and the form is submitted again, the server finds the
+ * first attempt by this key and returns it without creating a second row.
+ */
+export async function createAction(
+  ticketId: number,
+  requestKey: string,
+  input: ActionTakenInput,
+): Promise<ActionTaken> {
+  const response = await apiFetch(`/api/tickets/${ticketId}/actions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requestKey, ...input }),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to save the Action Taken')
+  }
+
+  return (await response.json()) as ActionTaken
+}
+
+/**
+ * Edits an Action Taken (Lab 4 api-spec.md §3).
+ *
+ * `expectedVersion` is the version of the copy the edit was made from. If
+ * somebody else has edited it since, the server refuses with the code
+ * `STALE_ACTION` and puts the current row in the error body.
+ */
+export async function updateAction(
+  ticketId: number,
+  actionId: number,
+  expectedVersion: number,
+  input: ActionTakenInput,
+): Promise<ActionTaken> {
+  const response = await apiFetch(`/api/tickets/${ticketId}/actions/${actionId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expectedVersion, ...input }),
+  })
+
+  if (!response.ok) {
+    throw await readError(response, 'Unable to save the Action Taken')
+  }
+
+  return (await response.json()) as ActionTaken
+}
+
 /** One move the Ticket may make from where it is (specification.md §5.2). */
 export interface StatusTransition {
   to: TicketStatus
   /** The move also needs a Ticket Owner (BR-23). */
   requiresOwner: boolean
+  /**
+   * Null when the server would accept this move now. Otherwise the sentence
+   * it would refuse with (Lab 4 api-spec.md §4): no Ticket Owner, no Action
+   * Taken recorded, or follow-up still required on the latest one. The screen
+   * shows it; it does not work the resolution gate out for itself.
+   */
+  blockedReason: string | null
 }
 
 /** A Ticket as IT Staff see it (api-spec.md §9). */
@@ -616,6 +830,11 @@ export interface StaffTicketDetail extends StaffQueueItem {
   /** The Ticket's status is one that must keep its owner (BR-23), so it
    *  cannot be unassigned, only handed to someone else. */
   ownerRequired: boolean
+  /** Sent back as `expectedVersion` with every workflow change, so a change
+   *  made from an out-of-date copy is refused (Lab 4 BR-16). */
+  version: number
+  /** When the Ticket last entered Resolved; null unless Resolved or Closed. */
+  resolvedAt: string | null
 }
 
 export interface AssignableUser {
@@ -667,18 +886,27 @@ async function patchStaffTicket(
   return (await response.json()) as StaffTicketDetail
 }
 
+// Each of the three names the version of the Ticket the change was made from
+// (Lab 4 api-spec.md §5). If the Ticket has moved on since, the server
+// refuses with the code STALE_TICKET and nothing is written.
+
 /** Claim, reassign, or (with `null`) unassign (api-spec.md §10). */
-export const setTicketOwner = (id: number, ownerId: number | null) =>
-  patchStaffTicket(id, 'owner', { ownerId }, 'Unable to change the Ticket Owner')
+export const setTicketOwner = (id: number, ownerId: number | null, expectedVersion: number) =>
+  patchStaffTicket(id, 'owner', { ownerId, expectedVersion }, 'Unable to change the Ticket Owner')
 
 /** api-spec.md §11. Requested Priority is not touched (BR-21). */
-export const setItPriority = (id: number, itPriority: ItPriority) =>
-  patchStaffTicket(id, 'it-priority', { itPriority }, 'Unable to change the IT Priority')
+export const setItPriority = (id: number, itPriority: ItPriority, expectedVersion: number) =>
+  patchStaffTicket(
+    id,
+    'it-priority',
+    { itPriority, expectedVersion },
+    'Unable to change the IT Priority',
+  )
 
 /** api-spec.md §12. Only the target is sent; the server judges the move from
  *  the status it holds, not from one this screen believes. */
-export const setTicketStatus = (id: number, currentStatus: TicketStatus) =>
-  patchStaffTicket(id, 'status', { currentStatus }, 'Unable to change the status')
+export const setTicketStatus = (id: number, currentStatus: TicketStatus, expectedVersion: number) =>
+  patchStaffTicket(id, 'status', { currentStatus, expectedVersion }, 'Unable to change the status')
 
 export interface ResolvedSignal {
   id: number

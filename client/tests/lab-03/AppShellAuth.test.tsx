@@ -49,7 +49,7 @@ describe('UI-08 role-specific navigation (AC-13, FR-05)', () => {
     mockApi()
     await renderApp()
 
-    expect(navLabels()).toEqual(['My Tickets', 'Create Ticket'])
+    expect(navLabels()).toEqual(['Dashboard', 'My Tickets', 'Create Ticket'])
     // Not rendered at all, rather than rendered and disabled: a disabled link
     // to a place you can never go is an invitation (ui-spec.md §2).
     expect(screen.queryByRole('link', { name: 'Ticket Queue' })).not.toBeInTheDocument()
@@ -59,22 +59,22 @@ describe('UI-08 role-specific navigation (AC-13, FR-05)', () => {
     expect(screen.getByText('Requester')).toBeInTheDocument()
   })
 
-  it('shows IT Staff the queue only', async () => {
+  it('shows IT Staff the dashboard and the queue only', async () => {
     signedIn = authUser({ role: 'IT_STAFF', name: 'Sarah Chen' })
     mockApi()
     await renderApp()
 
-    expect(navLabels()).toEqual(['Ticket Queue'])
+    expect(navLabels()).toEqual(['Dashboard', 'Ticket Queue'])
     expect(screen.getByText('IT Staff')).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'My Tickets' })).not.toBeInTheDocument()
   })
 
-  it('shows an Administrator the queue and user management', async () => {
+  it('shows an Administrator the queue, user management and system status', async () => {
     signedIn = authUser({ role: 'ADMINISTRATOR', name: 'Alex Morgan' })
     mockApi()
     await renderApp()
 
-    expect(navLabels()).toEqual(['Ticket Queue', 'User Management'])
+    expect(navLabels()).toEqual(['Dashboard', 'Ticket Queue', 'User Management', 'System Status'])
     expect(screen.getByText('Administrator')).toBeInTheDocument()
   })
 

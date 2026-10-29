@@ -16,12 +16,18 @@ export {
 export const shot = (screen: string, name: string) =>
   `artifacts/lab-03/screenshots/${screen}/${name}.png`
 
-/** One seeded account per role, by the addresses the README documents. */
+/**
+ * One seeded account per role, by the addresses the README documents.
+ *
+ * `home` is the role's own working screen, which is what the Lab 3 captures
+ * open. `landing` is where the role arrives after signing in, which since
+ * Lab 4 is its Dashboard.
+ */
 export const ACCOUNTS = {
-  requester: { email: 'peter.parker@toktickit.test', name: 'Peter Parker', home: '/tickets' },
-  staff: { email: 'sarah.chen@toktickit.test', name: 'Sarah Chen', home: '/staff/tickets' },
-  colleague: { email: 'marcus.reed@toktickit.test', name: 'Marcus Reed', home: '/staff/tickets' },
-  admin: { email: 'alex.morgan@toktickit.test', name: 'Alex Morgan', home: '/admin/users' },
+  requester: { email: 'peter.parker@toktickit.test', name: 'Peter Parker', home: '/tickets', landing: '/dashboard' },
+  staff: { email: 'sarah.chen@toktickit.test', name: 'Sarah Chen', home: '/staff/tickets', landing: '/staff/dashboard' },
+  colleague: { email: 'marcus.reed@toktickit.test', name: 'Marcus Reed', home: '/staff/tickets', landing: '/staff/dashboard' },
+  admin: { email: 'alex.morgan@toktickit.test', name: 'Alex Morgan', home: '/admin/users', landing: '/staff/dashboard' },
 } as const
 
 export type Role = keyof typeof ACCOUNTS
@@ -131,4 +137,62 @@ export async function settlePassword(request: APIRequestContext, user: CreatedUs
     data: { currentPassword: user.password, newPassword: next, confirmPassword: next },
   })
   expect(response.status(), await response.text()).toBe(200)
+}
+
+type WorkflowChange = 'owner' | 'it-priority' | 'status'
+
+/**
+ * One change of status, owner or IT Priority, made through the API.
+ *
+ * Since Lab 4 such a request names the version of the Ticket it was based on
+ * (Lab 4 BR-16). A spec that sets a Ticket up through the API is not about
+ * that rule, so this reads the current version first and sends it, as a
+ * screen that had just loaded the Ticket would. With no `cookie` the request
+ * goes out with whatever session `request` already carries.
+ */
+export async function workflowChange(
+  request: APIRequestContext,
+  ticketId: number,
+  what: WorkflowChange,
+  data: Record<string, unknown>,
+  cookie?: string,
+) {
+  const headers = cookie ? { Cookie: cookie } : undefined
+  const current = await request.get(`${API}/api/staff/tickets/${ticketId}`, { headers })
+  expect(current.ok(), `could not read Ticket ${ticketId} as staff`).toBe(true)
+  const { version } = (await current.json()) as { version: number }
+  return request.patch(`${API}/api/staff/tickets/${ticketId}/${what}`, {
+    headers,
+    data: { ...data, expectedVersion: version },
+  })
+}
+
+let actionCursor = 0
+
+/**
+ * Records one Action Taken through the API, asking for no follow-up.
+ *
+ * Since Lab 4 a Ticket can be Resolved only once work is recorded on it
+ * (Lab 4 BR-13), so a spec that resolves a Ticket and is not about the gate
+ * records this first.
+ */
+export async function recordAction(
+  request: APIRequestContext,
+  ticketId: number,
+  cookie?: string,
+  overrides: Record<string, unknown> = {},
+) {
+  const response = await request.post(`${API}/api/tickets/${ticketId}/actions`, {
+    headers: cookie ? { Cookie: cookie } : undefined,
+    data: {
+      requestKey: `e2e-${Date.now()}-${actionCursor++}`,
+      actionAt: new Date().toISOString(),
+      description: 'Checked the fault and replaced the faulty part.',
+      result: 'Working again.',
+      followUpRequired: false,
+      ...overrides,
+    },
+  })
+  expect(response.status(), await response.text()).toBe(201)
+  return (await response.json()) as { id: number; version: number }
 }

@@ -40,6 +40,9 @@
   font-weight: 600;
   padding: var(--zg-space-2) 0;
   border-bottom: 2px solid transparent;
+  /* An item is one line. A label that broke in two made the header look like
+     it had more items than it does. */
+  white-space: nowrap;
 }
 
 .ttk-shell__nav-link:hover {
@@ -218,5 +221,45 @@
 
   .ttk-shell__user-name {
     display: none;
+  }
+}
+
+/* Tablet (768-991px), for a role with more than two items. Lab 4 put
+   Dashboard first for everyone and gave the Administrator System Status, and
+   three or four labels do not fit beside the name, role and Log out at this
+   width: the labels wrapped and the role badge was cut off. Those roles'
+   navigation uses the same menu here that everyone gets on a phone. IT Staff
+   have two items, which still fit, and theirs stays in the header. */
+@media (min-width: 768px) and (max-width: 991px) {
+  .ttk-shell__header--long-nav .ttk-shell__nav-toggle {
+    display: flex;
+  }
+
+  .ttk-shell__header--long-nav .ttk-shell__nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    gap: 0;
+    background: var(--zg-primary);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+  }
+
+  .ttk-shell__header--long-nav .ttk-shell__nav--open {
+    display: flex;
+    padding: 0 var(--zg-space-6) var(--zg-space-2);
+  }
+
+  .ttk-shell__header--long-nav .ttk-shell__nav-link {
+    padding: var(--zg-space-3) 0;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .ttk-shell__header--long-nav .ttk-shell__nav-link--active {
+    border-bottom-color: var(--zg-nav-active);
   }
 }

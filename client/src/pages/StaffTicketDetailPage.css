@@ -111,3 +111,12 @@
     flex: 1;
   }
 }
+
+/* A move the server would refuse right now, and why (Lab 4 ui-spec.md §7).
+   Text, with the status named in words: nothing here depends on colour. */
+.ttk-workflow__blocked {
+  padding: var(--zg-space-2) var(--zg-space-3);
+  background: var(--zg-surface);
+  border-left: 3px solid var(--zg-warning);
+  border-radius: var(--zg-radius);
+}

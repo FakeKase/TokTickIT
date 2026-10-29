@@ -2,16 +2,16 @@ import type { Role } from '../api'
 
 /**
  * Where each role belongs after signing in, and where a Forbidden state sends
- * someone back to (ui-spec.md §2).
+ * someone back to. Since Lab 4 that is the role's Dashboard (ui-spec.md §1).
  *
  * One table, because "the Requester's home page" is answered in three places —
  * login, the password-change redirect, and the Forbidden action — and three
  * copies would eventually disagree.
  */
 const LANDING: Record<Role, string> = {
-  REQUESTER: '/tickets',
-  IT_STAFF: '/staff/tickets',
-  ADMINISTRATOR: '/admin/users',
+  REQUESTER: '/dashboard',
+  IT_STAFF: '/staff/dashboard',
+  ADMINISTRATOR: '/staff/dashboard',
 }
 
 export const landingPathFor = (role: Role): string => LANDING[role]
@@ -20,13 +20,13 @@ export const landingPathFor = (role: Role): string => LANDING[role]
  * The URL space each role may open, used to decide whether a remembered
  * destination still makes sense for whoever actually signed in.
  *
- * Every role may open "/" — the Check System screen belongs to nobody in
- * particular.
+ * Every role may open "/": it shows nothing itself and leads to the role's
+ * landing route.
  */
 const REACHABLE: Record<Role, string[]> = {
-  REQUESTER: ['/tickets'],
+  REQUESTER: ['/dashboard', '/tickets'],
   IT_STAFF: ['/staff'],
-  ADMINISTRATOR: ['/staff', '/admin'],
+  ADMINISTRATOR: ['/staff', '/admin', '/system-status'],
 }
 
 /**

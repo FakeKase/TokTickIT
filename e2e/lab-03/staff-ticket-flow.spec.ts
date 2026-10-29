@@ -7,6 +7,8 @@ import {
   createTicket,
   firstRequester,
   loginAs,
+  recordAction,
+  workflowChange,
 } from './helpers'
 
 // E2E-03, E2E-04 (AC-18, AC-20, AC-27, AC-30, AC-32, AC-33, AC-34).
@@ -64,18 +66,20 @@ test.describe('one Ticket, from the queue to resolved', () => {
 
     await workflow.getByLabel('Move to').selectOption('IN_PROGRESS')
     await workflow.getByRole('button', { name: 'Change status' }).click()
+    // Lab 4: Resolved is in the matrix from here, and offered, but no work
+    // has been recorded on this Ticket yet, so it is not available (Lab 4
+    // BR-13). The gate itself is covered in lab-04/ticket-resolution.spec.ts.
     await expect(workflow.getByLabel('Move to').getByRole('option')).toHaveText([
       'Choose a status…',
       'Waiting for Requester',
-      'Resolved',
+      'Resolved (not available yet)',
       'Cancelled',
     ])
 
     // AC-31: Closed is not reachable from In Progress, in the UI or the API.
-    const illegal = await page.request.patch(`${API}/api/staff/tickets/${ticket.id}/status`, {
-      data: { currentStatus: 'CLOSED' },
-    })
+    const illegal = await workflowChange(page.request, ticket.id, 'status', { currentStatus: 'CLOSED' })
     expect(illegal.status()).toBe(409)
+    expect((await illegal.json()).error).toBe('Cannot move a Ticket from In Progress to Closed')
 
     await page.getByLabel('Add a public comment').fill(STAFF_COMMENT)
     await page.getByRole('button', { name: 'Post comment' }).click()
@@ -137,6 +141,12 @@ test.describe('one Ticket, from the queue to resolved', () => {
     const workflow = page.getByRole('region', { name: 'Workflow' })
     await expect(workflow.getByText(/The Requester reported this appears resolved/)).toBeVisible()
     await expect(page.getByText(REQUESTER_COMMENT)).toBeVisible()
+
+    // Lab 4: the work is recorded before the Ticket can be resolved. Saving
+    // it through the screen is lab-04/actions-taken-flow.spec.ts; here it
+    // only has to exist, and the page is reloaded to see it.
+    await recordAction(page.request, ticket.id)
+    await page.reload()
 
     await workflow.getByLabel('Move to').selectOption('RESOLVED')
     await workflow.getByRole('button', { name: 'Change status' }).click()

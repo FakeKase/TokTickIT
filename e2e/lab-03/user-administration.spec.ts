@@ -83,7 +83,7 @@ test.describe('E2E-05 an account, from created to switched off', () => {
     await theirs.getByLabel(/^Confirm new password/).fill('Chosen-By-Jamie-9')
     await theirs.getByRole('button', { name: 'Save and continue' }).click()
     // The screen for the role they were given.
-    await expect(theirs).toHaveURL(/\/tickets$/)
+    await expect(theirs).toHaveURL(/\/dashboard$/)
 
     // Deactivated: their very next request is refused (AC-10).
     await page.getByRole('table').getByRole('button', { name: `Edit ${name}` }).click()

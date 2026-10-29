@@ -171,6 +171,14 @@ h3 {
   font-size: var(--zg-font-size-heading-sm);
 }
 
+/* Links are --zg-secondary (ui-spec.md §1). Bootstrap's reset colours a bare
+   link its own blue, which is what a Ticket Number in a table was drawn in
+   until Lab 4's dashboards, which set the colour themselves, showed the two
+   side by side. A link with a class of its own keeps what that class says. */
+a {
+  color: var(--zg-secondary);
+}
+
 /* Visible focus ring everywhere — never removed via outline: none (ui-spec.md §3, §9) */
 a:focus-visible,
 button:focus-visible,

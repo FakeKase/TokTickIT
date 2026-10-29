@@ -536,7 +536,11 @@ describe("a user who can no longer own Tickets hands the live ones back (BR-19)"
     const response = await request(app)
       .patch(`/api/staff/tickets/${tickets.live.id}/owner`)
       .set("Cookie", staffCookie)
-      .send({ ownerId: staff.id });
+      // Lab 4 BR-16: a workflow change names the version it was based on.
+      .send({
+        ownerId: staff.id,
+        expectedVersion: (await prisma.ticket.findUniqueOrThrow({ where: { id: tickets.live.id } })).version,
+      });
 
     expect(response.status).toBe(409);
     expect(await ownerOf(tickets.live.id)).toBeNull();
